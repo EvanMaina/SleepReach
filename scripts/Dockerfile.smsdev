@@ -1,0 +1,13 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install Flask and Flask-CORS
+RUN pip install --no-cache-dir flask flask-cors
+
+# Copy the SMS dev server script
+COPY sms_dev_server.py /app/sms_dev_server.py
+
+EXPOSE 1081
+
+CMD ["python", "sms_dev_server.py"]
