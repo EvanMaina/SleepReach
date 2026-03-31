@@ -235,6 +235,8 @@ CREATE INDEX idx_leads_condition ON leads(condition);
 CREATE INDEX idx_leads_score ON leads(score DESC);
 CREATE INDEX idx_leads_deleted_at ON leads(deleted_at);
 CREATE INDEX idx_leads_last_updated_at ON leads(last_updated_at);
+CREATE INDEX idx_leads_updated_at ON leads(updated_at DESC);
+CREATE INDEX idx_leads_active_last_updated_created ON leads(last_updated_at DESC NULLS FIRST, created_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX idx_leads_is_referral ON leads(is_referral);
 CREATE INDEX idx_leads_source ON leads(source);
 CREATE INDEX idx_leads_contact_outcome ON leads(contact_outcome);

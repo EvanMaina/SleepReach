@@ -7,6 +7,7 @@ and lead retrieval for the dashboard.
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
+import re
 from typing import List, Optional
 from uuid import UUID
 
@@ -18,6 +19,8 @@ from ..core.config import settings
 from ..core.database import get_db
 from ..models.lead import Lead, PriorityType, LeadStatus, ContactOutcome, LeadSource, ConditionType, DurationType, UrgencyType
 from ..models.provider import ReferringProvider
+from ..models.lead_note import LeadNote
+from ..models.user import User
 from ..schemas.lead import (
     LeadCreate,
     LeadUpdate,
@@ -110,6 +113,156 @@ def clear_lead_transition_fields(lead: Lead) -> None:
     lead.scheduled_callback_at = None
     lead.next_follow_up_at = None
     lead.scheduled_notes = None
+
+
+def build_display_conditions(lead: Lead) -> list[str]:
+    """
+    Build a display-ready conditions array for API responses.
+
+    The DB keeps canonical values like "other" for scoring compatibility.
+    The UI should see the actual typed text whenever OTHER was selected.
+    """
+    raw_conditions = list(lead.conditions or [])
+    if not raw_conditions and lead.condition:
+        raw_conditions = [lead.condition.value.lower()]
+
+    other_text = (lead.other_condition_text or lead.condition_other or "").strip()
+    display_conditions: list[str] = []
+
+    for raw in raw_conditions:
+        candidate = str(raw).strip()
+        if not candidate:
+            continue
+        if candidate.lower() == "other" and other_text:
+            candidate = other_text
+        elif candidate.isupper():
+            candidate = candidate.lower()
+        if candidate not in display_conditions:
+            display_conditions.append(candidate)
+
+    if not display_conditions and other_text and lead.condition == ConditionType.OTHER:
+        display_conditions.append(other_text)
+
+    return display_conditions
+
+
+def build_lead_response(lead: Lead, decrypted: dict[str, str]) -> LeadResponse:
+    """Build a consistent LeadResponse payload for any lead endpoint."""
+    return LeadResponse(
+        id=lead.id,
+        lead_number=lead.lead_number,
+        first_name=decrypted["first_name"],
+        last_name=decrypted["last_name"],
+        email=decrypted["email"],
+        phone=decrypted["phone"],
+        condition=lead.condition,
+        condition_other=lead.condition_other,
+        conditions=build_display_conditions(lead),
+        other_condition_text=lead.other_condition_text,
+        preferred_contact_method=lead.preferred_contact_method,
+        symptom_duration=lead.symptom_duration,
+        prior_treatments=lead.prior_treatments if lead.prior_treatments else [],
+        has_insurance=lead.has_insurance,
+        insurance_provider=lead.insurance_provider,
+        zip_code=lead.zip_code,
+        in_service_area=lead.in_service_area,
+        urgency=lead.urgency,
+        hipaa_consent=lead.hipaa_consent,
+        hipaa_consent_timestamp=lead.hipaa_consent_timestamp,
+        privacy_consent_timestamp=lead.privacy_consent_timestamp,
+        sms_consent=lead.sms_consent,
+        sms_consent_timestamp=lead.sms_consent_timestamp,
+        score=lead.score,
+        priority=lead.priority,
+        sleep_treatment_interest=lead.sleep_treatment_interest,
+        status=lead.status,
+        notes=lead.notes,
+        utm_source=lead.utm_source,
+        utm_medium=lead.utm_medium,
+        utm_campaign=lead.utm_campaign,
+        created_at=lead.created_at,
+        updated_at=lead.updated_at,
+        contacted_at=lead.contacted_at,
+        scheduled_callback_at=lead.scheduled_callback_at,
+        scheduled_notes=lead.scheduled_notes,
+        contact_method=lead.contact_method,
+        last_contact_attempt=lead.last_contact_attempt,
+        contact_attempts=lead.contact_attempts,
+        next_follow_up_at=lead.next_follow_up_at,
+        contact_outcome=lead.contact_outcome or ContactOutcome.NEW,
+        follow_up_reason=lead.follow_up_reason,
+        follow_up_date=lead.follow_up_date,
+        last_updated_at=lead.last_updated_at,
+        is_referral=lead.is_referral if lead.is_referral else False,
+        referring_provider_id=lead.referring_provider_id,
+        referring_provider_name=lead.referring_provider.name if lead.referring_provider else None,
+    )
+
+
+def normalize_duplicate_email(email: Optional[str]) -> Optional[str]:
+    """Normalize email values for duplicate detection."""
+    if not email:
+        return None
+    normalized = email.strip().lower()
+    if not normalized or normalized.endswith("@placeholder.local"):
+        return None
+    return normalized
+
+
+def normalize_duplicate_phone(phone: Optional[str]) -> Optional[str]:
+    """Normalize phone values for duplicate detection."""
+    if not phone:
+        return None
+    digits = re.sub(r"\D", "", phone)
+    if not digits or digits == "10000000000":
+        return None
+    if len(digits) == 11 and digits.startswith("1"):
+        digits = digits[1:]
+    return digits or None
+
+
+def find_duplicate_lead(
+    db: Session,
+    *,
+    email: Optional[str] = None,
+    phone: Optional[str] = None,
+    exclude_lead_id: Optional[UUID] = None,
+):
+    """
+    Find an existing non-deleted lead with the same email or phone.
+
+    SleepReach stores PHI encrypted at rest, so duplicate checks compare
+    normalized decrypted values at the application layer.
+    """
+    normalized_email = normalize_duplicate_email(email)
+    normalized_phone = normalize_duplicate_phone(phone)
+    if not normalized_email and not normalized_phone:
+        return None
+
+    query = db.query(
+        Lead.id,
+        Lead.lead_number,
+        Lead.email_encrypted,
+        Lead.phone_encrypted,
+    ).filter(Lead.deleted_at.is_(None))
+
+    if exclude_lead_id is not None:
+        query = query.filter(Lead.id != exclude_lead_id)
+
+    for candidate in query.order_by(desc(Lead.created_at)).all():
+        existing_email = normalize_duplicate_email(
+            EncryptionService.decrypt_field(candidate.email_encrypted)
+        )
+        if normalized_email and existing_email == normalized_email:
+            return "email", candidate
+
+        existing_phone = normalize_duplicate_phone(
+            EncryptionService.decrypt_field(candidate.phone_encrypted)
+        )
+        if normalized_phone and existing_phone == normalized_phone:
+            return "phone", candidate
+
+    return None
 
 
 def get_client_ip(request: Request) -> Optional[str]:
@@ -450,6 +603,21 @@ async def submit_lead(
         except Exception:
             pass  # Redis down — proceed normally
 
+        duplicate_match = find_duplicate_lead(
+            db,
+            email=lead_data.email,
+            phone=lead_data.phone,
+        )
+        if duplicate_match:
+            duplicate_field, duplicate_lead = duplicate_match
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"A lead with this {duplicate_field} already exists "
+                    f"({duplicate_lead.lead_number})."
+                ),
+            )
+
         # =====================================================================
         # Step 1: Map widget submission to canonical LeadInput format
         # =====================================================================
@@ -462,19 +630,12 @@ async def submit_lead(
             # Use single condition as conditions array
             "condition": lead_data.condition.value if lead_data.condition else "",
             "condition_other": lead_data.condition_other,
-            # Multi-condition support (NEW)
+            # Multi-condition support
             "conditions": [c.value for c in lead_data.conditions] if lead_data.conditions else [],
             "other_condition_text": lead_data.other_condition_text,
-            # Severity assessments (NEW)
-            "phq2_interest": lead_data.phq2_interest,
-            "phq2_mood": lead_data.phq2_mood,
-            "gad2_nervous": lead_data.gad2_nervous,
-            "gad2_worry": lead_data.gad2_worry,
-            "ocd_time_occupied": lead_data.ocd_time_occupied,
-            "ptsd_intrusion": lead_data.ptsd_intrusion,
-            # TMS therapy interest (NEW)
-            "tms_therapy_interest": lead_data.tms_therapy_interest,
-            # Preferred contact method (NEW)
+            # Sleep treatment interest
+            "sleep_treatment_interest": lead_data.sleep_treatment_interest,
+            # Preferred contact method
             "preferred_contact_method": lead_data.preferred_contact_method,
             # Other fields
             "symptom_duration": lead_data.symptom_duration.value if lead_data.symptom_duration else "",
@@ -538,7 +699,7 @@ async def submit_lead(
                 "utm_content": lead_data.utm_params.utm_content,
             }
 
-        # Generate unique lead number (TMS-YYYY-XXX format) with retry logic
+        # Generate unique lead number (SR-YYYY-XXX format) with retry logic
         lead_number = generate_unique_lead_number(db)
 
         # Get current timestamp for consent tracking
@@ -618,29 +779,13 @@ async def submit_lead(
             # Clinical info (legacy single condition)
             condition=lead_data.condition,
             condition_other=lead_data.condition_other,
-            # Multi-condition support (NEW)
+            # Multi-condition support
             conditions=lead_input.conditions if lead_input.conditions else [],
             other_condition_text=lead_input.other_condition_text,
-            # TMS therapy interest
-            tms_therapy_interest=lead_input.tms_therapy_interest,
-            # Preferred contact method (NEW)
+            # Sleep treatment interest
+            sleep_treatment_interest=lead_input.sleep_treatment_interest,
+            # Preferred contact method
             preferred_contact_method=lead_input.preferred_contact_method,
-            # Depression PHQ-2 Assessment
-            phq2_interest=lead_input.phq2_interest,
-            phq2_mood=lead_input.phq2_mood,
-            depression_severity_score=score_breakdown.depression_severity_score,
-            depression_severity_level=score_breakdown.depression_severity_level,
-            # Anxiety GAD-2 Assessment
-            gad2_nervous=lead_input.gad2_nervous,
-            gad2_worry=lead_input.gad2_worry,
-            anxiety_severity_score=score_breakdown.anxiety_severity_score,
-            anxiety_severity_level=score_breakdown.anxiety_severity_level,
-            # OCD Assessment
-            ocd_time_occupied=lead_input.ocd_time_occupied,
-            ocd_severity_level=score_breakdown.ocd_severity_level,
-            # PTSD Assessment
-            ptsd_intrusion=lead_input.ptsd_intrusion,
-            ptsd_severity_level=score_breakdown.ptsd_severity_level,
             # Symptom duration
             symptom_duration=lead_data.symptom_duration,
             prior_treatments=lead_data.prior_treatments,
@@ -764,6 +909,7 @@ async def submit_lead(
             success=True,
             message=message,
             lead_id=lead.id,
+            lead_number=lead.lead_number,
             priority=priority,
             estimated_response_time=estimated_time,
         )
@@ -790,6 +936,8 @@ async def submit_lead(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+    except HTTPException:
+        raise
     except Exception as e:
         # Log error without PHI
         db.rollback()
@@ -932,7 +1080,7 @@ async def list_leads(
                 phone=decrypted["phone"],
                 condition=lead.condition,
                 # Multi-condition support
-                conditions=lead.conditions if lead.conditions else [],
+                conditions=build_display_conditions(lead),
                 other_condition_text=lead.other_condition_text,
                 # Preferred contact method
                 preferred_contact_method=lead.preferred_contact_method,
@@ -1112,6 +1260,9 @@ async def search_leads_phi(
                 email=decrypted["email"],
                 phone=decrypted["phone"],
                 condition=lead.condition,
+                conditions=build_display_conditions(lead),
+                other_condition_text=lead.other_condition_text,
+                preferred_contact_method=lead.preferred_contact_method,
                 score=lead.score,
                 priority=lead.priority,
                 status=lead.status,
@@ -1211,7 +1362,8 @@ async def list_deleted_leads(
                 "email": decrypted["email"],
                 "phone": decrypted["phone"],
                 "condition": lead.condition.value if lead.condition else None,
-                "conditions": lead.conditions if lead.conditions else [],
+                "conditions": build_display_conditions(lead),
+                "other_condition_text": lead.other_condition_text,
                 "priority": lead.priority.value if lead.priority else None,
                 "status": lead.status.value if lead.status else None,
                 "created_at": lead.created_at.isoformat() if lead.created_at else None,
@@ -1267,6 +1419,7 @@ async def list_deleted_leads(
 async def create_manual_lead(
     lead_data: ManualLeadCreate,
     request: Request,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """
@@ -1292,6 +1445,21 @@ async def create_manual_lead(
     logger = logging.getLogger(__name__)
 
     try:
+        duplicate_match = find_duplicate_lead(
+            db,
+            email=lead_data.email,
+            phone=lead_data.phone,
+        )
+        if duplicate_match:
+            duplicate_field, duplicate_lead = duplicate_match
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"A lead with this {duplicate_field} already exists "
+                    f"({duplicate_lead.lead_number})."
+                ),
+            )
+
         # Generate unique lead number using the same logic as all other leads
         lead_number = generate_unique_lead_number(db)
 
@@ -1321,6 +1489,49 @@ async def create_manual_lead(
             normalized_conditions = [condition.value.lower()]
         else:
             normalized_conditions = []  # Empty = "Not Provided" in frontend
+
+        # Referral provider lookup / creation
+        is_referral = bool(lead_data.is_referral and (lead_data.referring_provider_name or "").strip())
+        referring_provider_id = None
+        provider_contact = (lead_data.referring_provider_contact or "").strip()
+        provider_email_lookup = provider_contact.lower() if "@" in provider_contact else None
+        provider_phone_lookup = provider_contact if provider_contact and "@" not in provider_contact else None
+        provider_name_lookup = (lead_data.referring_provider_name or "").strip()
+
+        if is_referral and provider_name_lookup:
+            existing_provider = None
+
+            if provider_email_lookup:
+                existing_provider = db.query(ReferringProvider).filter(
+                    ReferringProvider.email == provider_email_lookup
+                ).first()
+
+            if not existing_provider:
+                existing_provider = db.query(ReferringProvider).filter(
+                    ReferringProvider.name.ilike(provider_name_lookup)
+                ).first()
+
+            if existing_provider:
+                if provider_email_lookup and not existing_provider.email:
+                    existing_provider.email = provider_email_lookup
+                if provider_phone_lookup and not existing_provider.phone:
+                    existing_provider.phone = provider_phone_lookup
+                if lead_data.referring_provider_specialty and not existing_provider.specialty:
+                    existing_provider.specialty = lead_data.referring_provider_specialty.strip()
+                referring_provider_id = existing_provider.id
+                db.flush()
+            else:
+                new_provider = ReferringProvider(
+                    name=provider_name_lookup,
+                    email=provider_email_lookup,
+                    phone=provider_phone_lookup,
+                    specialty=lead_data.referring_provider_specialty.strip() if lead_data.referring_provider_specialty else None,
+                    total_referrals=0,
+                    converted_referrals=0,
+                )
+                db.add(new_provider)
+                db.flush()
+                referring_provider_id = new_provider.id
 
         # Build lead record with proper defaults for all required NOT NULL columns
         lead = Lead(
@@ -1358,8 +1569,9 @@ async def create_manual_lead(
             contact_outcome=ContactOutcome.NEW,
             # Source tracking
             source=LeadSource.manual,
-            # Referral defaults for NOT NULL column
-            is_referral=False,
+            # Referral tracking
+            is_referral=is_referral,
+            referring_provider_id=referring_provider_id,
             # Notes from coordinator
             notes=lead_data.notes,
             # Metadata
@@ -1367,7 +1579,36 @@ async def create_manual_lead(
             user_agent=get_user_agent(request),
         )
 
+        mark_lead_activity(lead)
         db.add(lead)
+
+        # Create a real note-feed entry so manual-entry notes appear in Lead Details.
+        note_text = (lead_data.notes or "").strip()
+        if note_text:
+            db.flush()
+            db.add(
+                LeadNote(
+                    lead_id=lead.id,
+                    note_text=note_text,
+                    created_by=current_user.id,
+                    created_by_name=current_user.full_name or current_user.email,
+                    note_type="manual",
+                    related_outcome=None,
+                )
+            )
+
+        if is_referral and referring_provider_id:
+            actual_count = db.query(func.count(Lead.id)).filter(
+                Lead.referring_provider_id == referring_provider_id,
+                Lead.deleted_at.is_(None),
+            ).scalar() or 0
+            provider = db.query(ReferringProvider).filter(
+                ReferringProvider.id == referring_provider_id
+            ).first()
+            if provider:
+                provider.total_referrals = actual_count
+                provider.last_referral_at = datetime.now(timezone.utc)
+
         db.commit()
         db.refresh(lead)
 
@@ -1392,6 +1633,7 @@ async def create_manual_lead(
                     "lead_number": lead_number,
                     "source": "manual",
                     "priority": "HOT",
+                    "is_referral": is_referral,
                     "phi_fields": "[REDACTED]",
                 },
             )
@@ -1405,6 +1647,8 @@ async def create_manual_lead(
             "lead_number": lead_number,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Manual lead creation error: {str(e)}", exc_info=True)
@@ -1573,44 +1817,7 @@ async def get_lead(
     # Decrypt PHI
     decrypted = EncryptionService.decrypt_lead_phi(lead)
 
-    return LeadResponse(
-        id=lead.id,
-        first_name=decrypted["first_name"],
-        last_name=decrypted["last_name"],
-        email=decrypted["email"],
-        phone=decrypted["phone"],
-        condition=lead.condition,
-        condition_other=lead.condition_other,
-        symptom_duration=lead.symptom_duration,
-        prior_treatments=lead.prior_treatments if lead.prior_treatments else [],
-        has_insurance=lead.has_insurance,
-        insurance_provider=lead.insurance_provider,
-        zip_code=lead.zip_code,
-        in_service_area=lead.in_service_area,
-        urgency=lead.urgency,
-        hipaa_consent=lead.hipaa_consent,
-        hipaa_consent_timestamp=lead.hipaa_consent_timestamp,
-        privacy_consent_timestamp=lead.privacy_consent_timestamp,
-        sms_consent=lead.sms_consent,
-        sms_consent_timestamp=lead.sms_consent_timestamp,
-        score=lead.score,
-        priority=lead.priority,
-        status=lead.status,
-        notes=lead.notes,
-        utm_source=lead.utm_source,
-        utm_medium=lead.utm_medium,
-        utm_campaign=lead.utm_campaign,
-        created_at=lead.created_at,
-        updated_at=lead.updated_at,
-        contacted_at=lead.contacted_at,
-        scheduled_callback_at=lead.scheduled_callback_at,
-        scheduled_notes=lead.scheduled_notes,
-        contact_method=lead.contact_method,
-        last_contact_attempt=lead.last_contact_attempt,
-        contact_attempts=lead.contact_attempts,
-        next_follow_up_at=lead.next_follow_up_at,
-        tms_therapy_interest=lead.tms_therapy_interest,
-    )
+    return build_lead_response(lead, decrypted)
 
 
 # =============================================================================
@@ -1731,43 +1938,7 @@ async def schedule_callback(
     # Return updated lead
     decrypted = EncryptionService.decrypt_lead_phi(lead)
 
-    return LeadResponse(
-        id=lead.id,
-        first_name=decrypted["first_name"],
-        last_name=decrypted["last_name"],
-        email=decrypted["email"],
-        phone=decrypted["phone"],
-        condition=lead.condition,
-        condition_other=lead.condition_other,
-        symptom_duration=lead.symptom_duration,
-        prior_treatments=lead.prior_treatments if lead.prior_treatments else [],
-        has_insurance=lead.has_insurance,
-        insurance_provider=lead.insurance_provider,
-        zip_code=lead.zip_code,
-        in_service_area=lead.in_service_area,
-        urgency=lead.urgency,
-        hipaa_consent=lead.hipaa_consent,
-        hipaa_consent_timestamp=lead.hipaa_consent_timestamp,
-        privacy_consent_timestamp=lead.privacy_consent_timestamp,
-        sms_consent=lead.sms_consent,
-        sms_consent_timestamp=lead.sms_consent_timestamp,
-        score=lead.score,
-        priority=lead.priority,
-        status=lead.status,
-        notes=lead.notes,
-        utm_source=lead.utm_source,
-        utm_medium=lead.utm_medium,
-        utm_campaign=lead.utm_campaign,
-        created_at=lead.created_at,
-        updated_at=lead.updated_at,
-        contacted_at=lead.contacted_at,
-        scheduled_callback_at=lead.scheduled_callback_at,
-        scheduled_notes=lead.scheduled_notes,
-        contact_method=lead.contact_method,
-        last_contact_attempt=lead.last_contact_attempt,
-        contact_attempts=lead.contact_attempts,
-        next_follow_up_at=lead.next_follow_up_at,
-    )
+    return build_lead_response(lead, decrypted)
 
 
 @router.post(
@@ -1863,43 +2034,7 @@ async def log_contact_attempt(
     # Return updated lead
     decrypted = EncryptionService.decrypt_lead_phi(lead)
 
-    return LeadResponse(
-        id=lead.id,
-        first_name=decrypted["first_name"],
-        last_name=decrypted["last_name"],
-        email=decrypted["email"],
-        phone=decrypted["phone"],
-        condition=lead.condition,
-        condition_other=lead.condition_other,
-        symptom_duration=lead.symptom_duration,
-        prior_treatments=lead.prior_treatments if lead.prior_treatments else [],
-        has_insurance=lead.has_insurance,
-        insurance_provider=lead.insurance_provider,
-        zip_code=lead.zip_code,
-        in_service_area=lead.in_service_area,
-        urgency=lead.urgency,
-        hipaa_consent=lead.hipaa_consent,
-        hipaa_consent_timestamp=lead.hipaa_consent_timestamp,
-        privacy_consent_timestamp=lead.privacy_consent_timestamp,
-        sms_consent=lead.sms_consent,
-        sms_consent_timestamp=lead.sms_consent_timestamp,
-        score=lead.score,
-        priority=lead.priority,
-        status=lead.status,
-        notes=lead.notes,
-        utm_source=lead.utm_source,
-        utm_medium=lead.utm_medium,
-        utm_campaign=lead.utm_campaign,
-        created_at=lead.created_at,
-        updated_at=lead.updated_at,
-        contacted_at=lead.contacted_at,
-        scheduled_callback_at=lead.scheduled_callback_at,
-        scheduled_notes=lead.scheduled_notes,
-        contact_method=lead.contact_method,
-        last_contact_attempt=lead.last_contact_attempt,
-        contact_attempts=lead.contact_attempts,
-        next_follow_up_at=lead.next_follow_up_at,
-    )
+    return build_lead_response(lead, decrypted)
 
 
 @router.get(
@@ -2070,37 +2205,7 @@ async def update_lead_status(
     # Return updated lead
     decrypted = EncryptionService.decrypt_lead_phi(lead)
 
-    return LeadResponse(
-        id=lead.id,
-        first_name=decrypted["first_name"],
-        last_name=decrypted["last_name"],
-        email=decrypted["email"],
-        phone=decrypted["phone"],
-        condition=lead.condition,
-        condition_other=lead.condition_other,
-        symptom_duration=lead.symptom_duration,
-        prior_treatments=lead.prior_treatments if lead.prior_treatments else [],
-        has_insurance=lead.has_insurance,
-        insurance_provider=lead.insurance_provider,
-        zip_code=lead.zip_code,
-        in_service_area=lead.in_service_area,
-        urgency=lead.urgency,
-        hipaa_consent=lead.hipaa_consent,
-        hipaa_consent_timestamp=lead.hipaa_consent_timestamp,
-        privacy_consent_timestamp=lead.privacy_consent_timestamp,
-        sms_consent=lead.sms_consent,
-        sms_consent_timestamp=lead.sms_consent_timestamp,
-        score=lead.score,
-        priority=lead.priority,
-        status=lead.status,
-        notes=lead.notes,
-        utm_source=lead.utm_source,
-        utm_medium=lead.utm_medium,
-        utm_campaign=lead.utm_campaign,
-        created_at=lead.created_at,
-        updated_at=lead.updated_at,
-        contacted_at=lead.contacted_at,
-    )
+    return build_lead_response(lead, decrypted)
 
 
 # =============================================================================
@@ -2282,44 +2387,7 @@ async def update_contact_outcome(
     # Return updated lead
     decrypted = EncryptionService.decrypt_lead_phi(lead)
 
-    return LeadResponse(
-        id=lead.id,
-        first_name=decrypted["first_name"],
-        last_name=decrypted["last_name"],
-        email=decrypted["email"],
-        phone=decrypted["phone"],
-        condition=lead.condition,
-        condition_other=lead.condition_other,
-        symptom_duration=lead.symptom_duration,
-        prior_treatments=lead.prior_treatments if lead.prior_treatments else [],
-        has_insurance=lead.has_insurance,
-        insurance_provider=lead.insurance_provider,
-        zip_code=lead.zip_code,
-        in_service_area=lead.in_service_area,
-        urgency=lead.urgency,
-        hipaa_consent=lead.hipaa_consent,
-        hipaa_consent_timestamp=lead.hipaa_consent_timestamp,
-        privacy_consent_timestamp=lead.privacy_consent_timestamp,
-        sms_consent=lead.sms_consent,
-        sms_consent_timestamp=lead.sms_consent_timestamp,
-        score=lead.score,
-        priority=lead.priority,
-        status=lead.status,
-        notes=lead.notes,
-        utm_source=lead.utm_source,
-        utm_medium=lead.utm_medium,
-        utm_campaign=lead.utm_campaign,
-        created_at=lead.created_at,
-        updated_at=lead.updated_at,
-        contacted_at=lead.contacted_at,
-        scheduled_callback_at=lead.scheduled_callback_at,
-        scheduled_notes=lead.scheduled_notes,
-        contact_method=lead.contact_method,
-        last_contact_attempt=lead.last_contact_attempt,
-        contact_attempts=lead.contact_attempts,
-        next_follow_up_at=lead.next_follow_up_at,
-        contact_outcome=lead.contact_outcome,
-    )
+    return build_lead_response(lead, decrypted)
 
 
 # =============================================================================
@@ -2602,6 +2670,22 @@ async def update_lead(
                 ),
             )
 
+    duplicate_match = find_duplicate_lead(
+        db,
+        email=update_data.email,
+        phone=update_data.phone,
+        exclude_lead_id=lead_id,
+    )
+    if duplicate_match:
+        duplicate_field, duplicate_lead = duplicate_match
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"A lead with this {duplicate_field} already exists "
+                f"({duplicate_lead.lead_number})."
+            ),
+        )
+
     try:
         # Store old values for audit
         old_values = {}
@@ -2697,10 +2781,10 @@ async def update_lead(
             lead.priority = update_data.priority
             new_values["priority"] = update_data.priority.value
 
-        if update_data.tms_therapy_interest is not None:
-            old_values["tms_therapy_interest"] = lead.tms_therapy_interest
-            lead.tms_therapy_interest = update_data.tms_therapy_interest if update_data.tms_therapy_interest != '' else None
-            new_values["tms_therapy_interest"] = lead.tms_therapy_interest
+        if update_data.sleep_treatment_interest is not None:
+            old_values["sleep_treatment_interest"] = lead.sleep_treatment_interest
+            lead.sleep_treatment_interest = update_data.sleep_treatment_interest if update_data.sleep_treatment_interest != '' else None
+            new_values["sleep_treatment_interest"] = lead.sleep_treatment_interest
 
         # =====================================================================
         # SCORE RECALCULATION: Re-score when any scoring-relevant field changes.
@@ -2712,7 +2796,7 @@ async def update_lead(
         # =====================================================================
         _SCORING_FIELDS = {
             'condition', 'has_insurance', 'insurance_provider', 'zip_code',
-            'urgency', 'symptom_duration', 'prior_treatments', 'tms_therapy_interest',
+            'urgency', 'symptom_duration', 'prior_treatments', 'sleep_treatment_interest',
         }
         if set(new_values.keys()) & _SCORING_FIELDS:
             try:
@@ -2732,13 +2816,7 @@ async def update_lead(
                 )
                 _new_breakdown = calculate_score_from_lead_data(
                     conditions=_conditions,
-                    tms_therapy_interest=lead.tms_therapy_interest or "",
-                    phq2_interest=lead.phq2_interest,
-                    phq2_mood=lead.phq2_mood,
-                    gad2_nervous=lead.gad2_nervous,
-                    gad2_worry=lead.gad2_worry,
-                    ocd_time_occupied=lead.ocd_time_occupied,
-                    ptsd_intrusion=lead.ptsd_intrusion,
+                    sleep_treatment_interest=lead.sleep_treatment_interest or "",
                     has_insurance=bool(lead.has_insurance),
                     insurance_provider=_ins_provider,
                     other_insurance_provider=lead.other_insurance_provider or "",
@@ -2817,45 +2895,7 @@ async def update_lead(
         # Return updated lead
         decrypted = EncryptionService.decrypt_lead_phi(lead)
 
-        return LeadResponse(
-            id=lead.id,
-            first_name=decrypted["first_name"],
-            last_name=decrypted["last_name"],
-            email=decrypted["email"],
-            phone=decrypted["phone"],
-            condition=lead.condition,
-            condition_other=lead.condition_other,
-            symptom_duration=lead.symptom_duration,
-            prior_treatments=lead.prior_treatments if lead.prior_treatments else [],
-            has_insurance=lead.has_insurance,
-            insurance_provider=lead.insurance_provider,
-            zip_code=lead.zip_code,
-            in_service_area=lead.in_service_area,
-            urgency=lead.urgency,
-            hipaa_consent=lead.hipaa_consent,
-            hipaa_consent_timestamp=lead.hipaa_consent_timestamp,
-            privacy_consent_timestamp=lead.privacy_consent_timestamp,
-            sms_consent=lead.sms_consent,
-            sms_consent_timestamp=lead.sms_consent_timestamp,
-            score=lead.score,
-            priority=lead.priority,
-            status=lead.status,
-            notes=lead.notes,
-            utm_source=lead.utm_source,
-            utm_medium=lead.utm_medium,
-            utm_campaign=lead.utm_campaign,
-            created_at=lead.created_at,
-            updated_at=lead.updated_at,
-            contacted_at=lead.contacted_at,
-            scheduled_callback_at=lead.scheduled_callback_at,
-            scheduled_notes=lead.scheduled_notes,
-            contact_method=lead.contact_method,
-            last_contact_attempt=lead.last_contact_attempt,
-            contact_attempts=lead.contact_attempts,
-            next_follow_up_at=lead.next_follow_up_at,
-            contact_outcome=lead.contact_outcome or ContactOutcome.NEW,
-            last_updated_at=lead.last_updated_at,
-        )
+        return build_lead_response(lead, decrypted)
 
     except HTTPException:
         raise  # Re-raise HTTP exceptions as-is
@@ -3048,45 +3088,7 @@ async def restore_lead(
         # Return restored lead
         decrypted = EncryptionService.decrypt_lead_phi(lead)
 
-        return LeadResponse(
-            id=lead.id,
-            first_name=decrypted["first_name"],
-            last_name=decrypted["last_name"],
-            email=decrypted["email"],
-            phone=decrypted["phone"],
-            condition=lead.condition,
-            condition_other=lead.condition_other,
-            symptom_duration=lead.symptom_duration,
-            prior_treatments=lead.prior_treatments if lead.prior_treatments else [],
-            has_insurance=lead.has_insurance,
-            insurance_provider=lead.insurance_provider,
-            zip_code=lead.zip_code,
-            in_service_area=lead.in_service_area,
-            urgency=lead.urgency,
-            hipaa_consent=lead.hipaa_consent,
-            hipaa_consent_timestamp=lead.hipaa_consent_timestamp,
-            privacy_consent_timestamp=lead.privacy_consent_timestamp,
-            sms_consent=lead.sms_consent,
-            sms_consent_timestamp=lead.sms_consent_timestamp,
-            score=lead.score,
-            priority=lead.priority,
-            status=lead.status,
-            notes=lead.notes,
-            utm_source=lead.utm_source,
-            utm_medium=lead.utm_medium,
-            utm_campaign=lead.utm_campaign,
-            created_at=lead.created_at,
-            updated_at=lead.updated_at,
-            contacted_at=lead.contacted_at,
-            scheduled_callback_at=lead.scheduled_callback_at,
-            scheduled_notes=lead.scheduled_notes,
-            contact_method=lead.contact_method,
-            last_contact_attempt=lead.last_contact_attempt,
-            contact_attempts=lead.contact_attempts,
-            next_follow_up_at=lead.next_follow_up_at,
-            contact_outcome=lead.contact_outcome or ContactOutcome.NEW,
-            last_updated_at=lead.last_updated_at,
-        )
+        return build_lead_response(lead, decrypted)
 
     except HTTPException:
         raise
