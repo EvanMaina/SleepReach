@@ -140,6 +140,52 @@ function normalizePriority(value?: string): string {
     return PRIORITY_OPTIONS.some((option) => option.value === priority) ? priority : 'LOW'
 }
 
+type LeadEditField = 'first_name' | 'email' | 'phone' | 'zip_code' | 'condition_other' | 'insurance_provider'
+
+function validateEmail(value: string): string | null {
+    if (!value.trim()) return null
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(value.trim()) ? null : 'Please enter a valid email address'
+}
+
+function validatePhone(value: string): string | null {
+    if (!value.trim()) return null
+    const digits = value.replace(/\D/g, '')
+    return digits.length >= 10 ? null : 'Please enter a valid phone number'
+}
+
+function validateZip(value: string): string | null {
+    if (!value.trim()) return null
+    return /^\d{5}$/.test(value.trim()) ? null : 'Please enter a valid 5-digit ZIP code'
+}
+
+function resolveFieldErrors(detail: unknown): Partial<Record<LeadEditField, string>> {
+    if (Array.isArray(detail)) {
+        const next: Partial<Record<LeadEditField, string>> = {}
+        detail.forEach((item) => {
+            const path = Array.isArray(item?.loc) ? item.loc.join('.') : ''
+            const message = typeof item?.msg === 'string' ? item.msg : 'Invalid value'
+            if (path.includes('first_name')) next.first_name = message
+            if (path.includes('email')) next.email = message
+            if (path.includes('phone')) next.phone = message
+            if (path.includes('zip_code')) next.zip_code = message
+            if (path.includes('condition_other')) next.condition_other = message
+            if (path.includes('insurance_provider')) next.insurance_provider = message
+        })
+        return next
+    }
+
+    if (typeof detail === 'string') {
+        const message = detail.trim()
+        const lowered = message.toLowerCase()
+        if (lowered.includes('email')) return { email: message }
+        if (lowered.includes('phone')) return { phone: message }
+        if (lowered.includes('zip')) return { zip_code: message }
+    }
+
+    return {}
+}
+
 export function LeadEditModal({ isOpen, lead, onClose, onSave }: LeadEditModalProps) {
     const [formData, setFormData] = useState({
         first_name: '',
@@ -161,6 +207,7 @@ export function LeadEditModal({ isOpen, lead, onClose, onSave }: LeadEditModalPr
     const [isSaving, setIsSaving] = useState(false)
     const [saveSuccess, setSaveSuccess] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [fieldErrors, setFieldErrors] = useState<Partial<Record<LeadEditField, string>>>({})
 
     useEffect(() => {
         if (!lead || !isOpen) return
@@ -183,6 +230,7 @@ export function LeadEditModal({ isOpen, lead, onClose, onSave }: LeadEditModalPr
         })
         setError(null)
         setSaveSuccess(false)
+        setFieldErrors({})
     }, [isOpen, lead])
 
     const hasConditionOther = formData.condition === 'OTHER'
@@ -192,8 +240,24 @@ export function LeadEditModal({ isOpen, lead, onClose, onSave }: LeadEditModalPr
     ) => {
         const { name, value, type } = event.target
         if (type === 'checkbox') {
+            const fieldName = name as LeadEditField
+            if (fieldErrors[fieldName]) {
+                setFieldErrors((prev) => {
+                    const next = { ...prev }
+                    delete next[fieldName]
+                    return next
+                })
+            }
             setFormData((prev) => ({ ...prev, [name]: (event.target as HTMLInputElement).checked }))
             return
+        }
+        const fieldName = name as LeadEditField
+        if (fieldErrors[fieldName]) {
+            setFieldErrors((prev) => {
+                const next = { ...prev }
+                delete next[fieldName]
+                return next
+            })
         }
         setFormData((prev) => ({ ...prev, [name]: value }))
     }
@@ -208,6 +272,24 @@ export function LeadEditModal({ isOpen, lead, onClose, onSave }: LeadEditModalPr
         if (!lead || !canSubmit) return
         setIsSaving(true)
         setError(null)
+        setFieldErrors({})
+
+        const nextFieldErrors: Partial<Record<LeadEditField, string>> = {}
+        if (!formData.first_name.trim()) nextFieldErrors.first_name = 'First name is required'
+        const emailError = validateEmail(formData.email)
+        if (emailError) nextFieldErrors.email = emailError
+        const phoneError = validatePhone(formData.phone)
+        if (phoneError) nextFieldErrors.phone = phoneError
+        const zipError = validateZip(formData.zip_code)
+        if (zipError) nextFieldErrors.zip_code = zipError
+        if (hasConditionOther && !formData.condition_other.trim()) nextFieldErrors.condition_other = 'Please describe the condition'
+        if (formData.has_insurance && !formData.insurance_provider.trim()) nextFieldErrors.insurance_provider = 'Insurance provider is required when insurance is selected'
+
+        if (Object.keys(nextFieldErrors).length > 0) {
+            setFieldErrors(nextFieldErrors)
+            setIsSaving(false)
+            return
+        }
 
         const payload: Record<string, unknown> = {}
         const assignIfChanged = (key: keyof typeof formData, nextValue: unknown, currentValue: unknown) => {
@@ -268,7 +350,10 @@ export function LeadEditModal({ isOpen, lead, onClose, onSave }: LeadEditModalPr
                 onSave()
             }, 700)
         } catch (err: any) {
-            setError(err?.response?.data?.detail || err?.message || 'Failed to save changes.')
+            const detail = err?.response?.data?.detail
+            const nextFieldErrors = resolveFieldErrors(detail)
+            if (Object.keys(nextFieldErrors).length > 0) setFieldErrors(nextFieldErrors)
+            setError(detail || err?.message || 'Failed to save changes.')
         } finally {
             setIsSaving(false)
         }
@@ -279,7 +364,7 @@ export function LeadEditModal({ isOpen, lead, onClose, onSave }: LeadEditModalPr
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-4" onClick={onClose}>
             <div
-                className="flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
+                className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl"
                 onClick={(event) => event.stopPropagation()}
             >
                 <div className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-5">
@@ -337,8 +422,9 @@ export function LeadEditModal({ isOpen, lead, onClose, onSave }: LeadEditModalPr
                                         name="first_name"
                                         value={formData.first_name}
                                         onChange={handleChange}
-                                        className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-sleep-500 focus:outline-none focus:ring-2 focus:ring-sleep-500/20"
+                                        className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sleep-500/20 ${fieldErrors.first_name ? 'border-red-300 bg-red-50 focus:border-red-500' : 'border-gray-300 focus:border-sleep-500'}`}
                                     />
+                                    {fieldErrors.first_name ? <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.first_name}</p> : null}
                                 </div>
                                 <div>
                                     <label className="mb-1.5 block text-sm font-medium text-gray-700">Last Name</label>
@@ -359,8 +445,9 @@ export function LeadEditModal({ isOpen, lead, onClose, onSave }: LeadEditModalPr
                                         type="email"
                                         value={formData.email}
                                         onChange={handleChange}
-                                        className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-sleep-500 focus:outline-none focus:ring-2 focus:ring-sleep-500/20"
+                                        className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sleep-500/20 ${fieldErrors.email ? 'border-red-300 bg-red-50 focus:border-red-500' : 'border-gray-300 focus:border-sleep-500'}`}
                                     />
+                                    {fieldErrors.email ? <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.email}</p> : null}
                                 </div>
                                 <div>
                                     <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-gray-700">
@@ -372,8 +459,9 @@ export function LeadEditModal({ isOpen, lead, onClose, onSave }: LeadEditModalPr
                                         type="tel"
                                         value={formData.phone}
                                         onChange={handleChange}
-                                        className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-sleep-500 focus:outline-none focus:ring-2 focus:ring-sleep-500/20"
+                                        className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sleep-500/20 ${fieldErrors.phone ? 'border-red-300 bg-red-50 focus:border-red-500' : 'border-gray-300 focus:border-sleep-500'}`}
                                     />
+                                    {fieldErrors.phone ? <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.phone}</p> : null}
                                 </div>
                                 <div className="md:col-span-2">
                                     <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-gray-700">
@@ -385,8 +473,9 @@ export function LeadEditModal({ isOpen, lead, onClose, onSave }: LeadEditModalPr
                                         value={formData.zip_code}
                                         onChange={handleChange}
                                         maxLength={10}
-                                        className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-sleep-500 focus:outline-none focus:ring-2 focus:ring-sleep-500/20"
+                                        className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sleep-500/20 ${fieldErrors.zip_code ? 'border-red-300 bg-red-50 focus:border-red-500' : 'border-gray-300 focus:border-sleep-500'}`}
                                     />
+                                    {fieldErrors.zip_code ? <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.zip_code}</p> : null}
                                 </div>
                             </div>
                         </section>
@@ -434,8 +523,9 @@ export function LeadEditModal({ isOpen, lead, onClose, onSave }: LeadEditModalPr
                                             value={formData.condition_other}
                                             onChange={handleChange}
                                             placeholder="Describe the sleep condition"
-                                            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-sleep-500 focus:outline-none focus:ring-2 focus:ring-sleep-500/20"
+                                            className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sleep-500/20 ${fieldErrors.condition_other ? 'border-red-300 bg-red-50 focus:border-red-500' : 'border-gray-300 focus:border-sleep-500'}`}
                                         />
+                                        {fieldErrors.condition_other ? <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.condition_other}</p> : null}
                                     </div>
                                 ) : null}
                                 <div>
@@ -496,8 +586,9 @@ export function LeadEditModal({ isOpen, lead, onClose, onSave }: LeadEditModalPr
                                             value={formData.insurance_provider}
                                             onChange={handleChange}
                                             placeholder="Enter provider name"
-                                            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-sleep-500 focus:outline-none focus:ring-2 focus:ring-sleep-500/20"
+                                            className={`w-full rounded-xl border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-sleep-500/20 ${fieldErrors.insurance_provider ? 'border-red-300 bg-red-50 focus:border-red-500' : 'border-gray-300 focus:border-sleep-500'}`}
                                         />
+                                        {fieldErrors.insurance_provider ? <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.insurance_provider}</p> : null}
                                     </div>
                                 ) : null}
                                 <div>
