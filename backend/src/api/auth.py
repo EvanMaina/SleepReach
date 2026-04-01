@@ -349,15 +349,15 @@ async def forgot_password(
         })
         text_content = (
             f"Hi {user.first_name},\n\n"
-            f"We received a request to reset your password for your TMS NeuroReach account.\n\n"
+            f"We received a request to reset your password for your SleepReach account.\n\n"
             f"Click the link below to reset your password:\n{reset_url}\n\n"
             f"This link will expire in 1 hour.\n\n"
             f"If you didn't request this, you can safely ignore this email.\n\n"
-            f"— TMS Institute of Arizona Team"
+            f"— The Insomnia and Sleep Institute of Arizona Team"
         )
         result = send_email_via_paubox(
             to_email=user.email,
-            subject="Password Reset Request — TMS NeuroReach",
+            subject="Password Reset Request — SleepReach",
             html_content=html,
             text_content=text_content,
         )
@@ -509,7 +509,7 @@ async def request_access(
     # Build list of admin emails; fall back to from_email if no admins found
     admin_emails = [u.email for u in admin_users if u.email]
     if not admin_emails:
-        fallback = getattr(settings, 'from_email', 'noreply@neuroreach.ai')
+        fallback = getattr(settings, 'from_email', 'noreply@sleeplessinarizona.com')
         admin_emails = [fallback]
 
     logger.info(f"Sending access request notification to {len(admin_emails)} admin(s): {admin_emails}")
@@ -526,8 +526,8 @@ async def request_access(
             "reason": body.reason,
         })
         text_content = (
-            f"New Access Request — TMS NeuroReach\n\n"
-            f"A new user has requested access to the TMS NeuroReach dashboard:\n\n"
+            f"New Access Request — SleepReach\n\n"
+            f"A new user has requested access to the SleepReach dashboard:\n\n"
             f"Name: {body.full_name}\n"
             f"Email: {body.email}\n"
             f"Role/Reason: {body.reason}\n\n"
@@ -538,7 +538,7 @@ async def request_access(
             try:
                 result = send_email_via_paubox(
                     to_email=admin_email,
-                    subject="New Access Request — TMS NeuroReach",
+                    subject="New Access Request — SleepReach",
                     html_content=html,
                     text_content=text_content,
                 )

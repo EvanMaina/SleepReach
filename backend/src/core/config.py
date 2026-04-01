@@ -237,7 +237,7 @@ class Settings(BaseSettings):
         description="SMS mode: 'local' for dev server, 'twilio' for real Twilio"
     )
     sms_local_url: str = Field(
-        default="http://localhost:1080",
+        default="http://localhost:1081",
         description="Local SMS dev server URL"
     )
     twilio_account_sid: str = Field(
@@ -273,7 +273,7 @@ class Settings(BaseSettings):
         description="SMTP password/app password"
     )
     from_email: str = Field(
-        default="noreply@sleepinstitute.co",
+        default="info@sleeplessinarizona.com",
         description="From email address"
     )
     from_name: str = Field(
@@ -337,9 +337,29 @@ class Settings(BaseSettings):
     # Email Logo URL (used in all email templates)
     # ==========================================================================
     email_logo_url: str = Field(
-        default="http://localhost:8000/static/images/logo.png",
+        default="http://localhost:8000/static/images/sleep-logo.png",
         description="Full URL to the logo image used in email templates. "
                     "Must be publicly accessible (no auth required)."
+    )
+
+    # ==========================================================================
+    # AI Insights / Anthropic
+    # ==========================================================================
+    anthropic_api_key: str = Field(
+        default="",
+        description="Anthropic API key used for AI Insights generation"
+    )
+    anthropic_model: str = Field(
+        default="claude-sonnet-4-20250514",
+        description="Anthropic model name used for AI Insights generation"
+    )
+    ai_insights_cache_ttl: int = Field(
+        default=3600,
+        description="AI insights cache TTL in seconds"
+    )
+    ai_estimated_case_value: int = Field(
+        default=0,
+        description="Optional estimated revenue value per converted patient"
     )
 
     # ==========================================================================

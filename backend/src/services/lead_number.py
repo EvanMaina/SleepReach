@@ -1,10 +1,11 @@
 """
 Lead Number Generation Service.
 
-Generates unique lead numbers in the format TMS-YYYY-XXX.
+Generates unique lead numbers in the format SR-YYYY-XXX.
 Thread-safe implementation with database locking and retry logic.
 
-Note: Legacy leads may use the NR-YYYY-XXX prefix. Both formats are valid.
+Note: Legacy leads may use TMS-YYYY-XXX or NR-YYYY-XXX prefixes.
+All historical formats remain valid, but new SleepReach leads use SR.
 """
 
 import logging
@@ -21,6 +22,8 @@ from ..models.lead import Lead
 
 logger = logging.getLogger(__name__)
 
+CURRENT_PREFIX = "SR"
+
 
 def generate_unique_lead_number(db: Session, max_retries: int = 5) -> str:
     """
@@ -32,7 +35,7 @@ def generate_unique_lead_number(db: Session, max_retries: int = 5) -> str:
     may have already flushed other objects (e.g., ReferringProvider)
     that must survive a retry here.
     
-    Queries both TMS- and legacy NR- prefixed leads to find the current
+    Queries current SR- leads plus legacy TMS-/NR- prefixed leads to find the current
     maximum sequence number, then returns MAX + 1.
     
     Args:
@@ -40,10 +43,10 @@ def generate_unique_lead_number(db: Session, max_retries: int = 5) -> str:
         max_retries: Maximum number of attempts
         
     Returns:
-        Unique lead number string (e.g., "TMS-2026-154")
+        Unique lead number string (e.g., "SR-2026-154")
     """
     current_year = datetime.now().year
-    prefix = f"TMS-{current_year}-"
+    prefix = f"{CURRENT_PREFIX}-{current_year}-"
     
     for attempt in range(max_retries):
         try:
@@ -53,16 +56,24 @@ def generate_unique_lead_number(db: Session, max_retries: int = 5) -> str:
                 result = db.execute(
                     text("""
                         SELECT MAX(num) FROM (
-                            SELECT CAST(SUBSTRING(lead_number FROM 'TMS-\\d{4}-(\\d+)') AS INTEGER) AS num
+                            SELECT CAST(SUBSTRING(lead_number FROM 'SR-\\d{4}-(\\d+)') AS INTEGER) AS num
                             FROM leads
-                            WHERE lead_number LIKE :tms_pattern
+                            WHERE lead_number LIKE :sr_pattern
                         ) t1
                         UNION ALL
                         (SELECT MAX(CAST(SUBSTRING(lead_number FROM 'NR-\\d{4}-(\\d+)') AS INTEGER)) AS num
                          FROM leads
                          WHERE lead_number LIKE :nr_pattern)
+                        UNION ALL
+                        (SELECT MAX(CAST(SUBSTRING(lead_number FROM 'TMS-\\d{4}-(\\d+)') AS INTEGER)) AS num
+                         FROM leads
+                         WHERE lead_number LIKE :tms_pattern)
                     """),
-                    {"tms_pattern": f"TMS-{current_year}-%", "nr_pattern": f"NR-{current_year}-%"}
+                    {
+                        "sr_pattern": f"SR-{current_year}-%",
+                        "tms_pattern": f"TMS-{current_year}-%",
+                        "nr_pattern": f"NR-{current_year}-%",
+                    }
                 )
                 
                 # The UNION ALL returns two rows; pick the overall max.
@@ -129,7 +140,7 @@ def validate_lead_number_format(lead_number: str) -> bool:
     """
     Validate that a lead number follows the correct format.
     
-    Accepts both TMS- (current) and NR- (legacy) prefixes.
+    Accepts current SR- numbers plus legacy TMS-/NR- prefixes.
     
     Args:
         lead_number: String to validate
@@ -138,6 +149,8 @@ def validate_lead_number_format(lead_number: str) -> bool:
         True if valid format, False otherwise
         
     Example:
+        >>> validate_lead_number_format("SR-2026-001")
+        True
         >>> validate_lead_number_format("TMS-2026-001")
         True
         >>> validate_lead_number_format("NR-2026-001")
@@ -145,7 +158,7 @@ def validate_lead_number_format(lead_number: str) -> bool:
         >>> validate_lead_number_format("INVALID")
         False
     """
-    pattern = r"^(TMS|NR)-\d{4}-\d{3,}$"
+    pattern = r"^(SR|TMS|NR)-\d{4}-\d{3,}$"
     return bool(re.match(pattern, lead_number))
 
 

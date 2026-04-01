@@ -40,7 +40,7 @@ class PlatformAnalyticsService:
     """
     
     # Cache key prefixes
-    PREFIX = "neuroreach:platform"
+    PREFIX = "sleepreach:platform"
     
     def __init__(self, db: Session, cache: Optional[CacheService] = None):
         """

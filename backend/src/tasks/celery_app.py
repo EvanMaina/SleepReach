@@ -48,7 +48,7 @@ if settings.celery_result_backend.startswith("rediss://"):
 # =============================================================================
 
 celery_app = Celery(
-    "neuroreach",
+    "sleepreach",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
     include=[

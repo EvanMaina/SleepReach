@@ -564,7 +564,7 @@ def move_to_dead_letter(
     }
 
     # Store with unique key
-    dlq_key = f"neuroreach:dlq:{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    dlq_key = f"sleepreach:dlq:{datetime.now().strftime('%Y%m%d%H%M%S')}"
     cache.set(dlq_key, dlq_entry, ttl=86400 * 7)  # Keep for 7 days
 
     logger.warning(f"Task {task_name} moved to DLQ: {error}")
@@ -719,7 +719,7 @@ def warm_dashboard_cache() -> Dict[str, Any]:
                 "total_leads": total,
                 "new_leads": new_count,
             }
-            cache.set("neuroreach:dashboard:summary", summary, ttl=60)
+            cache.set("sleepreach:dashboard:summary", summary, ttl=60)
             warmed.append("dashboard-summary")
         except Exception as e:
             logger.warning(f"Failed to warm dashboard summary: {e}")
@@ -735,7 +735,7 @@ def warm_dashboard_cache() -> Dict[str, Any]:
                 LIMIT 20
             """)).fetchall()
             cond_data = [{"condition": r[0], "count": r[1]} for r in conditions]
-            cache.set("neuroreach:conditions:distribution", cond_data, ttl=120)
+            cache.set("sleepreach:conditions:distribution", cond_data, ttl=120)
             warmed.append("conditions-distribution")
         except Exception as e:
             logger.warning(f"Failed to warm conditions cache: {e}")
@@ -751,7 +751,7 @@ def warm_dashboard_cache() -> Dict[str, Any]:
                 ORDER BY date
             """)).fetchall()
             trend_data = [{"date": str(r[0]), "count": r[1]} for r in trend]
-            cache.set("neuroreach:leads:trend:30", trend_data, ttl=60)
+            cache.set("sleepreach:leads:trend:30", trend_data, ttl=60)
             warmed.append("leads-trend-30d")
         except Exception as e:
             logger.warning(f"Failed to warm leads trend cache: {e}")
@@ -1348,7 +1348,7 @@ def send_coordinator_sms(
 )
 def send_daily_lead_digest(self) -> Dict[str, Any]:
     """
-    Send daily lead digest email at 7:00 AM MST to ask@tmsinstitute.co.
+    Send daily lead digest email at 7:00 AM MST to ask@insomniaandsleep.com.
 
     Queries leads created in the prior 24 hours and sends a summary email
     with total count and breakdown by condition. Contains NO PII.
@@ -1398,7 +1398,7 @@ def send_daily_lead_digest(self) -> Dict[str, Any]:
         mst_now = now.astimezone(mst_tz)
         date_str = mst_now.strftime("%B %d, %Y")
 
-        subject = f"NeuroReach Daily Lead Digest — {date_str}"
+        subject = f"SleepReach Daily Lead Digest — {date_str}"
 
         # Build email HTML body using the shared design system
         if total_count == 0:
@@ -1513,7 +1513,7 @@ def send_daily_lead_digest(self) -> Dict[str, Any]:
         )
 
         # Plain text version — priority breakdown only, no PII, no links
-        plain_text = f"NeuroReach Daily Lead Digest — {date_str}\n\n"
+        plain_text = f"SleepReach Daily Lead Digest — {date_str}\n\n"
         plain_text += f"Total new leads (last 24 hours): {total_count}\n\n"
         if total_count > 0:
             plain_text += "Priority Breakdown:\n"
@@ -1526,7 +1526,7 @@ def send_daily_lead_digest(self) -> Dict[str, Any]:
         plain_text += "\nThis digest is sent automatically at 7:00 AM MST."
 
         # Send email via Paubox (HIPAA-compliant) with SMTP fallback
-        recipient = "ask@tmsinstitute.co"
+        recipient = "ask@insomniaandsleep.com"
 
         result = send_email_via_paubox(
             to_email=recipient,

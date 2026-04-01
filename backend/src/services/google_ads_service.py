@@ -342,7 +342,7 @@ class GoogleAdsService:
 
         return GoogleAdsAccountMetrics(
             account_id=self.customer_id,
-            account_name="NeuroReach TMS Clinic",
+            account_name="Insomnia and Sleep Institute",
             total_impressions=total_impressions,
             total_clicks=total_clicks,
             total_cost_micros=total_cost_micros,
@@ -368,7 +368,7 @@ class GoogleAdsService:
         mock_campaigns = [
             GoogleAdsCampaignMetrics(
                 campaign_id="12345678901",
-                campaign_name="TMS Therapy - Depression Treatment",
+                campaign_name="Sleep Apnea Treatment - Phoenix",
                 status="ENABLED",
                 impressions=45230,
                 clicks=1892,
@@ -383,7 +383,7 @@ class GoogleAdsService:
             ),
             GoogleAdsCampaignMetrics(
                 campaign_id="12345678902",
-                campaign_name="TMS Therapy - Anxiety Treatment",
+                campaign_name="Insomnia Treatment - Arizona",
                 status="ENABLED",
                 impressions=32150,
                 clicks=1245,
@@ -462,7 +462,7 @@ class GoogleAdsService:
 
         return GoogleAdsAccountMetrics(
             account_id="123-456-7890",
-            account_name="NeuroReach TMS Clinic (Demo)",
+            account_name="Insomnia and Sleep Institute (Demo)",
             total_impressions=total_impressions,
             total_clicks=total_clicks,
             total_cost_micros=total_cost_micros,

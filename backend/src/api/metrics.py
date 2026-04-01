@@ -35,9 +35,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/metrics", tags=["Metrics"], dependencies=[Depends(get_current_user)])
 
 # Cache key prefixes for metrics
-CACHE_PREFIX_QUEUE_METRICS = "neuroreach:metrics:queue"
-CACHE_PREFIX_TRENDS = "neuroreach:metrics:trends"
-CACHE_PREFIX_DASHBOARD_SUMMARY = "neuroreach:metrics:dashboard_summary"
+CACHE_PREFIX_QUEUE_METRICS = "sleepreach:metrics:queue"
+CACHE_PREFIX_TRENDS = "sleepreach:metrics:trends"
+CACHE_PREFIX_DASHBOARD_SUMMARY = "sleepreach:metrics:dashboard_summary"
 CACHE_TTL_QUEUE_METRICS = 30  # 30 seconds for queue metrics
 CACHE_TTL_TRENDS = 60  # 60 seconds for trends
 CACHE_TTL_DASHBOARD = 30  # 30 seconds for dashboard summary

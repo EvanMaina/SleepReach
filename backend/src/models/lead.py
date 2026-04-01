@@ -31,15 +31,15 @@ from ..core.database import Base
 
 
 # =============================================================================
-# Enum Definitions
+# Enum Definitions (must match database/init/001_initial_schema.sql)
 # =============================================================================
 
 class ConditionType(str, enum.Enum):
-    """TMS-treatable conditions."""
-    DEPRESSION = "DEPRESSION"
-    ANXIETY = "ANXIETY"
-    OCD = "OCD"
-    PTSD = "PTSD"
+    """Sleep-treatable conditions."""
+    INSOMNIA = "INSOMNIA"
+    SLEEP_APNEA = "SLEEP_APNEA"
+    RESTLESS_LEG = "RESTLESS_LEG"
+    NARCOLEPSY = "NARCOLEPSY"
     OTHER = "OTHER"
 
 
@@ -51,10 +51,11 @@ class DurationType(str, enum.Enum):
 
 
 class TreatmentType(str, enum.Enum):
-    """Prior treatment options."""
-    ANTIDEPRESSANTS = "ANTIDEPRESSANTS"
+    """Prior treatment options for sleep disorders."""
+    CPAP_BIPAP = "CPAP_BIPAP"
+    MEDICATION = "MEDICATION"
+    SLEEP_STUDY = "SLEEP_STUDY"
     THERAPY_CBT = "THERAPY_CBT"
-    BOTH = "BOTH"
     NONE = "NONE"
     OTHER = "OTHER"
 
@@ -86,22 +87,15 @@ class LeadStatus(str, enum.Enum):
 
 
 class ContactOutcome(str, enum.Enum):
-    """
-    Contact outcome for coordinator outreach tracking.
-    
-    Tracks the result of each contact attempt, enabling:
-    - Filtering leads by outcome (show only 'no answer' leads)
-    - Progress tracking through outreach workflow
-    - Reporting on contact success rates
-    """
-    NEW = "NEW"                      # Not contacted yet
-    ANSWERED = "ANSWERED"            # Spoke with lead, can proceed to schedule
-    NO_ANSWER = "NO_ANSWER"          # Called but no pickup, needs follow-up
-    UNREACHABLE = "UNREACHABLE"      # Wrong number, disconnected, etc.
-    CALLBACK_REQUESTED = "CALLBACK_REQUESTED"  # Lead asked to call back at specific time
-    SCHEDULED = "SCHEDULED"          # Consultation has been scheduled
-    COMPLETED = "COMPLETED"          # Consultation completed successfully
-    NOT_INTERESTED = "NOT_INTERESTED"  # Lead declined, archive
+    """Contact outcome for coordinator outreach tracking."""
+    NEW = "NEW"
+    ANSWERED = "ANSWERED"
+    NO_ANSWER = "NO_ANSWER"
+    UNREACHABLE = "UNREACHABLE"
+    CALLBACK_REQUESTED = "CALLBACK_REQUESTED"
+    SCHEDULED = "SCHEDULED"
+    COMPLETED = "COMPLETED"
+    NOT_INTERESTED = "NOT_INTERESTED"
 
 
 class ContactMethodType(str, enum.Enum):
@@ -117,15 +111,13 @@ class LeadSource(str, enum.Enum):
     
     IMPORTANT: Enum member NAMES must be lowercase to match PostgreSQL enum values.
     SQLAlchemy with create_type=False uses member NAMES for comparison, not values.
-    Database enum: {widget,jotform,google_ads,referral,manual,api,import}
+    Database enum: {widget,jotform,referral,manual,api,import}
     """
     widget = "widget"
     jotform = "jotform"
-    google_ads = "google_ads"
     referral = "referral"
     manual = "manual"
     api = "api"
-    # Note: 'import' is a Python reserved keyword, using IMPORT with special handling
     IMPORT = "import"
 
 
@@ -135,29 +127,10 @@ class LeadSource(str, enum.Enum):
 
 class Lead(Base):
     """
-    Patient intake lead model.
+    Patient intake lead model for Sleep Institute of Arizona.
     
     Stores patient information from the intake widget.
     All PHI (Protected Health Information) is encrypted at rest.
-    
-    Attributes:
-        id: UUID primary key
-        first_name_encrypted: AES-256 encrypted first name (PHI)
-        last_name_encrypted: AES-256 encrypted last name (PHI)
-        email_encrypted: AES-256 encrypted email (PHI)
-        phone_encrypted: AES-256 encrypted phone (PHI)
-        condition: Selected mental health condition
-        symptom_duration: Duration of symptoms
-        prior_treatments: Array of prior treatments tried
-        has_insurance: Insurance status
-        zip_code: ZIP code for service area check
-        in_service_area: Whether ZIP is in service area
-        urgency: Treatment urgency level
-        hipaa_consent: HIPAA consent given
-        sms_consent: SMS communication consent
-        score: Calculated lead score
-        priority: Calculated priority level
-        status: Current lead status
     """
     
     __tablename__ = "leads"
@@ -170,7 +143,7 @@ class Lead(Base):
         nullable=False,
     )
     
-    # Lead Number (auto-generated: NR-YYYY-XXX)
+    # Lead Number (auto-generated: SR-YYYY-XXX)
     lead_number = Column(
         String(20),
         unique=True,
@@ -184,7 +157,7 @@ class Lead(Base):
     email_encrypted = Column(LargeBinary, nullable=False)
     phone_encrypted = Column(LargeBinary, nullable=False)
     
-    # Date of Birth (for age verification - must be 18+)
+    # Date of Birth
     date_of_birth = Column(Date, nullable=True)
     
     # Clinical Information
@@ -192,37 +165,17 @@ class Lead(Base):
         SQLEnum(ConditionType, name="condition_type", create_type=False),
         nullable=False,
     )
-    condition_other = Column(Text, nullable=True)  # Only if condition = 'OTHER'
+    condition_other = Column(Text, nullable=True)
     
-    # Multi-condition support (normalized lowercase keys: depression, anxiety, ocd, ptsd, other)
+    # Multi-condition support
     conditions = Column(ARRAY(Text), nullable=True, default=[])
-    other_condition_text = Column(Text, nullable=True)  # Free text when 'other' selected
+    other_condition_text = Column(Text, nullable=True)
     
-    # TMS Therapy Interest
-    tms_therapy_interest = Column(Text, nullable=True)  # daily_tms, accelerated_tms, not_sure
+    # Sleep Treatment Interest
+    sleep_treatment_interest = Column(Text, nullable=True)
     
     # Preferred Contact Method
-    preferred_contact_method = Column(Text, nullable=True)  # phone_call, text, email, any
-    
-    # Depression PHQ-2 Assessment (0-3 each)
-    phq2_interest = Column(Integer, nullable=True)
-    phq2_mood = Column(Integer, nullable=True)
-    depression_severity_score = Column(Integer, nullable=True)  # 0-6
-    depression_severity_level = Column(Text, nullable=True)  # minimal, mild, moderate, severe
-    
-    # Anxiety GAD-2 Assessment (0-3 each)
-    gad2_nervous = Column(Integer, nullable=True)
-    gad2_worry = Column(Integer, nullable=True)
-    anxiety_severity_score = Column(Integer, nullable=True)  # 0-6
-    anxiety_severity_level = Column(Text, nullable=True)  # minimal, mild, moderate, severe
-    
-    # OCD Assessment
-    ocd_time_occupied = Column(Integer, nullable=True)  # 1-4
-    ocd_severity_level = Column(Text, nullable=True)  # mild, moderate, moderate_severe, severe
-    
-    # PTSD Assessment
-    ptsd_intrusion = Column(Integer, nullable=True)  # 0-4
-    ptsd_severity_level = Column(Text, nullable=True)  # minimal, mild, moderate, moderate_severe, severe
+    preferred_contact_method = Column(Text, nullable=True)
     
     symptom_duration = Column(
         SQLEnum(DurationType, name="duration_type", create_type=False),
@@ -237,7 +190,7 @@ class Lead(Base):
     # Insurance Information
     has_insurance = Column(Boolean, nullable=False)
     insurance_provider = Column(Text, nullable=True)
-    other_insurance_provider = Column(Text, nullable=True)  # When provider = 'Other'
+    other_insurance_provider = Column(Text, nullable=True)
     
     # Location
     zip_code = Column(String(10), nullable=False)
@@ -249,21 +202,21 @@ class Lead(Base):
         nullable=False,
     )
     hipaa_consent = Column(Boolean, nullable=False, default=False)
-    hipaa_consent_timestamp = Column(DateTime(timezone=True), nullable=True)  # When HIPAA consent was given
-    privacy_consent_timestamp = Column(DateTime(timezone=True), nullable=True)  # When privacy consent was given
+    hipaa_consent_timestamp = Column(DateTime(timezone=True), nullable=True)
+    privacy_consent_timestamp = Column(DateTime(timezone=True), nullable=True)
     sms_consent = Column(Boolean, nullable=False, default=False)
-    sms_consent_timestamp = Column(DateTime(timezone=True), nullable=True)  # When SMS consent was given
+    sms_consent_timestamp = Column(DateTime(timezone=True), nullable=True)
     
     # Scoring & Priority
     score = Column(Integer, nullable=False, default=0)
-    lead_score = Column(Integer, nullable=True, default=0)  # Alias for score
+    lead_score = Column(Integer, nullable=True, default=0)
     priority = Column(
         SQLEnum(PriorityType, name="priority_type", create_type=False),
         nullable=False,
         default=PriorityType.LOW,
     )
     
-    # Score Breakdown Fields (for transparency)
+    # Score Breakdown Fields
     condition_score = Column(Integer, nullable=True, default=0)
     therapy_interest_score = Column(Integer, nullable=True, default=0)
     severity_score = Column(Integer, nullable=True, default=0)
@@ -279,7 +232,7 @@ class Lead(Base):
         nullable=False,
         default=LeadStatus.NEW,
     )
-    assigned_to = Column(PGUUID(as_uuid=True), nullable=True)  # Future: FK to users
+    assigned_to = Column(PGUUID(as_uuid=True), nullable=True)
     notes = Column(Text, nullable=True)
     
     # Lead Source/Platform
@@ -297,7 +250,7 @@ class Lead(Base):
     utm_content = Column(String(255), nullable=True)
     
     # Metadata
-    ip_address_hash = Column(String(64), nullable=True)  # SHA-256 hashed
+    ip_address_hash = Column(String(64), nullable=True)
     user_agent = Column(Text, nullable=True)
     referrer_url = Column(Text, nullable=True)
     
@@ -315,15 +268,12 @@ class Lead(Base):
     )
     contacted_at = Column(DateTime(timezone=True), nullable=True)
     converted_at = Column(DateTime(timezone=True), nullable=True)
-    
-    # Last activity timestamp (NULL for new untouched leads)
-    # Updated whenever ANY action is taken: status change, notes, scheduling, contact attempts, etc.
     last_updated_at = Column(DateTime(timezone=True), nullable=True, index=True)
     
     # Soft delete
     deleted_at = Column(DateTime(timezone=True), nullable=True, index=True)
     
-    # Scheduling fields (for coordinator callbacks)
+    # Scheduling fields
     scheduled_callback_at = Column(DateTime(timezone=True), nullable=True)
     scheduled_notes = Column(Text, nullable=True)
     contact_method = Column(
@@ -335,36 +285,26 @@ class Lead(Base):
     contact_attempts = Column(Integer, nullable=True, default=0)
     next_follow_up_at = Column(DateTime(timezone=True), nullable=True)
     
-    # Contact Outcome (result of coordinator outreach)
+    # Contact Outcome
     contact_outcome = Column(
         SQLEnum(ContactOutcome, name="contact_outcome_type", create_type=False),
         nullable=False,
         default=ContactOutcome.NEW,
     )
     
-    # Follow-up tracking (set by outcome workflow logic)
-    follow_up_reason = Column(String(100), nullable=True)  # e.g., "No Answer", "Not Interested", "No Show"
-    follow_up_date = Column(DateTime(timezone=True), nullable=True)  # When to follow up
-    
-    # Automated follow-up tracking (6-hour SMS + email cycle)
+    # Follow-up tracking
+    follow_up_reason = Column(String(100), nullable=True)
+    follow_up_date = Column(DateTime(timezone=True), nullable=True)
     last_follow_up_sent_at = Column(DateTime(timezone=True), nullable=True)
     
-    # ==========================================================================
     # Referral Information
-    # ==========================================================================
-    
-    # Flag for quick filtering of referral leads
     is_referral = Column(Boolean, nullable=False, default=False, index=True)
-    
-    # Foreign key to referring provider (nullable - some referrals may not have matched provider)
     referring_provider_id = Column(
         PGUUID(as_uuid=True),
         ForeignKey("referring_providers.id"),
         nullable=True,
         index=True,
     )
-    
-    # Raw referral data from Jotform (preserved even if provider matching fails)
     referring_provider_raw = Column(JSONB, nullable=True)
     
     # Relationship to ReferringProvider
@@ -375,12 +315,6 @@ class Lead(Base):
     )
     
     def __repr__(self) -> str:
-        """
-        String representation without exposing PHI.
-        
-        Returns:
-            Safe string representation of lead
-        """
         return (
             f"<Lead(id={self.id}, "
             f"condition={self.condition.value}, "
@@ -389,18 +323,12 @@ class Lead(Base):
         )
     
     def to_safe_dict(self) -> dict:
-        """
-        Convert to dictionary without PHI for logging/debugging.
-        
-        Returns:
-            Dictionary with non-PHI fields only
-        """
         return {
             "id": str(self.id),
             "condition": self.condition.value,
             "symptom_duration": self.symptom_duration.value,
             "has_insurance": self.has_insurance,
-            "zip_code": self.zip_code[:3] + "**" if self.zip_code else None,  # Partial ZIP
+            "zip_code": self.zip_code[:3] + "**" if self.zip_code else None,
             "in_service_area": self.in_service_area,
             "urgency": self.urgency.value,
             "score": self.score,

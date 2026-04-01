@@ -485,15 +485,15 @@ async def get_conditions_distribution(
     
     # Mapping from lowercase/various formats to canonical enum values
     CONDITION_NORMALIZE = {
-        "depression": "DEPRESSION",
-        "anxiety": "ANXIETY",
-        "ocd": "OCD",
-        "ptsd": "PTSD",
+        "insomnia": "INSOMNIA",
+        "sleep_apnea": "SLEEP_APNEA",
+        "restless_leg": "RESTLESS_LEG",
+        "narcolepsy": "NARCOLEPSY",
         "other": "OTHER",
-        "DEPRESSION": "DEPRESSION",
-        "ANXIETY": "ANXIETY",
-        "OCD": "OCD",
-        "PTSD": "PTSD",
+        "INSOMNIA": "INSOMNIA",
+        "SLEEP_APNEA": "SLEEP_APNEA",
+        "RESTLESS_LEG": "RESTLESS_LEG",
+        "NARCOLEPSY": "NARCOLEPSY",
         "OTHER": "OTHER",
     }
     
@@ -600,40 +600,41 @@ async def get_conditions_distribution(
 
 
 # =============================================================================
-# TMS Therapy Interest Distribution Endpoint
+# Sleep Treatment Interest Distribution Endpoint
 # =============================================================================
 
-class TMSInterestDistribution(BaseModel):
-    """TMS therapy interest distribution data."""
-    interest_type: str = Field(..., description="TMS interest type")
+class SleepTreatmentDistribution(BaseModel):
+    """Sleep treatment interest distribution data."""
+    interest_type: str = Field(..., description="Sleep treatment interest type")
     count: int = Field(..., description="Number of leads with this interest")
-    percentage: float = Field(..., description="Percentage of leads with TMS interest set")
+    percentage: float = Field(..., description="Percentage of leads with treatment interest set")
     trend: float = Field(default=0, description="Week-over-week trend percentage")
 
 
-class TMSInterestDistributionResponse(BaseModel):
-    """TMS therapy interest distribution response."""
-    interests: List[TMSInterestDistribution] = Field(..., description="Distribution by TMS interest type")
-    total_with_interest: int = Field(..., description="Leads with TMS interest set")
+class SleepTreatmentDistributionResponse(BaseModel):
+    """Sleep treatment interest distribution response."""
+    interests: List[SleepTreatmentDistribution] = Field(..., description="Distribution by treatment interest type")
+    total_with_interest: int = Field(..., description="Leads with treatment interest set")
     total_leads: int = Field(..., description="Total leads counted")
     cache_hit: bool = Field(default=False, description="Whether data came from cache")
     query_time_ms: float = Field(default=0, description="Query execution time in milliseconds")
 
 
+# Keep old path as alias for backward compat
 @router.get(
-    "/tms-therapy-distribution",
-    response_model=TMSInterestDistributionResponse,
-    summary="Get TMS Therapy Interest Distribution",
-    description="Get distribution of leads by TMS therapy interest type.",
+    "/sleep-treatment-distribution",
+    response_model=SleepTreatmentDistributionResponse,
+    summary="Get Sleep Treatment Interest Distribution",
+    description="Get distribution of leads by sleep treatment interest type.",
 )
-async def get_tms_therapy_distribution(
+async def get_sleep_treatment_distribution(
     request: Request,
     db: Session = Depends(get_db),
-) -> TMSInterestDistributionResponse:
+) -> SleepTreatmentDistributionResponse:
     """
-    Get TMS therapy interest distribution with percentage breakdown.
+    Get sleep treatment interest distribution with percentage breakdown.
     
-    Queries Lead.tms_therapy_interest (text column), counts by value,
+    Queries Lead.sleep_treatment_interest (text column), counts by value,
     calculates percentages and week-over-week trends.
     Cached for 120 seconds.
     """
@@ -641,12 +642,12 @@ async def get_tms_therapy_distribution(
     cache = get_cache()
     
     # Try cache first
-    cache_key = f"{cache.PREFIX_CONDITIONS}:tms_distribution"
+    cache_key = f"{cache.PREFIX_CONDITIONS}:sleep_treatment_distribution"
     try:
         cached_data = cache.get(cache_key)
         if cached_data and isinstance(cached_data, dict) and "interests" in cached_data:
-            return TMSInterestDistributionResponse(
-                interests=[TMSInterestDistribution(**i) for i in cached_data["interests"]],
+            return SleepTreatmentDistributionResponse(
+                interests=[SleepTreatmentDistribution(**i) for i in cached_data["interests"]],
                 total_with_interest=cached_data.get("total_with_interest", 0),
                 total_leads=cached_data.get("total_leads", 0),
                 cache_hit=True,
@@ -660,16 +661,16 @@ async def get_tms_therapy_distribution(
         Lead.deleted_at.is_(None)
     ).scalar() or 0
     
-    # Count by tms_therapy_interest value — EXCLUDES soft-deleted leads
+    # Count by sleep_treatment_interest value — EXCLUDES soft-deleted leads
     distribution = db.query(
-        Lead.tms_therapy_interest,
+        Lead.sleep_treatment_interest,
         func.count(Lead.id).label('count'),
     ).filter(
-        Lead.tms_therapy_interest.isnot(None),
-        Lead.tms_therapy_interest != '',
+        Lead.sleep_treatment_interest.isnot(None),
+        Lead.sleep_treatment_interest != '',
         Lead.deleted_at.is_(None),  # EXCLUDE soft-deleted leads
     ).group_by(
-        Lead.tms_therapy_interest
+        Lead.sleep_treatment_interest
     ).order_by(
         func.count(Lead.id).desc()
     ).all()
@@ -682,31 +683,31 @@ async def get_tms_therapy_distribution(
     two_weeks_ago = today - timedelta(days=14)
     
     this_week_q = db.query(
-        Lead.tms_therapy_interest,
+        Lead.sleep_treatment_interest,
         func.count(Lead.id).label('count'),
     ).filter(
         Lead.created_at >= last_week,
-        Lead.tms_therapy_interest.isnot(None),
-        Lead.tms_therapy_interest != '',
+        Lead.sleep_treatment_interest.isnot(None),
+        Lead.sleep_treatment_interest != '',
         Lead.deleted_at.is_(None),  # EXCLUDE soft-deleted leads
-    ).group_by(Lead.tms_therapy_interest).all()
-    this_week_map = {row.tms_therapy_interest: row.count for row in this_week_q}
+    ).group_by(Lead.sleep_treatment_interest).all()
+    this_week_map = {row.sleep_treatment_interest: row.count for row in this_week_q}
     
     last_week_q = db.query(
-        Lead.tms_therapy_interest,
+        Lead.sleep_treatment_interest,
         func.count(Lead.id).label('count'),
     ).filter(
         and_(Lead.created_at >= two_weeks_ago, Lead.created_at < last_week),
-        Lead.tms_therapy_interest.isnot(None),
-        Lead.tms_therapy_interest != '',
+        Lead.sleep_treatment_interest.isnot(None),
+        Lead.sleep_treatment_interest != '',
         Lead.deleted_at.is_(None),  # EXCLUDE soft-deleted leads
-    ).group_by(Lead.tms_therapy_interest).all()
-    last_week_map = {row.tms_therapy_interest: row.count for row in last_week_q}
+    ).group_by(Lead.sleep_treatment_interest).all()
+    last_week_map = {row.sleep_treatment_interest: row.count for row in last_week_q}
     
     # Build result
     interests = []
     for row in distribution:
-        interest_type = row.tms_therapy_interest
+        interest_type = row.sleep_treatment_interest
         count = row.count
         this_wk = this_week_map.get(interest_type, 0)
         last_wk = last_week_map.get(interest_type, 0)
@@ -728,8 +729,8 @@ async def get_tms_therapy_distribution(
     # Cache result for 120 seconds
     cache.set(cache_key, result, ttl=120)
     
-    return TMSInterestDistributionResponse(
-        interests=[TMSInterestDistribution(**i) for i in interests],
+    return SleepTreatmentDistributionResponse(
+        interests=[SleepTreatmentDistribution(**i) for i in interests],
         total_with_interest=total_with_interest,
         total_leads=total_leads,
         cache_hit=False,

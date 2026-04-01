@@ -1,7 +1,7 @@
 """
 Referring Provider database model.
 
-Represents healthcare providers who refer patients for TMS therapy.
+Represents healthcare providers who refer patients for sleep consultations.
 Tracks provider information, referral metrics, and relationship status.
 """
 
@@ -31,6 +31,10 @@ from ..core.database import Base
 # Enum Definitions
 # =============================================================================
 
+def _enum_values(enum_cls) -> list[str]:
+    """Persist enum values, not member names, for existing PostgreSQL enums."""
+    return [member.value for member in enum_cls]
+
 class ProviderNoteType(str, enum.Enum):
     """Types of provider notes/interactions."""
     GENERAL = "general"
@@ -56,18 +60,18 @@ class ProviderSpecialty(str, enum.Enum):
 
 class ProviderStatus(str, enum.Enum):
     """Provider relationship status."""
-    ACTIVE = "ACTIVE"      # Verified, actively referring
-    PENDING = "PENDING"    # Auto-created, awaiting verification
-    INACTIVE = "INACTIVE"  # No referrals in 12+ months
-    ARCHIVED = "ARCHIVED"  # Historical data only
+    ACTIVE = "active"      # Verified, actively referring
+    PENDING = "pending"    # Auto-created, awaiting verification
+    INACTIVE = "inactive"  # No referrals in 12+ months
+    ARCHIVED = "archived"  # Historical data only
 
 
 class ProviderContactMethod(str, enum.Enum):
     """Preferred contact method for provider communications."""
-    EMAIL = "EMAIL"
-    PHONE = "PHONE"
-    FAX = "FAX"
-    PORTAL = "PORTAL"
+    EMAIL = "email"
+    PHONE = "phone"
+    FAX = "fax"
+    PORTAL = "portal"
 
 
 # =============================================================================
@@ -124,12 +128,22 @@ class ReferringProvider(Base):
     
     # Status & Preferences
     status = Column(
-        SQLEnum(ProviderStatus, name="provider_status", create_type=False),
+        SQLEnum(
+            ProviderStatus,
+            name="provider_status",
+            create_type=False,
+            values_callable=_enum_values,
+        ),
         nullable=False,
         default=ProviderStatus.PENDING,
     )
     preferred_contact = Column(
-        SQLEnum(ProviderContactMethod, name="provider_contact_method", create_type=False),
+        SQLEnum(
+            ProviderContactMethod,
+            name="provider_contact_method",
+            create_type=False,
+            values_callable=_enum_values,
+        ),
         nullable=True,
         default=ProviderContactMethod.EMAIL,
     )

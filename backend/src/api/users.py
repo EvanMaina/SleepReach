@@ -235,7 +235,7 @@ def _send_invitation_email(user: User, temp_password: str) -> None:
         })
         text_content = (
             f"Hi {user.first_name} {user.last_name},\n\n"
-            f"An administrator has created your TMS NeuroReach account. "
+            f"An administrator has created your SleepReach account. "
             f"Use the credentials below to log in for the first time.\n\n"
             f"Role: {user.role.value.capitalize()}\n"
             f"Email (Username): {user.email}\n"
@@ -244,11 +244,11 @@ def _send_invitation_email(user: User, temp_password: str) -> None:
             f"Important: You will be prompted to change this temporary password on your "
             f"first login. Please choose a strong password that you will remember.\n\n"
             f"If you have any questions or trouble logging in, contact your administrator.\n\n"
-            f"— TMS Institute of Arizona Team"
+            f"— The Insomnia and Sleep Institute of Arizona Team"
         )
         result = send_email_via_paubox(
             to_email=user.email,
-            subject="Welcome to TMS NeuroReach — Your Account Has Been Created",
+            subject="Welcome to SleepReach — Your Account Has Been Created",
             html_content=html,
             text_content=text_content,
         )

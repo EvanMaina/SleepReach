@@ -46,12 +46,12 @@ class CacheService:
     """
     
     # Cache key prefixes
-    PREFIX_DASHBOARD = "neuroreach:dashboard"
-    PREFIX_ANALYTICS = "neuroreach:analytics"
-    PREFIX_LEADS = "neuroreach:leads"
-    PREFIX_CONDITIONS = "neuroreach:conditions"
-    PREFIX_COHORT = "neuroreach:cohort"
-    PREFIX_TREND = "neuroreach:trend"
+    PREFIX_DASHBOARD = "sleepreach:dashboard"
+    PREFIX_ANALYTICS = "sleepreach:analytics"
+    PREFIX_LEADS = "sleepreach:leads"
+    PREFIX_CONDITIONS = "sleepreach:conditions"
+    PREFIX_COHORT = "sleepreach:cohort"
+    PREFIX_TREND = "sleepreach:trend"
     
     def __init__(self):
         """Initialize Redis connection."""
@@ -518,7 +518,7 @@ class CacheService:
     
     def invalidate_all(self) -> None:
         """Invalidate all caches (use sparingly)."""
-        self.delete_pattern("neuroreach:*")
+        self.delete_pattern("sleepreach:*")
         logger.info("All caches invalidated")
     
     def invalidate_on_lead_change(self) -> None:
@@ -536,10 +536,10 @@ class CacheService:
         
         # CRITICAL FIX: Also invalidate metrics dashboard summary cache
         # This key is used by /api/metrics/analytics/dashboard-summary
-        self.delete("neuroreach:metrics:dashboard_summary")
+        self.delete("sleepreach:metrics:dashboard_summary")
         
         # Invalidate queue metrics for all queue types
-        self.delete_pattern("neuroreach:metrics:queue:*")
+        self.delete_pattern("sleepreach:metrics:queue:*")
         
         # Also invalidate source-specific caches (used by source_analytics.py)
         self.delete_pattern(f"{self.PREFIX_ANALYTICS}:source:*")
@@ -551,10 +551,10 @@ class CacheService:
         self.delete_pattern(f"{self.PREFIX_TREND}:*")
         
         # Invalidate metrics trends caches (daily/monthly trends in metrics.py)
-        self.delete_pattern("neuroreach:metrics:trends:*")
+        self.delete_pattern("sleepreach:metrics:trends:*")
         
-        # CRITICAL: Invalidate conditions + TMS distribution caches
-        # When a lead's tms_therapy_interest or condition is edited,
+        # CRITICAL: Invalidate conditions + sleep treatment distribution caches
+        # When a lead's sleep_treatment_interest or condition is edited,
         # the analytics dashboard cards must reflect changes immediately.
         self.delete_pattern(f"{self.PREFIX_CONDITIONS}:*")
         

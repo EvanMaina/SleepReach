@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS clinic_settings (
 
 INSERT INTO clinic_settings (key, value) VALUES
     ('clinic_name',    'The Insomnia and Sleep Institute of Arizona'),
-    ('clinic_address', '3805 E Bell Rd, Suite 2800, Phoenix, AZ 85032'),
+    ('clinic_address', '8330 E Hartford Drive, Suite 100, Scottsdale, Arizona 85255'),
     ('clinic_phone',   '(480) 745-3547'),
     ('clinic_email',   'info@sleeplessinarizona.com')
 ON CONFLICT (key) DO NOTHING;
@@ -127,13 +127,13 @@ CREATE INDEX IF NOT EXISTS idx_provider_notes_provider_id ON provider_notes_hist
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token VARCHAR(255) NOT NULL UNIQUE,
+    token_hash VARCHAR(255) NOT NULL UNIQUE,
     expires_at TIMESTAMPTZ NOT NULL,
-    used BOOLEAN NOT NULL DEFAULT FALSE,
+    used_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_reset_tokens_token ON password_reset_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_reset_tokens_token_hash ON password_reset_tokens(token_hash);
 
 -- Invitation requests
 CREATE TABLE IF NOT EXISTS invitation_requests (

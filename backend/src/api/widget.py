@@ -30,15 +30,21 @@ router = APIRouter(tags=["Widget"])
 # In Docker: /app/frontend/dist-widget/widget-embed.js
 # Local dev: ../frontend/dist-widget/widget-embed.js
 WIDGET_PATHS = [
+    # Backend static mount path (works in Docker dev with bind-mounted backend/static)
+    Path("/app/static/widget-embed.js"),
     # Docker path
     Path("/app/frontend/dist-widget/widget-embed.js"),
+    # Local backend static path
+    Path(__file__).resolve().parent.parent.parent / "static" / "widget-embed.js",
     # Local development path (relative to backend/src/)
     Path(__file__).resolve().parent.parent.parent.parent / "frontend" / "dist-widget" / "widget-embed.js",
 ]
 
 # Resolve assessment bundle path
 ASSESSMENT_PATHS = [
+    Path("/app/static/assessment.js"),
     Path("/app/frontend/dist-assessment/assessment.js"),
+    Path(__file__).resolve().parent.parent.parent / "static" / "assessment.js",
     Path(__file__).resolve().parent.parent.parent.parent / "frontend" / "dist-assessment" / "assessment.js",
 ]
 
@@ -211,7 +217,7 @@ async def widget_test_page(request: Request):
         HTMLResponse: Test HTML page with the widget embedded
     """
     # Determine the base URL for the widget script
-    base_url = str(request.base_url).rstrip("/")
+    base_url = _get_external_base_url(request)
     cache_bust = int(time.time())
     
     html = f"""<!DOCTYPE html>
@@ -219,7 +225,7 @@ async def widget_test_page(request: Request):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NeuroReach AI Widget - Test Page</title>
+    <title>SleepReach Widget - Test Page</title>
     <style>
         /* Simulating a typical WordPress site */
         body {{
@@ -286,22 +292,22 @@ async def widget_test_page(request: Request):
 </head>
 <body>
     <div class="hero">
-        <h1>🧠 TMS Therapy Center</h1>
-        <p>Advanced Transcranial Magnetic Stimulation for Depression, Anxiety &amp; More</p>
-        <p><span class="badge" style="background:rgba(255,255,255,0.2);color:white;">FDA-Cleared</span>
+        <h1>🌙 The Insomnia and Sleep Institute of Arizona</h1>
+        <p>Comprehensive Sleep Medicine — Diagnostics, Therapy &amp; Better Sleep</p>
+        <p><span class="badge" style="background:rgba(255,255,255,0.2);color:white;">Board-Certified</span>
            <span class="badge" style="background:rgba(255,255,255,0.2);color:white;">Insurance Accepted</span>
            <span class="badge" style="background:rgba(255,255,255,0.2);color:white;">HIPAA Compliant</span></p>
     </div>
 
     <div class="card">
-        <h2>What is TMS Therapy?</h2>
-        <p>Transcranial Magnetic Stimulation (TMS) is a non-invasive procedure that uses magnetic fields to stimulate nerve cells in the brain to improve symptoms of depression, anxiety, OCD, and PTSD.</p>
-        <p>TMS therapy is FDA-cleared and covered by most major insurance plans. Treatment typically involves daily sessions over 4-6 weeks, with each session lasting about 20-40 minutes.</p>
+        <h2>Why a Sleep Assessment?</h2>
+        <p>Sleep disorders — including insomnia, sleep apnea, restless legs syndrome, and narcolepsy — affect millions of adults. Left untreated, they can contribute to heart disease, weight gain, mood changes, and daytime fatigue.</p>
+        <p>Our board-certified sleep specialists provide comprehensive evaluations, in-lab and at-home sleep studies, CPAP therapy, Inspire therapy, CBT-I, and more — most covered by insurance.</p>
     </div>
 
     <div class="card">
-        <h2>Is TMS Right for You?</h2>
-        <p>Click the <strong>"Free Assessment"</strong> button in the bottom-right corner to take our quick 2-minute assessment. Our care coordinators will review your information and reach out within 24 hours to schedule a consultation.</p>
+        <h2>Is a Sleep Consultation Right for You?</h2>
+        <p>Click the <strong>"Free Assessment"</strong> button in the bottom-right corner to take our quick 2-minute sleep assessment. Our care coordinators will review your information and reach out within 24 hours to schedule a consultation.</p>
         <p><span class="badge">✓ Free Assessment</span>
            <span class="badge">✓ HIPAA Protected</span>
            <span class="badge">✓ 2 Minutes</span></p>
@@ -315,11 +321,11 @@ async def widget_test_page(request: Request):
     </div>
 
     <footer>
-        <p>This is a test page for the NeuroReach AI embeddable widget.</p>
+        <p>This is a test page for the SleepReach embeddable widget.</p>
         <p>Widget is served from: <code>{base_url}/widget-embed.js</code></p>
     </footer>
 
-    <!-- NeuroReach AI Widget - Single script tag embedding -->
+    <!-- SleepReach Widget - Single script tag embedding -->
     <script src="{base_url}/widget-embed.js?v={cache_bust}"></script>
 </body>
 </html>"""
@@ -409,8 +415,8 @@ async def assessment_page(request: Request):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Free TMS Assessment — TMS Institute of Arizona</title>
-    <meta name="description" content="Take a free 2-minute assessment to see if TMS therapy is right for you. HIPAA compliant and secure.">
+    <title>Free Sleep Assessment — The Insomnia and Sleep Institute of Arizona</title>
+    <meta name="description" content="Take a free 2-minute sleep assessment to see if a consultation is right for you. HIPAA compliant and secure.">
     <meta name="robots" content="noindex, nofollow">
     <style>
         html, body {{

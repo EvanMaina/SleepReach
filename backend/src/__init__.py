@@ -1,5 +1,5 @@
 """
-NeuroReach AI Backend Package.
+SleepReach Backend Package.
 
 HIPAA-compliant patient intake and lead generation API.
 """

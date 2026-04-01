@@ -1,5 +1,5 @@
 """
-Pydantic validation schemas for NeuroReach AI.
+Pydantic validation schemas for SleepReach.
 
 Contains request/response DTOs with validation rules.
 These schemas enforce data integrity at API boundaries.

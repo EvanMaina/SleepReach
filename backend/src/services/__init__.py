@@ -1,5 +1,5 @@
 """
-Business logic services for NeuroReach AI.
+Business logic services for SleepReach.
 
 Contains all business logic separated from API layer.
 Services handle data processing, scoring, and external integrations.

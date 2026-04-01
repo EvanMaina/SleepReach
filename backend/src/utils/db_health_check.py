@@ -412,7 +412,7 @@ def print_health_report():
     }
 
     logger.info("=" * 60)
-    logger.info("NeuroReach AI - Database Health Check")
+    logger.info("SleepReach - Database Health Check")
     logger.info("=" * 60)
     logger.info("Overall Status: %s %s", status_emoji.get(report['status'], '❓'), report['status'].upper())
     logger.info("Timestamp: %s", report['timestamp'])

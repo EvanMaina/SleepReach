@@ -44,7 +44,7 @@ interface LeadEditModalProps {
     isOpen: boolean
     lead: EditableLead | null
     onClose: () => void
-    onSave: () => void
+    onSave: (updatedLead: EditableLead) => void
 }
 
 const CONDITION_OPTIONS = [
@@ -343,11 +343,11 @@ export function LeadEditModal({ isOpen, lead, onClose, onSave }: LeadEditModalPr
         }
 
         try {
-            await leadsAPI.update(lead.id, payload)
+            const response = await leadsAPI.update(lead.id, payload)
             setSaveSuccess(true)
             window.setTimeout(() => {
                 setSaveSuccess(false)
-                onSave()
+                onSave(response.data)
             }, 700)
         } catch (err: any) {
             const detail = err?.response?.data?.detail

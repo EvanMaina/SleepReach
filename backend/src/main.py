@@ -1,8 +1,8 @@
 """
-NeuroReach AI Backend - FastAPI Application Entry Point
+SleepReach Backend - FastAPI Application Entry Point
 
-HIPAA-compliant patient intake and lead generation platform
-for TMS therapy clinics.
+HIPAA-compliant patient intake and lead management platform
+for The Insomnia and Sleep Institute of Arizona.
 
 Performance optimized with:
 - Redis caching layer
@@ -28,7 +28,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from .core.config import settings
 from .core.database import engine, Base
-from .api import health_router, leads_router, analytics_router, metrics_router, calls_router, source_analytics_router, platform_analytics_router, webhooks_router, providers_router, communications_router, auth_router, users_router, widget_router, notes_router
+from .api import health_router, leads_router, analytics_router, metrics_router, source_analytics_router, platform_analytics_router, webhooks_router, providers_router, communications_router, auth_router, users_router, widget_router, notes_router, attachments_router, ai_insights_router
 from .services.cache import get_cache
 
 
@@ -361,7 +361,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Admin seeding is handled by the setup_fresh_admin.py script.
     # Run it after first deployment:
-    #   docker exec -it neuroreach-backend python /app/scripts/setup_fresh_admin.py --email you@clinic.com
+    #   docker exec -it sleepreach-backend python /app/scripts/setup_fresh_admin.py --email you@clinic.com
     try:
         from .core.database import SessionLocal
         from .models.user import User
@@ -372,7 +372,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             if user_count == 0:
                 logger.warning(
                     "NO USERS FOUND. Run the setup script to create the first admin: "
-                    "docker exec -it neuroreach-backend python /app/scripts/setup_fresh_admin.py --email admin@clinic.com"
+                    "docker exec -it sleepreach-backend python /app/scripts/setup_fresh_admin.py --email admin@clinic.com"
                 )
         finally:
             db.close()
@@ -401,8 +401,8 @@ def create_application() -> FastAPI:
         title=settings.app_name,
         version=settings.app_version,
         description=(
-            "HIPAA-compliant patient intake and lead generation API "
-            "for TMS therapy clinics. Performance optimized with Redis caching."
+            "HIPAA-compliant patient intake and lead management API "
+            "for The Insomnia and Sleep Institute of Arizona."
         ),
         docs_url="/docs" if settings.is_development else None,
         redoc_url="/redoc" if settings.is_development else None,
@@ -444,19 +444,23 @@ def create_application() -> FastAPI:
 
     # Register routers
     app.include_router(health_router)
+    # Register more specific /api/leads/* routes before the generic /api/leads/{lead_id}
+    # routes in leads_router so static paths like /api/leads/attachment-counts resolve
+    # correctly instead of being parsed as a UUID.
+    app.include_router(attachments_router)
+    app.include_router(notes_router)
     app.include_router(leads_router)
     app.include_router(analytics_router)
     app.include_router(source_analytics_router)
     app.include_router(platform_analytics_router)
     app.include_router(metrics_router)
-    app.include_router(calls_router)
     app.include_router(webhooks_router)
     app.include_router(providers_router)
     app.include_router(communications_router)
+    app.include_router(ai_insights_router)
     app.include_router(auth_router)
     app.include_router(users_router)
     app.include_router(widget_router)
-    app.include_router(notes_router)
 
     return app
 

@@ -8,7 +8,7 @@ to leads directly from the dashboard.
 import hashlib
 import time
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field
 
@@ -19,7 +19,8 @@ from ..core.database import get_db
 from ..models.lead import Lead, LeadStatus
 from ..services.encryption import EncryptionService
 from ..services.audit import AuditService
-from ..core.auth import get_current_user
+from ..core.auth import get_current_user, require_role
+from ..services.communication_templates import get_template_payload, save_template_payload
 
 
 from ..models.user import User
@@ -81,6 +82,28 @@ class CommunicationResponse(BaseModel):
     success: bool
     message: str
     task_id: Optional[str] = None
+
+
+class EmailTemplateItem(BaseModel):
+    id: str
+    label: str
+    description: str
+    subject: str
+    body: str
+    editable: bool = True
+
+
+class SMSTemplateItem(BaseModel):
+    id: str
+    label: str
+    description: str
+    message: str
+    editable: bool = True
+
+
+class CommunicationTemplatesResponse(BaseModel):
+    email_templates: List[EmailTemplateItem]
+    sms_templates: List[SMSTemplateItem]
 
 
 # =============================================================================
@@ -414,46 +437,32 @@ async def send_sms_to_lead(
 
 @router.get(
     "/templates",
+    response_model=CommunicationTemplatesResponse,
     summary="Get Communication Templates",
     description="Get available email and SMS templates.",
 )
-async def get_templates():
+async def get_templates(
+    db: Session = Depends(get_db),
+) -> CommunicationTemplatesResponse:
     """
     Get available communication templates.
 
-    Returns predefined templates for email and SMS communications.
+    Returns editable default templates for email and SMS communications.
     """
-    return {
-        "email_templates": [
-            {"id": "follow_up", "label": "Follow-up",
-                "description": "General follow-up on TMS inquiry"},
-            {"id": "appointment_confirmation", "label": "Appointment Confirmation",
-                "description": "Confirm scheduled consultation"},
-            {"id": "appointment_reminder", "label": "Appointment Reminder",
-                "description": "Remind about upcoming appointment"},
-            {"id": "missed_call", "label": "Missed Call Follow-up",
-                "description": "Follow up after missed call"},
-            {"id": "thank_you", "label": "Thank You",
-                "description": "Thank you after conversation"},
-            {"id": "no_response_final", "label": "Final Outreach",
-                "description": "Last attempt to reach lead"},
-            {"id": "custom", "label": "Custom Email",
-                "description": "Write custom message"},
-        ],
-        "sms_templates": [
-            {"id": "follow_up", "label": "Follow-up",
-                "description": "Quick follow-up message"},
-            {"id": "appointment_reminder", "label": "Appointment Reminder",
-                "description": "Remind about appointment"},
-            {"id": "missed_call", "label": "Missed Call",
-                "description": "Follow up after missed call"},
-            {"id": "thank_you", "label": "Thank You",
-                "description": "Thank you message"},
-            {"id": "schedule_request", "label": "Schedule Request",
-                "description": "Request to schedule"},
-            {"id": "no_response_final", "label": "Final Outreach",
-                "description": "Last attempt"},
-            {"id": "custom", "label": "Custom SMS",
-                "description": "Write custom message"},
-        ],
-    }
+    payload = get_template_payload(db)
+    return CommunicationTemplatesResponse(**payload)
+
+
+@router.put(
+    "/templates",
+    response_model=CommunicationTemplatesResponse,
+    summary="Update Communication Templates",
+    description="Admin-only update for the default email and SMS templates.",
+)
+async def update_templates(
+    body: CommunicationTemplatesResponse,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("administrator")),
+) -> CommunicationTemplatesResponse:
+    payload = save_template_payload(db, body.model_dump())
+    return CommunicationTemplatesResponse(**payload)

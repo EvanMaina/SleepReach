@@ -586,9 +586,65 @@ export default function CoordinatorPage({
     }
   }, [activeQueue]);
 
+  const mergeLeadIntoState = useCallback(
+    (updatedLead: Partial<Lead> & { id: string }) => {
+      setLeads((prev) => {
+        const exists = prev.some((lead) => lead.id === updatedLead.id);
+        if (!exists) return [updatedLead as Lead, ...prev];
+        return prev.map((lead) =>
+          lead.id === updatedLead.id
+            ? ({ ...lead, ...updatedLead } as Lead)
+            : lead,
+        );
+      });
+      setDetailLead((prev) =>
+        prev && prev.id === updatedLead.id
+          ? ({ ...prev, ...updatedLead } as Lead)
+          : prev,
+      );
+    },
+    [],
+  );
+
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
+  useEffect(() => {
+    if (isLoading) return;
+    const raw = sessionStorage.getItem("sleepreach_focus_lead");
+    if (!raw) return;
+
+    let cancelled = false;
+
+    const openFocusedLead = async () => {
+      try {
+        const parsed = JSON.parse(raw) as { leadId?: string };
+        if (!parsed.leadId) {
+          sessionStorage.removeItem("sleepreach_focus_lead");
+          return;
+        }
+
+        const existing = leads.find((lead) => lead.id === parsed.leadId);
+        if (existing) {
+          setQuickActionLead(existing);
+          sessionStorage.removeItem("sleepreach_focus_lead");
+          return;
+        }
+
+        const response = await leadsAPI.get(parsed.leadId);
+        if (cancelled) return;
+        setQuickActionLead(response.data);
+        sessionStorage.removeItem("sleepreach_focus_lead");
+      } catch {
+        sessionStorage.removeItem("sleepreach_focus_lead");
+      }
+    };
+
+    void openFocusedLead();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading, leads, activeQueue]);
   useEffect(() => {
     setActiveFilter("All");
     setSearch("");
@@ -1032,7 +1088,7 @@ export default function CoordinatorPage({
       await leadsAPI.delete(lead.id);
       showToast(`Lead ${lead.lead_number} deleted`);
       setDetailLead(null);
-      fetchLeads();
+      setLeads((prev) => prev.filter((item) => item.id !== lead.id));
     } catch {
       showToast("Failed to delete lead", "error");
     }
@@ -1301,7 +1357,7 @@ export default function CoordinatorPage({
                     className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-gradient-to-r from-emerald-600 to-emerald-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:from-emerald-700 hover:to-emerald-800"
                   >
                     <Plus size={16} />
-                    Add Lead Manually
+                    Add Lead
                   </button>
                 </div>
                 <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
@@ -1960,11 +2016,10 @@ export default function CoordinatorPage({
           lead={quickActionLead}
           onClose={() => {
             setQuickActionLead(null);
-            fetchLeads();
           }}
           onViewDetails={handleViewFullProfile}
           showToast={showToast}
-          fetchLeads={fetchLeads}
+          onLeadUpdated={mergeLeadIntoState}
         />
       )}
 
@@ -1976,10 +2031,10 @@ export default function CoordinatorPage({
           lead={consultationLead}
           onClose={() => {
             setConsultationLead(null);
-            fetchLeads();
           }}
           onViewDetails={handleViewFullProfile}
           showToast={showToast}
+          onLeadUpdated={mergeLeadIntoState}
         />
       )}
 
@@ -2425,9 +2480,9 @@ export default function CoordinatorPage({
         isOpen={Boolean(editLead)}
         lead={editLead}
         onClose={() => setEditLead(null)}
-        onSave={() => {
+        onSave={(updatedLead) => {
+          mergeLeadIntoState(updatedLead as Lead);
           setEditLead(null);
-          fetchLeads();
           showToast("Lead updated");
         }}
       />
@@ -2661,13 +2716,13 @@ function QuickActionPanel({
   onClose,
   onViewDetails,
   showToast,
-  fetchLeads,
+  onLeadUpdated,
 }: {
   lead: Lead;
   onClose: () => void;
   onViewDetails: (id: string) => void;
   showToast: (msg: string, type?: "success" | "error") => void;
-  fetchLeads: () => void;
+  onLeadUpdated: (updatedLead: Partial<Lead> & { id: string }) => void;
 }) {
   type View =
     | "actions"
@@ -2716,10 +2771,11 @@ function QuickActionPanel({
     if (!pendingOutcome || isUpdating) return;
     setIsUpdating(true);
     try {
-      await leadsAPI.updateContactOutcome(lead.id, {
+      const response = await leadsAPI.updateContactOutcome(lead.id, {
         contact_outcome: pendingOutcome,
         notes: noteText.trim() || undefined,
       });
+      onLeadUpdated(response.data);
       const name = `${lead.first_name} ${lead.last_name || ""}`.trim();
       const msgs: Record<string, string> = {
         ANSWERED: `✓ ${name} moved to Contacted`,
@@ -2750,12 +2806,13 @@ function QuickActionPanel({
     }
     setIsUpdating(true);
     try {
-      await leadsAPI.schedule(lead.id, {
+      const response = await leadsAPI.schedule(lead.id, {
         scheduled_callback_at: dt.toISOString(),
         contact_method: "PHONE",
         schedule_type: type,
         scheduled_notes: noteText.trim() || undefined,
       });
+      onLeadUpdated(response.data);
       if (noteText.trim()) {
         try {
           await leadsAPI.createNote(lead.id, {
@@ -3267,11 +3324,13 @@ function ConsultationPanel({
   onClose,
   onViewDetails,
   showToast,
+  onLeadUpdated,
 }: {
   lead: Lead;
   onClose: () => void;
   onViewDetails: (id: string) => void;
   showToast: (msg: string, type?: "success" | "error") => void;
+  onLeadUpdated: (updatedLead: Partial<Lead> & { id: string }) => void;
 }) {
   type View = "outcomes" | "confirmation" | "reschedule" | "followup";
   const [view, setView] = useState<View>("outcomes");
@@ -3305,11 +3364,12 @@ function ConsultationPanel({
         NO_SHOW: "no_show",
         CANCELLED: "cancelled",
       };
-      await leadsAPI.updateConsultationOutcome(lead.id, {
+      const response = await leadsAPI.updateConsultationOutcome(lead.id, {
         outcome: apiMap[outcome],
         notes: noteText.trim() || undefined,
         scheduled_callback_at: scheduledAt,
       });
+      onLeadUpdated(response.data);
       const name = `${lead.first_name} ${lead.last_name || ""}`.trim();
       const msgs: Record<string, string> = {
         CONSULTATION_COMPLETE: `✓ ${name} marked as Completed`,

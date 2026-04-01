@@ -1,5 +1,5 @@
 """
-Core module for NeuroReach AI backend.
+Core module for SleepReach backend.
 
 Contains configuration, database setup, and security utilities.
 """

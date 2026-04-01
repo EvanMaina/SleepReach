@@ -46,8 +46,8 @@ class EmailService:
         self.smtp_username = getattr(settings, 'smtp_username', '')
         self.smtp_password = getattr(settings, 'smtp_password', '')
         self.from_email = getattr(
-            settings, 'from_email', 'noreply@neuroreach.ai')
-        self.from_name = getattr(settings, 'from_name', 'TMS Institute of Arizona')
+            settings, 'from_email', 'noreply@sleepreach.ai')
+        self.from_name = getattr(settings, 'from_name', 'The Insomnia and Sleep Institute of Arizona')
 
     def send_email(
         self,
@@ -151,19 +151,19 @@ class EmailService:
 
 EMAIL_TITLES = {
     "lead_receipt": (
-        "TMS Therapy Consultation Request Received",
+        "Sleep Consultation Request Received",
         "Thank you for reaching out to our care team",
     ),
     "user_invitation": (
-        "Welcome to TMS NeuroReach",
+        "Welcome to SleepReach",
         "Your account has been created",
     ),
     "password_reset": (
         "Reset Your Password",
-        "We received a request to reset your TMS NeuroReach account password",
+        "We received a request to reset your SleepReach account password",
     ),
     "access_request_admin": (
-        "New Access Request — TMS NeuroReach",
+        "New Access Request — SleepReach",
         "A new user has requested access to the dashboard",
     ),
 }
@@ -194,7 +194,7 @@ EMAIL_BODY_TEMPLATES = {
                     <tr>
                         <td style="padding: 16px 30px 0 30px;">
                             <p style="margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 15px; color: #444444; line-height: 1.6;">
-                                We've received your consultation request for TMS therapy. We understand that taking the first step toward treatment can feel overwhelming &mdash; you're not alone, and our team is here to guide you every step of the way.
+                                We've received your consultation request. We understand that taking the first step toward better sleep can feel overwhelming &mdash; you're not alone, and our team is here to guide you every step of the way.
                             </p>
                         </td>
                     </tr>
@@ -224,7 +224,7 @@ EMAIL_BODY_TEMPLATES = {
                     <tr>
                         <td style="padding: 16px 30px 0 30px;">
                             <p style="margin: 0 0 4px 0; font-family: Arial, Helvetica, sans-serif; font-size: 15px; font-weight: bold; color: #1A1A1A;">&#8226; Your Consultation</p>
-                            <p style="margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 15px; color: #444444; line-height: 1.6;">We'll schedule a consultation with our TMS specialists at a time that works for you.</p>
+                            <p style="margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 15px; color: #444444; line-height: 1.6;">We'll schedule a consultation with our sleep specialists at a time that works for you.</p>
                         </td>
                     </tr>
 
@@ -233,7 +233,7 @@ EMAIL_BODY_TEMPLATES = {
                     <!-- CTA -->
                     <tr>
                         <td align="center" style="padding: 10px 30px 0 30px;">
-                            <a href="tel:+14806683599" style="display: inline-block; padding: 14px 32px; background-color: {HEADER_BG_COLOR}; color: #ffffff; text-decoration: none; border-radius: 8px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: bold;">Call Us: (480) 668-3599</a>
+                            <a href="tel:+14807453547" style="display: inline-block; padding: 14px 32px; background-color: {HEADER_BG_COLOR}; color: #ffffff; text-decoration: none; border-radius: 8px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: bold;">Call Us: (480) 745-3547</a>
                         </td>
                     </tr>
                     <tr>
@@ -262,7 +262,7 @@ EMAIL_BODY_TEMPLATES = {
                     <tr>
                         <td style="padding: 16px 30px 0 30px;">
                             <p style="margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 15px; color: #444444; line-height: 1.6;">
-                                An administrator has created your TMS Institute of Arizona account. You can use the credentials below to log in for the first time.
+                                An administrator has created your SleepReach account. You can use the credentials below to log in for the first time.
                             </p>
                         </td>
                     </tr>
@@ -353,7 +353,7 @@ EMAIL_BODY_TEMPLATES = {
                     <tr>
                         <td style="padding: 16px 30px 0 30px;">
                             <p style="margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 15px; color: #444444; line-height: 1.6;">
-                                We received a request to reset your password for your TMS NeuroReach account. Click the button below to set a new password.
+                                We received a request to reset your password for your SleepReach account. Click the button below to set a new password.
                             </p>
                         </td>
                     </tr>
@@ -414,7 +414,7 @@ EMAIL_BODY_TEMPLATES = {
                     <tr>
                         <td style="padding: 20px 30px 0 30px;">
                             <p style="margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 15px; color: #444444; line-height: 1.6;">
-                                A new user has requested access to the TMS NeuroReach dashboard. Please review their details below.
+                                A new user has requested access to the SleepReach dashboard. Please review their details below.
                             </p>
                         </td>
                     </tr>

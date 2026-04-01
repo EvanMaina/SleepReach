@@ -42,3 +42,14 @@ celerybeat.pid
 # Coverage
 htmlcov/
 .coverage
+
+# Local repo/link artifacts
+NeuroReachAI/
+tmp/
+tmp-playwright-smoke.spec.ts
+test-results/
+frontend/test-results/
+frontend/dist-assessment/
+frontend/dist-widget/
+package-lock.json
+test_api.py

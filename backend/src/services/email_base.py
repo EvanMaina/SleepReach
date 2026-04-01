@@ -23,14 +23,16 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # Clinic Constants
 # =============================================================================
-CLINIC_NAME = "TMS Institute of Arizona"
-CLINIC_ADDRESS = "5150 N 16th St, Suite A-114, Phoenix, AZ 85016"
-CLINIC_PHONE = "(480) 668-3599"
-CLINIC_EMAIL = "support@tmsinstitute.co"
-CLINIC_WEBSITE = "tmsinstitute.co"
+CLINIC_NAME = "The Insomnia and Sleep Institute of Arizona"
+CLINIC_ADDRESS = "8330 E Hartford Drive, Suite 100, Scottsdale, Arizona 85255"
+CLINIC_PHONE = "(480) 745-3547"
+CLINIC_EMAIL = "info@sleeplessinarizona.com"
+CLINIC_WEBSITE = "sleeplessinarizona.com"
 HEADER_BG_COLOR = "#3D6B6B"
 FOOTER_BG_COLOR = "#3D6B6B"
 HIPAA_BG_COLOR = "#2F5C5C"
+EMAIL_LOGO_WIDTH = 47
+EMAIL_LOGO_HEIGHT = 64
 
 
 def get_logo_url() -> str:
@@ -73,11 +75,11 @@ def email_header(title: str, subtitle: Optional[str] = None) -> str:
                     <!-- HEADER: Teal background with logo + title  -->
                     <!-- ============================================ -->
                     <tr>
-                        <td align="center" style="background-color: {HEADER_BG_COLOR}; padding: 24px 30px 12px 30px; font-size: 0; line-height: 0;">
+                        <td align="center" style="background-color: {HEADER_BG_COLOR}; padding: 18px 30px 10px 30px; font-size: 0; line-height: 0;">
                             <img src="{logo_url}"
                                  alt="{CLINIC_NAME}"
-                                 width="180" height="47"
-                                 style="width: 180px; height: auto; border: 0; display: block; margin: 0 auto;" />
+                                 width="{EMAIL_LOGO_WIDTH}" height="{EMAIL_LOGO_HEIGHT}"
+                                 style="width: {EMAIL_LOGO_WIDTH}px; height: {EMAIL_LOGO_HEIGHT}px; border: 0; display: block; margin: 0 auto;" />
                         </td>
                     </tr>
                     <tr>
@@ -144,7 +146,7 @@ def email_footer() -> str:
                     <tr>
                         <td align="center" style="padding: 6px 30px 0 30px;">
                             <p style="margin: 0; font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #999999; line-height: 1.4;">
-                                <a href="tel:4806683599" style="color: #999999; text-decoration: none;">{CLINIC_PHONE}</a>
+                                <a href="tel:4807453547" style="color: #999999; text-decoration: none;">{CLINIC_PHONE}</a>
                                 &nbsp;|&nbsp;
                                 <a href="mailto:{CLINIC_EMAIL}" style="color: #999999; text-decoration: none;">{CLINIC_EMAIL}</a>
                                 &nbsp;|&nbsp;

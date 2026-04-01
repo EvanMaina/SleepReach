@@ -93,7 +93,7 @@ services:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - ./backend/src:/app/src:ro
-      - ./backend/static:/app/static:ro
+      - ./backend/static:/app/static
       - ./backend/scripts:/app/scripts:ro
     depends_on:
       db:
@@ -158,6 +158,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "PYTHONPATH=/app /opt/venv/bin/celery -A src.tasks.celery_app inspect ping --timeout=5 | grep -q pong"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 20s
     networks:
       - data
       - backend
@@ -184,6 +190,12 @@ services:
       - celerybeat_schedule:/var/run/celery
     depends_on:
       - celery-worker
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"from pathlib import Path; import time, sys; p = Path('/var/run/celery/celerybeat-schedule'); sys.exit(0 if p.exists() and (time.time() - p.stat().st_mtime) < 900 else 1)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     networks:
       - data
 
@@ -220,7 +232,7 @@ services:
       - MAILDEV_INCOMING_USER=
       - MAILDEV_INCOMING_PASS=
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:1080"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:1080"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -137,8 +137,8 @@ class ProviderCreate(BaseModel):
                 "practice_zip": "85001",
                 "specialty": "PSYCHIATRIST",
                 "credentials": "MD",
-                "status": "ACTIVE",
-                "preferred_contact": "EMAIL",
+                "status": "active",
+                "preferred_contact": "email",
                 "send_referral_updates": True
             }
         }
@@ -176,7 +176,7 @@ class ProviderUpdate(BaseModel):
     model_config = {
         "json_schema_extra": {
             "example": {
-                "status": "ACTIVE",
+                "status": "active",
                 "notes": "Verified provider - contacted on 2026-01-20"
             }
         }
