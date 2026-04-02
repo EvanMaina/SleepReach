@@ -375,9 +375,12 @@ export default function AIInsightsPage() {
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                     <MetricCard
                         icon={Users}
-                        label="New Untouched"
-                        value={data.pipeline.alerts.find(a => a.label === 'Untouched New Leads')?.count ?? (data.pipeline.stages.find(s => s.label === 'New')?.count || 0)}
-                        sub="Waiting for first contact"
+                        label="New Leads"
+                        value={data.pipeline.stages.find(s => s.label === 'New')?.count || 0}
+                        sub={(() => {
+                            const stale = data.pipeline.alerts.find(a => a.label === 'Untouched New Leads')?.count || 0;
+                            return stale > 0 ? `${stale} waiting 48h+ for first contact` : 'Awaiting first contact';
+                        })()}
                         accent="blue"
                     />
                     <MetricCard

@@ -44,7 +44,7 @@ engine = create_engine(
     pool_pre_ping=True,  # Enable connection health checks
     pool_recycle=settings.db_pool_recycle,   # Use config value (default 1800s)
     pool_timeout=settings.db_pool_timeout,   # Use config value (default 30s)
-    echo=settings.debug,  # Log SQL queries in debug mode
+    echo=False,  # SQL echo disabled — use logging config for query debugging
 )
 
 
