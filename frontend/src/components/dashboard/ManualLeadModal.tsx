@@ -267,7 +267,7 @@ export function ManualLeadModal({ isOpen, onClose, onSuccess }: ManualLeadModalP
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4" onClick={handleClose}>
-            <div className="w-full max-w-lg max-h-[92vh] overflow-hidden rounded-3xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="w-full max-w-2xl max-h-[92vh] overflow-hidden rounded-3xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
                 <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-emerald-50 via-white to-white px-6 py-4">
                     <div className="flex items-center gap-3">
                         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100">
@@ -340,7 +340,7 @@ export function ManualLeadModal({ isOpen, onClose, onSuccess }: ManualLeadModalP
                             </div>
                         ) : null}
 
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-[180px_minmax(0,1fr)_160px]">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                             <div>
                                 <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Insurance?</label>
                                 <select value={hasInsurance === undefined ? '' : hasInsurance ? 'yes' : 'no'} onChange={(event) => setHasInsurance(event.target.value === '' ? undefined : event.target.value === 'yes')} className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-sleep-500 focus:outline-none focus:ring-2 focus:ring-sleep-500/20">
@@ -370,10 +370,13 @@ export function ManualLeadModal({ isOpen, onClose, onSuccess }: ManualLeadModalP
                                 <button
                                     type="button"
                                     onClick={() => setIsReferral((prev) => !prev)}
-                                    className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors ${isReferral ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                    className={`relative inline-flex h-9 w-[72px] flex-shrink-0 items-center rounded-full border-2 transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-emerald-500/30 ${isReferral ? 'border-emerald-500 bg-emerald-500' : 'border-gray-300 bg-gray-200'}`}
                                 >
-                                    <span className={`absolute left-1 inline-flex h-6 w-6 rounded-full bg-white shadow transition-transform ${isReferral ? 'translate-x-8' : 'translate-x-0'}`} />
-                                    <span className={`w-full px-2 text-xs font-semibold ${isReferral ? 'text-white text-left' : 'text-gray-700 text-right'}`}>{isReferral ? 'Yes' : 'No'}</span>
+                                    <span className={`pointer-events-none inline-flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-lg ring-0 transition-transform duration-300 ease-in-out ${isReferral ? 'translate-x-[38px]' : 'translate-x-0.5'}`}>
+                                        <span className={`text-[10px] font-bold ${isReferral ? 'text-emerald-600' : 'text-gray-400'}`}>{isReferral ? '✓' : '—'}</span>
+                                    </span>
+                                    <span className={`absolute text-[11px] font-bold transition-opacity duration-200 ${isReferral ? 'left-2.5 text-white opacity-100' : 'left-2.5 text-white opacity-0'}`}>Yes</span>
+                                    <span className={`absolute text-[11px] font-bold transition-opacity duration-200 ${isReferral ? 'right-2 text-emerald-100 opacity-0' : 'right-2.5 text-gray-500 opacity-100'}`}>No</span>
                                 </button>
                             </div>
 
@@ -439,18 +442,20 @@ export function ManualLeadModal({ isOpen, onClose, onSuccess }: ManualLeadModalP
 
                         <div>
                             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-gray-500">Notes</label>
-                            <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={4} placeholder="Add coordinator notes" className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:border-sleep-500 focus:outline-none focus:ring-2 focus:ring-sleep-500/20" />
+                            <textarea value={notes} onChange={(event) => setNotes(event.target.value)} rows={3} placeholder="Add coordinator notes" className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm focus:border-sleep-500 focus:outline-none focus:ring-2 focus:ring-sleep-500/20 resize-none" />
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-between border-t border-gray-200 bg-gray-50 px-6 py-4">
-                        <p className="text-xs text-gray-500">Referred leads are tagged and linked to the Providers dashboard automatically.</p>
-                        <div className="flex items-center gap-3">
-                            <button type="button" onClick={handleClose} className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100">Cancel</button>
-                            <button type="submit" disabled={!canSubmit} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
-                                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                                Add Lead
-                            </button>
+                    <div className="border-t border-gray-200 bg-gray-50/80 px-6 py-5">
+                        <div className="flex items-center justify-between">
+                            <p className="text-xs text-gray-400 max-w-[280px]">Referred leads are tagged and linked to the Providers dashboard automatically.</p>
+                            <div className="flex items-center gap-3">
+                                <button type="button" onClick={handleClose} className="rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 hover:border-gray-300">Cancel</button>
+                                <button type="submit" disabled={!canSubmit} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60">
+                                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                                    Add Lead
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </form>

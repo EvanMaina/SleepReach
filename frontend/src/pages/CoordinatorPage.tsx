@@ -566,13 +566,20 @@ export default function CoordinatorPage({
     [],
   );
 
+  // ── Debounced search ─────────────────────────────────────────────────────
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   // ── Data Fetching ───────────────────────────────────────────────────────
   const fetchLeads = useCallback(async () => {
     setIsLoading(true);
     try {
       const [leadRes, countMap] = await Promise.all([
         api.get("/leads", {
-          params: { queue_type: activeQueue, page_size: 500 },
+          params: { queue_type: activeQueue, page_size: 200 },
         }),
         getAttachmentCounts().catch(() => ({})),
       ]);
@@ -588,15 +595,17 @@ export default function CoordinatorPage({
 
   const mergeLeadIntoState = useCallback(
     (updatedLead: Partial<Lead> & { id: string }) => {
-      setLeads((prev) => {
-        const exists = prev.some((lead) => lead.id === updatedLead.id);
-        if (!exists) return [updatedLead as Lead, ...prev];
-        return prev.map((lead) =>
+      // CRITICAL FIX: Never add new rows — only update existing leads.
+      // Adding non-existent leads causes ghost/empty rows when outcome
+      // responses (especially consultation-outcome) return partial data.
+      if (!updatedLead.id) return;
+      setLeads((prev) =>
+        prev.map((lead) =>
           lead.id === updatedLead.id
             ? ({ ...lead, ...updatedLead } as Lead)
             : lead,
-        );
-      });
+        ),
+      );
       setDetailLead((prev) =>
         prev && prev.id === updatedLead.id
           ? ({ ...prev, ...updatedLead } as Lead)
@@ -604,6 +613,16 @@ export default function CoordinatorPage({
       );
     },
     [],
+  );
+
+  // After any outcome recording, remove the lead from the current queue
+  // view (it moved to a different queue) and refetch to get accurate data.
+  const handleOutcomeRecorded = useCallback(
+    (leadId: string) => {
+      setLeads((prev) => prev.filter((lead) => lead.id !== leadId));
+      fetchLeads();
+    },
+    [fetchLeads],
   );
 
   useEffect(() => {
@@ -676,8 +695,8 @@ export default function CoordinatorPage({
       result = result.filter((l) => l.status === "SCHEDULED");
     else if (activeFilter === "Referral")
       result = result.filter((l) => l.is_referral);
-    if (search.trim()) {
-      const s = search.toLowerCase();
+    if (debouncedSearch.trim()) {
+      const s = debouncedSearch.toLowerCase();
       result = result.filter(
         (l) =>
           l.lead_number?.toLowerCase().includes(s) ||
@@ -718,7 +737,7 @@ export default function CoordinatorPage({
       return sortDir === "asc" ? cmp : -cmp;
     });
     return sorted;
-  }, [leads, activeFilter, search, sortField, sortDir]);
+  }, [leads, activeFilter, debouncedSearch, sortField, sortDir]);
 
   useEffect(() => {
     setTablePage(1);
@@ -829,7 +848,7 @@ export default function CoordinatorPage({
     );
   };
 
-  const handleLeadClick = (lead: Lead) => {
+  const handleOpenInteractionPanel = (lead: Lead) => {
     if (lead.status === "SCHEDULED") setConsultationLead(lead);
     else setQuickActionLead(lead);
   };
@@ -1352,13 +1371,15 @@ export default function CoordinatorPage({
                   >
                     <MessageSquare size={16} /> SMS
                   </button>
-                  <button
-                    onClick={() => setShowManualLeadModal(true)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-gradient-to-r from-emerald-600 to-emerald-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:from-emerald-700 hover:to-emerald-800"
-                  >
-                    <Plus size={16} />
-                    Add Lead
-                  </button>
+                  {activeQueue === "new" && (
+                    <button
+                      onClick={() => setShowManualLeadModal(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-gradient-to-r from-emerald-600 to-emerald-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:from-emerald-700 hover:to-emerald-800"
+                    >
+                      <Plus size={16} />
+                      Add Lead
+                    </button>
+                  )}
                 </div>
                 <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
                   {filteredLeads.length} of {leads.length} leads
@@ -1588,8 +1609,7 @@ export default function CoordinatorPage({
                 {paginatedLeads.map((lead) => (
                   <tr
                     key={lead.id}
-                    onClick={() => handleLeadClick(lead)}
-                    className="group cursor-pointer border-t border-gray-50 transition-colors duration-100 hover:bg-sleep-50/30"
+                    className="group border-t border-gray-50 transition-colors duration-100 hover:bg-sleep-50/30"
                   >
                     {visibleCols.has("leadId") && (
                       <td className="px-5 py-3">
@@ -1957,10 +1977,7 @@ export default function CoordinatorPage({
                             </div>
                           )}
                           <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleLeadClick(lead);
-                            }}
+                            onClick={() => handleOpenInteractionPanel(lead)}
                             className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                             title="Open interaction panel"
                           >
@@ -2023,6 +2040,10 @@ export default function CoordinatorPage({
           onViewDetails={handleViewFullProfile}
           showToast={showToast}
           onLeadUpdated={mergeLeadIntoState}
+          onOutcomeRecorded={(leadId: string) => {
+            setQuickActionLead(null);
+            handleOutcomeRecorded(leadId);
+          }}
         />
       )}
 
@@ -2038,6 +2059,10 @@ export default function CoordinatorPage({
           onViewDetails={handleViewFullProfile}
           showToast={showToast}
           onLeadUpdated={mergeLeadIntoState}
+          onOutcomeRecorded={(leadId: string) => {
+            setConsultationLead(null);
+            handleOutcomeRecorded(leadId);
+          }}
         />
       )}
 
@@ -2720,12 +2745,14 @@ function QuickActionPanel({
   onViewDetails,
   showToast,
   onLeadUpdated,
+  onOutcomeRecorded,
 }: {
   lead: Lead;
   onClose: () => void;
   onViewDetails: (id: string) => void;
   showToast: (msg: string, type?: "success" | "error") => void;
   onLeadUpdated: (updatedLead: Partial<Lead> & { id: string }) => void;
+  onOutcomeRecorded: (leadId: string) => void;
 }) {
   type View =
     | "actions"
@@ -2739,6 +2766,37 @@ function QuickActionPanel({
   const [schedDate, setSchedDate] = useState("");
   const [schedTime, setSchedTime] = useState("");
   const [schedError, setSchedError] = useState<string | null>(null);
+
+  // Draggable panel state
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const isDragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    setDragOffset({ x: 0, y: 0 });
+  }, [lead.id]);
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    isDragging.current = true;
+    dragStart.current = {
+      x: e.clientX - dragOffset.x,
+      y: e.clientY - dragOffset.y,
+    };
+    const onMove = (ev: MouseEvent) => {
+      if (!isDragging.current) return;
+      setDragOffset({
+        x: ev.clientX - dragStart.current.x,
+        y: ev.clientY - dragStart.current.y,
+      });
+    };
+    const onUp = () => {
+      isDragging.current = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -2774,11 +2832,10 @@ function QuickActionPanel({
     if (!pendingOutcome || isUpdating) return;
     setIsUpdating(true);
     try {
-      const response = await leadsAPI.updateContactOutcome(lead.id, {
+      await leadsAPI.updateContactOutcome(lead.id, {
         contact_outcome: pendingOutcome,
         notes: noteText.trim() || undefined,
       });
-      onLeadUpdated(response.data);
       const name = `${lead.first_name} ${lead.last_name || ""}`.trim();
       const msgs: Record<string, string> = {
         ANSWERED: `✓ ${name} moved to Contacted`,
@@ -2787,7 +2844,8 @@ function QuickActionPanel({
         NOT_INTERESTED: `✓ ${name} → Follow-up (Not Interested)`,
       };
       showToast(msgs[pendingOutcome] || `✓ ${name} outcome updated`);
-      onClose();
+      // Remove lead from current queue and refetch — prevents ghost rows
+      onOutcomeRecorded(lead.id);
     } catch {
       showToast("Failed to update outcome", "error");
       setView("confirmation");
@@ -2809,13 +2867,12 @@ function QuickActionPanel({
     }
     setIsUpdating(true);
     try {
-      const response = await leadsAPI.schedule(lead.id, {
+      await leadsAPI.schedule(lead.id, {
         scheduled_callback_at: dt.toISOString(),
         contact_method: "PHONE",
         schedule_type: type,
         scheduled_notes: noteText.trim() || undefined,
       });
-      onLeadUpdated(response.data);
       if (noteText.trim()) {
         try {
           await leadsAPI.createNote(lead.id, {
@@ -2834,7 +2891,8 @@ function QuickActionPanel({
           ? `✓ Consultation scheduled for ${name} on ${dateStr}`
           : `✓ Callback scheduled for ${name} on ${dateStr}`,
       );
-      onClose();
+      // Remove from current queue and refetch — lead moved to Scheduled/Callback
+      onOutcomeRecorded(lead.id);
     } catch (err: any) {
       setSchedError(err?.response?.data?.detail || "Failed to schedule");
       showToast("Failed to schedule", "error");
@@ -2886,9 +2944,15 @@ function QuickActionPanel({
     <>
       <div className="fixed inset-0 bg-black/5 z-40 pointer-events-none" />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        <div className="pointer-events-auto w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
-          {/* Header */}
-          <div className="relative bg-gradient-to-r from-slate-800 to-slate-900 text-white px-5 py-4">
+        <div
+          className="pointer-events-auto w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"
+          style={{ transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}
+        >
+          {/* Header — drag handle */}
+          <div
+            className="relative bg-gradient-to-r from-slate-800 to-slate-900 text-white px-5 py-4 cursor-grab active:cursor-grabbing select-none"
+            onMouseDown={handleDragStart}
+          >
             <button
               onClick={onClose}
               className="absolute top-3 right-3 p-1.5 hover:bg-white/10 rounded-lg"
@@ -3328,12 +3392,14 @@ function ConsultationPanel({
   onViewDetails,
   showToast,
   onLeadUpdated,
+  onOutcomeRecorded,
 }: {
   lead: Lead;
   onClose: () => void;
   onViewDetails: (id: string) => void;
   showToast: (msg: string, type?: "success" | "error") => void;
   onLeadUpdated: (updatedLead: Partial<Lead> & { id: string }) => void;
+  onOutcomeRecorded: (leadId: string) => void;
 }) {
   type View = "outcomes" | "confirmation" | "reschedule" | "followup";
   const [view, setView] = useState<View>("outcomes");
@@ -3343,6 +3409,37 @@ function ConsultationPanel({
   const [pickerDate, setPickerDate] = useState("");
   const [pickerTime, setPickerTime] = useState("");
   const [pickerError, setPickerError] = useState<string | null>(null);
+
+  // Draggable panel state
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const isDragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    setDragOffset({ x: 0, y: 0 });
+  }, [lead.id]);
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    isDragging.current = true;
+    dragStart.current = {
+      x: e.clientX - dragOffset.x,
+      y: e.clientY - dragOffset.y,
+    };
+    const onMove = (ev: MouseEvent) => {
+      if (!isDragging.current) return;
+      setDragOffset({
+        x: ev.clientX - dragStart.current.x,
+        y: ev.clientY - dragStart.current.y,
+      });
+    };
+    const onUp = () => {
+      isDragging.current = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -3367,12 +3464,11 @@ function ConsultationPanel({
         NO_SHOW: "no_show",
         CANCELLED: "cancelled",
       };
-      const response = await leadsAPI.updateConsultationOutcome(lead.id, {
+      await leadsAPI.updateConsultationOutcome(lead.id, {
         outcome: apiMap[outcome],
         notes: noteText.trim() || undefined,
         scheduled_callback_at: scheduledAt,
       });
-      onLeadUpdated(response.data);
       const name = `${lead.first_name} ${lead.last_name || ""}`.trim();
       const msgs: Record<string, string> = {
         CONSULTATION_COMPLETE: `✓ ${name} marked as Completed`,
@@ -3382,7 +3478,10 @@ function ConsultationPanel({
         CANCELLED: `✓ ${name} → Follow-up (Cancelled)`,
       };
       showToast(msgs[outcome] || `✓ ${name} outcome updated`);
-      onClose();
+      // Remove lead from current queue and refetch — prevents ghost rows.
+      // The consultation-outcome endpoint returns { success, lead_id, ... }
+      // (not a full Lead), so we must NOT call onLeadUpdated with it.
+      onOutcomeRecorded(lead.id);
     } catch {
       showToast("Failed to update outcome", "error");
       setView("confirmation");
@@ -3484,12 +3583,18 @@ function ConsultationPanel({
     <>
       <div className="fixed inset-0 bg-black/5 z-40 pointer-events-none" />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        <div className="pointer-events-auto w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
-          {/* Header */}
-          <div className="relative bg-gradient-to-r from-blue-800 to-indigo-900 text-white px-5 py-4">
+        <div
+          className="pointer-events-auto w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"
+          style={{ transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }}
+        >
+          {/* Header — drag handle */}
+          <div
+            className="relative bg-gradient-to-r from-blue-800 to-indigo-900 text-white px-5 py-4 cursor-grab active:cursor-grabbing select-none"
+            onMouseDown={handleDragStart}
+          >
             <button
               onClick={onClose}
-              className="absolute top-3 right-3 p-1.5 hover:bg-white/10 rounded-lg"
+              className="absolute top-3 right-3 p-1.5 hover:bg-white/10 rounded-lg z-10"
             >
               <X size={18} />
             </button>
