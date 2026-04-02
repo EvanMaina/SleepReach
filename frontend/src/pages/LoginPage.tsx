@@ -12,12 +12,18 @@ export default function LoginPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!email || !password) return
+        if (!email.trim()) {
+            toast.error('Please enter your email address')
+            return
+        }
+        if (!password) {
+            toast.error('Please enter your password')
+            return
+        }
 
         setIsLoading(true)
         try {
             await login(email, password)
-            // AuthGate handles navigation automatically via isAuthenticated state change
             toast.success('Welcome back!')
         } catch (err: any) {
             const msg = err.response?.data?.detail || 'Invalid credentials'
@@ -188,8 +194,8 @@ export default function LoginPage() {
                         {/* Submit — slate-blue matching left panel */}
                         <button
                             type="submit"
-                            disabled={isLoading || !email || !password}
-                            className="w-full h-12 rounded-xl font-semibold text-[15px] text-white transition-all duration-200 ease-out shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2.5"
+                            disabled={isLoading}
+                            className="w-full h-12 rounded-xl font-semibold text-[15px] text-white transition-all duration-200 ease-out shadow-md hover:shadow-lg hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2.5"
                             style={{
                                 background: 'linear-gradient(135deg, #243448 0%, #2C3E5A 50%, #3B5068 100%)',
                             }}

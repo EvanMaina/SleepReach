@@ -2,7 +2,8 @@ import { useEffect, useState, useMemo } from 'react'
 import {
     Users, UserCheck, TrendingUp, CalendarCheck,
     ArrowUpRight, ArrowDownRight, Activity, Moon,
-    ChevronRight, BarChart3
+    ChevronRight, BarChart3, Wind, Lightbulb, Brain,
+    ClipboardList, Pill, HelpCircle, type LucideIcon
 } from 'lucide-react'
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -38,7 +39,7 @@ interface ConditionData {
 interface TreatmentData {
     name: string
     interest: number
-    icon: string
+    icon: LucideIcon
     count: number
 }
 
@@ -86,14 +87,14 @@ const ALL_CONDITIONS = ['SLEEP_APNEA', 'INSOMNIA', 'RESTLESS_LEG', 'NARCOLEPSY',
 /* All treatment types to always display (even with 0 leads) */
 const ALL_TREATMENTS = ['cpap_bipap', 'inspire', 'therapy_cbt', 'sleep_study', 'medication', 'not_sure']
 
-/* ─── Treatment interest icons ─── */
-const TREATMENT_ICONS: Record<string, string> = {
-    'cpap_bipap': '🫁',
-    'inspire': '💡',
-    'therapy_cbt': '🧠',
-    'sleep_study': '📊',
-    'medication': '💊',
-    'not_sure': '📋',
+/* ─── Treatment interest icons (Lucide) ─── */
+const TREATMENT_ICONS: Record<string, LucideIcon> = {
+    'cpap_bipap': Wind,
+    'inspire': Lightbulb,
+    'therapy_cbt': Brain,
+    'sleep_study': ClipboardList,
+    'medication': Pill,
+    'not_sure': HelpCircle,
 }
 
 const TREATMENT_LABELS: Record<string, string> = {
@@ -301,7 +302,7 @@ export default function DashboardPage() {
                         return {
                             name: TREATMENT_LABELS[key] || key.replace(/_/g, ' '),
                             interest: data?.percentage || 0,
-                            icon: TREATMENT_ICONS[key] || '📋',
+                            icon: TREATMENT_ICONS[key] || HelpCircle,
                             count: data?.count || 0,
                         }
                     }))
@@ -310,7 +311,7 @@ export default function DashboardPage() {
                     setTreatments(ALL_TREATMENTS.map(key => ({
                         name: TREATMENT_LABELS[key] || key.replace(/_/g, ' '),
                         interest: 0,
-                        icon: TREATMENT_ICONS[key] || '📋',
+                        icon: TREATMENT_ICONS[key] || HelpCircle,
                         count: 0,
                     })))
                 }
@@ -599,8 +600,8 @@ export default function DashboardPage() {
                                     key={item.name}
                                     className="flex items-center gap-3 p-3 rounded-xl bg-gray-50/60 hover:bg-gray-50 transition-colors group"
                                 >
-                                    <div className="w-9 h-9 rounded-lg bg-white border border-gray-200/80 flex items-center justify-center text-sm shadow-sm">
-                                        {item.icon}
+                                    <div className="w-9 h-9 rounded-lg bg-gray-100 border border-gray-200/60 flex items-center justify-center">
+                                        <item.icon className="w-4 h-4 text-gray-500" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="mb-1.5 flex items-center justify-between">
