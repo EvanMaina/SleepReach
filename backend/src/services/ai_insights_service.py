@@ -29,7 +29,7 @@ from .encryption import EncryptionService
 
 logger = logging.getLogger(__name__)
 
-CACHE_KEY = "sleepreach:ai_insights:organization:v1"
+CACHE_KEY = "sleepreach:ai_insights:organization:v3"
 UTC = timezone.utc
 
 CONDITION_LABELS = {
@@ -91,6 +91,10 @@ class PriorityCandidate:
     recommended_action: str
     reason: str
     script: str
+    treatment_interest: str
+    preferred_contact_method: str
+    lead_name: str = ""
+    first_name: str = "there"
 
 
 class AIInsightsService:
@@ -125,9 +129,6 @@ class AIInsightsService:
         snapshot["communication"]["commentary"] = (
             narrative.get("communication_commentary") or snapshot["communication"]["commentary"]
         )
-        snapshot["revenue_growth"]["commentary"] = (
-            narrative.get("revenue_commentary") or snapshot["revenue_growth"]["commentary"]
-        )
         snapshot["provider_intelligence"]["commentary"] = (
             narrative.get("provider_commentary") or snapshot["provider_intelligence"]["commentary"]
         )
@@ -141,10 +142,6 @@ class AIInsightsService:
         llm_templates = narrative.get("communication_templates") or []
         if llm_templates:
             snapshot["communication"]["templates"] = llm_templates
-
-        llm_growth = narrative.get("growth_recommendations") or []
-        if llm_growth:
-            snapshot["revenue_growth"]["recommendations"] = llm_growth
 
         provider_recommendations = narrative.get("provider_recommendations") or []
         if provider_recommendations:
@@ -244,6 +241,14 @@ class AIInsightsService:
         current_conversion_rate = round((len([lead for lead in current_month_leads if lead.status in SCHEDULED_OR_BETTER]) / len(current_month_leads)) * 100, 1) if current_month_leads else 0.0
         previous_conversion_rate = round((len([lead for lead in previous_month_leads if lead.status in SCHEDULED_OR_BETTER]) / len(previous_month_leads)) * 100, 1) if previous_month_leads else 0.0
         trend_delta = round(current_conversion_rate - previous_conversion_rate, 1)
+        answered_not_scheduled = len(
+            [
+                lead
+                for lead in leads
+                if lead.contact_outcome in {ContactOutcome.ANSWERED, ContactOutcome.CALLBACK_REQUESTED}
+                and lead.status not in SCHEDULED_OR_BETTER
+            ]
+        )
 
         health_score = self._compute_health_score(
             total_leads=total_leads,
@@ -254,9 +259,6 @@ class AIInsightsService:
             avg_first_contact_hours=avg_first_contact_hours,
         )
 
-        estimated_case_value = settings.ai_estimated_case_value
-        estimated_pipeline_value = len(insured_open) * estimated_case_value if estimated_case_value else None
-        revenue_at_risk = insured_stale * estimated_case_value if estimated_case_value else None
 
         health_state = (
             "healthy" if health_score >= 71 else
@@ -264,15 +266,15 @@ class AIInsightsService:
             "critical"
         )
 
+        top_source = conversion_by_source[0]["label"] if conversion_by_source else "Widget"
+        top_condition = conversion_by_condition[0]["label"] if conversion_by_condition else "Insomnia"
+        top_insurer = conversion_by_insurance[0]["label"] if conversion_by_insurance else "Insured"
+        top_provider = provider_rankings[0]["name"] if provider_rankings else "Referral partners"
         summary_detail = (
-            f"{insured_stale} insured leads have been idle for 3+ days. "
-            f"Average first contact time is {avg_first_contact_hours or '—'} hours."
+            f"{insured_stale} insured leads have been idle for 3+ days, "
+            f"{answered_not_scheduled} engaged leads still need scheduling, and "
+            f"average first contact time is {avg_first_contact_hours if avg_first_contact_hours is not None else 'not enough data'} hours."
         )
-        if estimated_case_value:
-            summary_detail = (
-                f"{insured_stale} insured leads have been idle for 3+ days, "
-                f"representing about ${revenue_at_risk:,.0f} in potential revenue."
-            )
 
         snapshot = {
             "generated_at": now.isoformat(),
@@ -282,8 +284,17 @@ class AIInsightsService:
                 "health_score": health_score,
                 "health_state": health_state,
                 "trend_delta": trend_delta,
-                "headline": self._build_headline(health_score, insured_stale, callback_due, estimated_pipeline_value),
+                "headline": self._build_headline(health_score, insured_stale, callback_due, answered_not_scheduled),
                 "detail": summary_detail,
+                "metrics": {
+                    "active_leads": total_leads,
+                    "insured_open_leads": len(insured_open),
+                    "avg_first_contact_hours": avg_first_contact_hours,
+                    "best_source": top_source,
+                    "best_condition": top_condition,
+                    "best_insurer": top_insurer,
+                    "best_provider": top_provider,
+                },
             },
             "act_now": [candidate.__dict__ for candidate in top_candidates],
             "pipeline": {
@@ -296,9 +307,15 @@ class AIInsightsService:
                 "avg_first_contact_hours": avg_first_contact_hours,
                 "avg_schedule_days": avg_schedule_days,
                 "commentary": (
-                    f"Your biggest active queue is {self._largest_queue_label(stage_counts)}. "
-                    f"Contacted-to-scheduled drop-off is {funnel['contacted_to_scheduled_dropoff']}%."
+                    f"The biggest active queue is {self._largest_queue_label(stage_counts)}. "
+                    f"Contacted-to-scheduled drop-off is {funnel['contacted_to_scheduled_dropoff']}%, "
+                    f"with {answered_not_scheduled} leads already engaged but not yet booked."
                 ),
+                "conversion_drivers": {
+                    "source": conversion_by_source,
+                    "condition": conversion_by_condition,
+                    "insurance": conversion_by_insurance,
+                },
             },
             "communication": {
                 "best_time_of_day": best_response_window,
@@ -308,21 +325,8 @@ class AIInsightsService:
                 "templates": self._default_templates(),
                 "commentary": (
                     f"The strongest response window is {best_response_window}. "
-                    f"{best_contact_method} is currently the most effective preferred contact channel."
+                    f"{best_contact_method} is the most successful preferred contact channel in the current pipeline."
                 ),
-            },
-            "revenue_growth": {
-                "estimated_pipeline_value": estimated_pipeline_value,
-                "revenue_at_risk": revenue_at_risk,
-                "insured_open_leads": len(insured_open),
-                "conversion_by_source": conversion_by_source,
-                "conversion_by_condition": conversion_by_condition,
-                "conversion_by_insurance": conversion_by_insurance,
-                "commentary": (
-                    "Referral leads are typically the highest intent segment. "
-                    "Use insurer conversion rates and source conversion together when prioritizing outreach."
-                ),
-                "recommendations": self._default_growth_recommendations(conversion_by_source, conversion_by_condition),
             },
             "provider_intelligence": {
                 "providers": provider_rankings,
@@ -356,16 +360,19 @@ class AIInsightsService:
         health_score: int,
         insured_stale: int,
         callback_due: int,
-        estimated_pipeline_value: int | None,
+        answered_not_scheduled: int,
     ) -> str:
-        if insured_stale and estimated_pipeline_value:
+        if insured_stale:
             return (
-                f"Pipeline health is {health_score}/100. {insured_stale} insured leads need attention now, "
-                f"representing about ${estimated_pipeline_value:,.0f} in active pipeline value."
+                f"Pipeline health is {health_score}/100. {insured_stale} insured leads are cooling off and need same-day outreach."
             )
         if callback_due:
             return (
                 f"Pipeline health is {health_score}/100. You have {callback_due} callbacks due in the next 24 hours."
+            )
+        if answered_not_scheduled:
+            return (
+                f"Pipeline health is {health_score}/100. {answered_not_scheduled} leads already engaged live and should be pushed toward scheduling now."
             )
         return f"Pipeline health is {health_score}/100. Focus on same-day first contact to improve scheduling velocity."
 
@@ -387,14 +394,11 @@ class AIInsightsService:
                 "alerts": snapshot["pipeline"]["alerts"],
                 "avg_first_contact_hours": snapshot["pipeline"]["avg_first_contact_hours"],
                 "avg_schedule_days": snapshot["pipeline"]["avg_schedule_days"],
-            },
-            "revenue_growth": {
-                "insured_open_leads": snapshot["revenue_growth"]["insured_open_leads"],
-                "estimated_pipeline_value": snapshot["revenue_growth"]["estimated_pipeline_value"],
-                "revenue_at_risk": snapshot["revenue_growth"]["revenue_at_risk"],
-                "conversion_by_source": snapshot["revenue_growth"]["conversion_by_source"][:6],
-                "conversion_by_condition": snapshot["revenue_growth"]["conversion_by_condition"][:6],
-                "conversion_by_insurance": snapshot["revenue_growth"]["conversion_by_insurance"][:6],
+                "conversion_drivers": {
+                    "source": snapshot["pipeline"]["conversion_drivers"]["source"][:6],
+                    "condition": snapshot["pipeline"]["conversion_drivers"]["condition"][:6],
+                    "insurance": snapshot["pipeline"]["conversion_drivers"]["insurance"][:6],
+                },
             },
             "provider_intelligence": {
                 "providers": snapshot["provider_intelligence"]["providers"][:8],
@@ -415,12 +419,15 @@ class AIInsightsService:
                     "lead_id": item["lead_id"],
                     "lead_number": item["lead_number"],
                     "queue_hint": item["queue_hint"],
+                    "lead_name": item.get("lead_name"),
                     "condition": item["condition"],
                     "priority": item["priority"],
                     "status": item["status"],
                     "contact_outcome": item["contact_outcome"],
                     "urgency": item["urgency"],
                     "insurance_status": item["insurance_status"],
+                    "treatment_interest": item["treatment_interest"],
+                    "preferred_contact_method": item["preferred_contact_method"],
                     "days_waiting": item["days_waiting"],
                     "stale_days": item["stale_days"],
                     "recommended_action": item["recommended_action"],
@@ -432,19 +439,22 @@ class AIInsightsService:
 
         system_prompt = (
             "You are an AI conversion strategist for The Insomnia and Sleep Institute of Arizona, "
-            "a sleep medicine clinic. The pipeline stages are NEW, CONTACTED, SCHEDULED, and COMPLETED. "
-            "High-value leads usually have insurance, higher urgency, recent engagement, or referral source strength. "
-            "Return JSON only. Be specific, commercially useful, and grounded in the provided metrics. "
-            "Do not invent data. Keep recommendations concise and action-oriented."
+            "a sleep medicine clinic treating insomnia, sleep apnea, restless legs syndrome, narcolepsy, and other sleep disorders. "
+            "Common treatments include CPAP therapy, Inspire therapy, CBT-I, and sleep studies. "
+            "The lead lifecycle is NEW -> CONTACTED -> SCHEDULED -> COMPLETED, where completed means the consultation occurred. "
+            "Insurance, urgency, referral source strength, and response speed all matter. "
+            "Return JSON only. Be specific, operationally useful, and grounded in the provided metrics. "
+            "Do not invent data, do not mention revenue, and make every recommendation concrete enough for clinic leadership and coordinators to act on today."
         )
         user_prompt = (
             "Analyze this de-identified clinic pipeline snapshot and produce JSON with keys: "
             "headline_summary, summary_detail, pipeline_commentary, communication_commentary, "
-            "revenue_commentary, provider_commentary, trend_commentary, forecast_summary, "
-            "act_now_overrides, communication_templates, growth_recommendations, provider_recommendations. "
+            "provider_commentary, trend_commentary, forecast_summary, "
+            "act_now_overrides, communication_templates, provider_recommendations. "
             "act_now_overrides should be an array of up to 5 objects with lead_id, recommended_action, reason, script. "
-            "communication_templates should be an array of 4 objects with id, title, body for sleep-medicine outreach. "
-            "growth_recommendations and provider_recommendations should be arrays of short strings.\n\n"
+            "Each act_now override must mention the lead's actual condition or contact state from the data. "
+            "communication_templates should be an array of 4 objects with id, title, body for sleep-medicine outreach that a coordinator would genuinely use. "
+            "provider_recommendations should be arrays of short, concrete relationship-building suggestions.\n\n"
             f"{json.dumps(sanitized, default=str)}"
         )
 
@@ -474,17 +484,13 @@ class AIInsightsService:
         return self._parse_llm_json("\n".join(text_parts))
 
     def _fallback_narrative(self, snapshot: dict[str, Any]) -> dict[str, Any]:
-        top_source = snapshot["revenue_growth"]["conversion_by_source"][0]["label"] if snapshot["revenue_growth"]["conversion_by_source"] else "Referral"
+        top_source = snapshot["pipeline"]["conversion_drivers"]["source"][0]["label"] if snapshot["pipeline"]["conversion_drivers"]["source"] else "Widget"
         top_provider = snapshot["provider_intelligence"]["providers"][0]["name"] if snapshot["provider_intelligence"]["providers"] else "your best provider partners"
         return {
             "headline_summary": snapshot["summary"]["headline"],
             "summary_detail": snapshot["summary"]["detail"],
             "pipeline_commentary": snapshot["pipeline"]["commentary"],
             "communication_commentary": snapshot["communication"]["commentary"],
-            "revenue_commentary": (
-                f"{top_source} is currently your strongest conversion source. "
-                "Keep insured leads moving quickly from first contact to consult booking."
-            ),
             "provider_commentary": (
                 f"{top_provider} appears to be a strong referral relationship. "
                 "Reinforce high-volume, high-converting partners with faster feedback loops."
@@ -493,8 +499,9 @@ class AIInsightsService:
             "forecast_summary": snapshot["trends"]["forecast"]["summary"],
             "act_now_overrides": [],
             "communication_templates": self._default_templates(),
-            "growth_recommendations": snapshot["revenue_growth"]["recommendations"],
-            "provider_recommendations": [],
+            "provider_recommendations": [
+                f"Review your {top_source} lead source weekly so the strongest pipeline stays warm.",
+            ],
         }
 
     def _parse_llm_json(self, text: str) -> dict[str, Any]:
@@ -551,21 +558,24 @@ class AIInsightsService:
         if not candidates:
             return
 
-        def decrypt_candidate(candidate: PriorityCandidate) -> tuple[str, str]:
+        def decrypt_candidate(candidate: PriorityCandidate) -> tuple[str, str, str]:
             lead = lead_lookup.get(candidate.lead_id)
             if not lead:
-                return candidate.lead_id, candidate.lead_number
+                return candidate.lead_id, candidate.lead_number, "there"
+
             decrypted = EncryptionService.decrypt_lead_phi(lead)
-            first_name = decrypted.get("first_name", "").strip()
+            first_name = (decrypted.get("first_name") or "").strip()
             last_name = (decrypted.get("last_name") or "").strip()
             display = " ".join(part for part in [first_name, last_name] if part).strip()
-            return candidate.lead_id, display or candidate.lead_number
+            return candidate.lead_id, display or candidate.lead_number, first_name or "there"
 
         with ThreadPoolExecutor(max_workers=min(8, len(candidates))) as executor:
-            for lead_id, display_name in executor.map(decrypt_candidate, candidates):
+            for lead_id, display_name, first_name in executor.map(decrypt_candidate, candidates):
                 for candidate in candidates:
                     if candidate.lead_id == lead_id:
-                        candidate.__dict__["lead_name"] = display_name
+                        candidate.lead_name = display_name
+                        candidate.first_name = first_name
+                        candidate.script = candidate.script.replace("{first_name}", first_name)
                         break
 
     def _condition_values(self, lead: Lead) -> list[str]:
@@ -650,7 +660,7 @@ class AIInsightsService:
         return "new"
 
     def _build_priority_candidate(self, lead: Lead, now: datetime) -> PriorityCandidate | None:
-        if lead.status not in OPEN_STATUSES:
+        if lead.status not in OPEN_STATUSES or lead.contact_outcome == ContactOutcome.NOT_INTERESTED:
             return None
 
         created_at = self._ensure_utc(lead.created_at)
@@ -665,58 +675,92 @@ class AIInsightsService:
         insurance_status = lead.insurance_provider.strip() if lead.has_insurance and lead.insurance_provider else ("Insured" if lead.has_insurance else "Uninsured")
         condition = ", ".join(self._condition_values(lead))
         treatment_interest = self._normalize_treatment_interest(lead.sleep_treatment_interest)
+        preferred_contact_method = self._safe_label(
+            lead.preferred_contact_method or lead.contact_method or "Phone"
+        )
 
         score = 0
         score += {"Hot": 45, "Medium": 28, "Low": 14}.get(priority, 12)
         score += {"Asap": 18, "Within 30 Days": 12, "Exploring": 6}.get(urgency, 0)
         score += 14 if lead.has_insurance else 0
-        score += 10 if lead.is_referral else 0
+        score += 8 if lead.is_referral else 0
         score += min(days_waiting, 10) * 2
         score += min(stale_days, 8) * 2
         score += {
-            "Answered": 16,
+            "Answered": 18,
             "Callback Requested": 18,
             "No Answer": 10,
             "New": 12,
             "Unreachable": 4,
+            "Scheduled": 8,
         }.get(outcome, 0)
 
         if lead.status == LeadStatus.SCHEDULED:
-            action = "Send a consult confirmation"
-            reason = "This lead is already scheduled, so protecting attendance is the highest-value next step."
+            action = "Confirm attendance and remove any scheduling friction"
+            reason = (
+                f"This lead is already scheduled for care around {condition.lower()}, so the "
+                "highest-value move is protecting show rate."
+            )
             script = (
-                "Hi {first_name}, this is SleepReach confirming your upcoming sleep consultation. "
-                "We’re looking forward to helping you explore options for "
-                f"{condition.lower()}. Reply if you need to reschedule."
+                "Hi {first_name}, this is SleepReach checking in before your upcoming sleep "
+                f"consultation for {condition.lower()}. If anything about timing, paperwork, or "
+                "insurance needs attention, reply here and we will help right away."
             )
         elif lead.contact_outcome == ContactOutcome.ANSWERED:
-            action = "Offer the next available consultation slot"
-            reason = "They have already engaged live, which makes them one of the fastest paths to scheduling."
+            action = "Move this lead from interest to a booked consultation"
+            reason = (
+                f"This lead already engaged live, has {insurance_status.lower()}, and is still "
+                "close enough to the conversation for scheduling to feel natural today."
+            )
             script = (
-                "Hi {first_name}, I’m following up on your interest in help for "
-                f"{condition.lower()}. We have consultation openings this week and can talk through {treatment_interest.lower()}. "
-                "Would you like the earliest slot?"
+                "Hi {first_name}, this is SleepReach following up on our conversation about "
+                f"{condition.lower()}. Since you are interested in {treatment_interest.lower()}, "
+                "the best next step is to reserve a consultation slot while we still have "
+                "availability this week."
             )
         elif lead.contact_outcome == ContactOutcome.NO_ANSWER:
-            action = "Retry by phone, then follow with SMS"
-            reason = "This lead has not connected yet, but repeated outreach is still warranted because the lead remains open."
+            action = "Retry by phone, then send a concise SMS"
+            reason = (
+                f"This lead has not connected yet, but they are still active and looking for help "
+                f"with {condition.lower()}. Consistent follow-up is still worth it here."
+            )
             script = (
-                "Hi {first_name}, this is SleepReach. I’m following up on your request for help with "
-                f"{condition.lower()}. We can review insurance and next steps quickly by phone or text."
+                "Hi {first_name}, this is SleepReach. I am following up on your request for help "
+                f"with {condition.lower()}. We can quickly review your symptoms, insurance, and the "
+                "best next step for a sleep consultation by phone or text."
             )
         elif lead.contact_outcome == ContactOutcome.CALLBACK_REQUESTED:
-            action = "Call back at the promised time"
-            reason = "Honoring callback timing is usually the strongest trust signal for active leads."
+            action = "Honor the promised callback window"
+            reason = (
+                f"They already asked for a callback, and fast follow-through is one of the "
+                f"strongest trust signals for someone seeking help with {condition.lower()}."
+            )
             script = (
-                "Hi {first_name}, I’m calling back as promised about your sleep consultation request. "
-                "Let’s lock in a time that works for you."
+                "Hi {first_name}, this is SleepReach calling back as promised about your "
+                f"{condition.lower()} concerns. I can help you review {treatment_interest.lower()} "
+                "options and get a consultation time on the calendar."
+            )
+        elif lead.is_referral:
+            action = "Reference the referring provider and offer immediate scheduling"
+            reason = (
+                "Referral leads tend to convert well when the clinic acknowledges the provider "
+                "connection and moves straight into scheduling."
+            )
+            script = (
+                "Hi {first_name}, this is SleepReach. We received your referral and would love to "
+                f"help you with {condition.lower()}. I can walk you through insurance, testing, "
+                "and available consultation times today."
             )
         else:
             action = "Make first contact today"
-            reason = "This lead is still early in the funnel, and faster first-touch speed improves scheduling rates."
+            reason = (
+                f"This lead is still early in the funnel and faster first-touch speed improves "
+                f"scheduling rates for patients dealing with {condition.lower()}."
+            )
             script = (
-                "Hi {first_name}, this is SleepReach. I’m reaching out about your interest in care for "
-                f"{condition.lower()}. We can help you understand treatment and consultation options."
+                "Hi {first_name}, this is SleepReach. I am reaching out about your interest in "
+                f"care for {condition.lower()}. We can help you understand treatment paths like "
+                f"{treatment_interest.lower()} and guide you to the right next step."
             )
 
         return PriorityCandidate(
@@ -735,6 +779,8 @@ class AIInsightsService:
             recommended_action=action,
             reason=reason,
             script=script,
+            treatment_interest=treatment_interest,
+            preferred_contact_method=preferred_contact_method,
         )
 
     def _compute_health_score(
@@ -836,10 +882,16 @@ class AIInsightsService:
         for lead in leads:
             if dimension == "source":
                 key = self._safe_label(lead.source)
-            elif dimension == "condition":
-                key = ", ".join(self._condition_values(lead)) or "Not specified"
-            else:
-                key = lead.insurance_provider.strip() if lead.has_insurance and lead.insurance_provider else ("Uninsured" if not lead.has_insurance else "Insured")
+                buckets[key].append(lead)
+                continue
+
+            if dimension == "condition":
+                labels = self._condition_values(lead) or ["Not specified"]
+                for label in labels:
+                    buckets[label].append(lead)
+                continue
+
+            key = lead.insurance_provider.strip() if lead.has_insurance and lead.insurance_provider else ("Uninsured" if not lead.has_insurance else "Insured")
             buckets[key].append(lead)
 
         rows = []
@@ -1038,43 +1090,24 @@ class AIInsightsService:
             {
                 "id": "first_contact",
                 "title": "First Contact Script",
-                "body": "Hi {first_name}, this is SleepReach. I’m reaching out about your request for help with your sleep concerns. We can review your symptoms, insurance, and next steps for a consultation today.",
+                "body": "Hi, this is SleepReach with The Insomnia and Sleep Institute of Arizona. We received your request for help with your sleep concerns and can walk you through consultation options, insurance review, and the right next step today.",
             },
             {
                 "id": "follow_up_no_answer",
                 "title": "Follow-up After No Answer",
-                "body": "Hi {first_name}, I tried to reach you from SleepReach about your sleep consultation request. Reply here or call us back and we’ll help you review options quickly.",
+                "body": "Hi, this is SleepReach. I tried to reach you about your sleep consultation request. If now is not a good time, reply here and we can coordinate the best time to talk about insomnia, sleep apnea, testing, or treatment options.",
             },
             {
                 "id": "re_engagement",
-                "title": "Re-engagement for Cooler Leads",
-                "body": "Hi {first_name}, SleepReach here. We still have your information on file and can help you explore treatment options for insomnia, sleep apnea, and other sleep concerns when you’re ready.",
+                "title": "Re-engagement for Cooling Leads",
+                "body": "Hi, this is SleepReach checking back in. We still have your information on file and can help you explore sleep studies, CPAP support, Inspire therapy, or CBT-I when you are ready.",
             },
             {
                 "id": "scheduling_confirmation",
                 "title": "Scheduling Confirmation",
-                "body": "Hi {first_name}, your sleep consultation is confirmed. Reply if you need to change the time, and we’ll help you stay on track.",
+                "body": "Hi, this is SleepReach confirming your upcoming sleep consultation. If you need to adjust the time, reply here and we will help you stay on track.",
             },
         ]
-
-    def _default_growth_recommendations(
-        self,
-        source_rows: list[dict[str, Any]],
-        condition_rows: list[dict[str, Any]],
-    ) -> list[str]:
-        recommendations = []
-        if source_rows:
-            recommendations.append(
-                f"Double down on {source_rows[0]['label']} leads; they are your strongest conversion source right now."
-            )
-        if condition_rows:
-            recommendations.append(
-                f"Build tighter outreach around {condition_rows[0]['label']} because that segment is currently converting best."
-            )
-        recommendations.append(
-            "Prioritize insured leads that are still in New or Contacted status to reduce preventable revenue leakage."
-        )
-        return recommendations
 
     def _default_forecast(
         self,

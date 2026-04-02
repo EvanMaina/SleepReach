@@ -7,7 +7,6 @@ import {
     Brain,
     Building2,
     ChevronRight,
-    Clock3,
     Copy,
     LineChart as LineChartIcon,
     PhoneCall,
@@ -15,7 +14,6 @@ import {
     ShieldCheck,
     Sparkles,
     TrendingUp,
-    Wallet,
 } from 'lucide-react'
 import {
     ResponsiveContainer,
@@ -56,10 +54,16 @@ interface ActNowItem {
     condition: string
     priority: string
     status: string
+    contact_outcome: string
+    urgency: string
+    days_waiting: number
+    stale_days: number
     recommended_action: string
     reason: string
     script: string
     insurance_status: string
+    treatment_interest?: string
+    preferred_contact_method?: string
 }
 
 interface AIInsightsResponse {
@@ -73,6 +77,15 @@ interface AIInsightsResponse {
         trend_delta: number
         headline: string
         detail: string
+        metrics: {
+            active_leads: number
+            insured_open_leads: number
+            avg_first_contact_hours: number | null
+            best_source: string
+            best_condition: string
+            best_insurer: string
+            best_provider: string
+        }
     }
     act_now: ActNowItem[]
     pipeline: {
@@ -81,6 +94,11 @@ interface AIInsightsResponse {
         avg_first_contact_hours: number | null
         avg_schedule_days: number | null
         commentary: string
+        conversion_drivers: {
+            source: InsightRow[]
+            condition: InsightRow[]
+            insurance: InsightRow[]
+        }
     }
     communication: {
         best_time_of_day: string
@@ -89,16 +107,6 @@ interface AIInsightsResponse {
         method_rows: InsightRow[]
         templates: { id: string; title: string; body: string }[]
         commentary: string
-    }
-    revenue_growth: {
-        estimated_pipeline_value: number | null
-        revenue_at_risk: number | null
-        insured_open_leads: number
-        conversion_by_source: InsightRow[]
-        conversion_by_condition: InsightRow[]
-        conversion_by_insurance: InsightRow[]
-        commentary: string
-        recommendations: string[]
     }
     provider_intelligence: {
         providers: { id: string; name: string; specialty: string; referrals: number; conversion_rate: number; practice_name?: string | null }[]
@@ -114,11 +122,6 @@ interface AIInsightsResponse {
     operational: {
         team_performance: { name: string; assigned: number; scheduled: number; completed: number; scheduled_rate: number }[]
     }
-}
-
-function currency(value: number | null | undefined) {
-    if (value == null) return 'Not configured'
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value)
 }
 
 function scoreTone(score: number) {
@@ -223,20 +226,61 @@ export default function AIInsightsPage() {
                         </button>
                     </div>
                 </div>
-                <div className="mt-6 grid gap-4 md:grid-cols-4">
-                    <div className="rounded-3xl bg-gray-950 p-5 text-white"><div className="text-xs uppercase tracking-wide text-white/60">Conversion Health Score</div><div className="mt-2 text-4xl font-bold">{data.summary.health_score}</div></div>
-                    <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5"><div className="text-xs uppercase tracking-wide text-gray-500">Trend vs prior period</div><div className="mt-2 flex items-center gap-2 text-2xl font-bold text-gray-900">{data.summary.trend_delta >= 0 ? <ArrowUpRight className="h-5 w-5 text-emerald-600" /> : <ArrowDownRight className="h-5 w-5 text-rose-600" />}{Math.abs(data.summary.trend_delta)}%</div></div>
-                    <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5"><div className="text-xs uppercase tracking-wide text-gray-500">Best contact window</div><div className="mt-2 text-2xl font-bold text-gray-900">{data.communication.best_time_of_day}</div></div>
-                    <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5"><div className="text-xs uppercase tracking-wide text-gray-500">Best contact method</div><div className="mt-2 text-2xl font-bold text-gray-900">{data.communication.best_contact_method}</div></div>
+                <div className="mt-6 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+                    <div className="grid gap-4 md:grid-cols-3">
+                        <div className="rounded-3xl bg-gray-950 p-5 text-white">
+                            <div className="text-xs uppercase tracking-wide text-white/60">Conversion Health Score</div>
+                            <div className="mt-2 text-4xl font-bold">{data.summary.health_score}</div>
+                            <div className="mt-2 flex items-center gap-2 text-sm text-white/70">
+                                {data.summary.trend_delta >= 0 ? (
+                                    <ArrowUpRight className="h-4 w-4 text-emerald-400" />
+                                ) : (
+                                    <ArrowDownRight className="h-4 w-4 text-rose-400" />
+                                )}
+                                {Math.abs(data.summary.trend_delta)}% vs prior period
+                            </div>
+                        </div>
+                        <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5">
+                            <div className="text-xs uppercase tracking-wide text-gray-500">Active Leads</div>
+                            <div className="mt-2 text-3xl font-bold text-gray-900">{data.summary.metrics.active_leads}</div>
+                            <div className="mt-1 text-sm text-gray-500">Current open pipeline across the clinic</div>
+                        </div>
+                        <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5">
+                            <div className="text-xs uppercase tracking-wide text-gray-500">Insured Open Leads</div>
+                            <div className="mt-2 text-3xl font-bold text-gray-900">{data.summary.metrics.insured_open_leads}</div>
+                            <div className="mt-1 text-sm text-gray-500">High-value leads that still need action</div>
+                        </div>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-3">
+                        <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5">
+                            <div className="text-xs uppercase tracking-wide text-gray-500">Avg. First Contact</div>
+                            <div className="mt-2 text-3xl font-bold text-gray-900">
+                                {data.summary.metrics.avg_first_contact_hours == null
+                                    ? '—'
+                                    : `${data.summary.metrics.avg_first_contact_hours}h`}
+                            </div>
+                            <div className="mt-1 text-sm text-gray-500">Time from submission to first outreach</div>
+                        </div>
+                        <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5">
+                            <div className="text-xs uppercase tracking-wide text-gray-500">Best Source</div>
+                            <div className="mt-2 text-2xl font-bold text-gray-900">{data.summary.metrics.best_source}</div>
+                            <div className="mt-1 text-sm text-gray-500">Source currently converting best</div>
+                        </div>
+                        <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5">
+                            <div className="text-xs uppercase tracking-wide text-gray-500">Best Contact Window</div>
+                            <div className="mt-2 text-2xl font-bold text-gray-900">{data.communication.best_time_of_day}</div>
+                            <div className="mt-1 text-sm text-gray-500">{data.communication.best_contact_method} is performing best overall</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
                 <section className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-                    <div className="flex items-center gap-3"><Sparkles className="h-5 w-5 text-sleep-600" /><h2 className="text-xl font-bold text-gray-900">Act Now</h2></div>
-                    <p className="mt-1 text-sm text-gray-500">Top coordinator actions to move the pipeline right now.</p>
+                    <div className="flex items-center gap-3"><Sparkles className="h-5 w-5 text-sleep-600" /><h2 className="text-xl font-bold text-gray-900">Priority Actions</h2></div>
+                    <p className="mt-1 text-sm text-gray-500">The highest-leverage follow-ups to move real SleepReach leads forward right now.</p>
                     <div className="mt-5 space-y-3">
-                        {data.act_now.map((item) => (
+                        {data.act_now.length ? data.act_now.map((item) => (
                             <div key={item.lead_id} className="rounded-3xl border border-gray-200 p-4">
                                 <div className="flex flex-wrap items-start justify-between gap-3">
                                     <div>
@@ -248,15 +292,25 @@ export default function AIInsightsPage() {
                                     </div>
                                     <span className="rounded-full bg-sleep-50 px-3 py-1 text-xs font-semibold text-sleep-700">{item.priority} priority</span>
                                 </div>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">{item.status}</span>
+                                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">{item.contact_outcome || 'New lead'}</span>
+                                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">{item.preferred_contact_method || 'Phone'}</span>
+                                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">{item.days_waiting}d waiting</span>
+                                </div>
                                 <p className="mt-3 text-sm font-semibold text-gray-900">{item.recommended_action}</p>
                                 <p className="mt-1 text-sm text-gray-600">{item.reason}</p>
-                                <div className="mt-3 rounded-2xl bg-gray-50 p-3 text-sm text-gray-700">{item.script}</div>
+                                <div className="mt-3 rounded-2xl bg-gray-50 p-3 text-sm leading-6 text-gray-700">{item.script}</div>
                                 <div className="mt-3 flex flex-wrap gap-2">
                                     <button onClick={() => openLead(item)} className="inline-flex items-center gap-2 rounded-xl border border-sleep-200 px-3 py-2 text-sm font-medium text-sleep-700 hover:bg-sleep-50"><PhoneCall className="h-4 w-4" />Open lead</button>
                                     <button onClick={() => void copyText(item.script, 'Script copied')} className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"><Copy className="h-4 w-4" />Copy script</button>
                                 </div>
                             </div>
-                        ))}
+                        )) : (
+                            <div className="rounded-3xl border border-dashed border-sleep-200 bg-sleep-50/70 p-6 text-sm text-sleep-900">
+                                There is not enough active outreach history yet to rank urgent actions. As new leads and contact outcomes accumulate, this section will surface exactly who to prioritize and why.
+                            </div>
+                        )}
                     </div>
                 </section>
 
@@ -281,13 +335,51 @@ export default function AIInsightsPage() {
                             </div>
                         ))}
                     </div>
+                    <div className="mt-5 grid gap-4 lg:grid-cols-3">
+                        {[
+                            ['Best by Source', data.pipeline.conversion_drivers.source],
+                            ['Best by Condition', data.pipeline.conversion_drivers.condition],
+                            ['Best by Insurance', data.pipeline.conversion_drivers.insurance],
+                        ].map(([title, rows]) => (
+                            <div key={title as string} className="rounded-2xl border border-gray-200 p-4">
+                                <h3 className="text-sm font-semibold text-gray-900">{title as string}</h3>
+                                <div className="mt-3 space-y-3">
+                                    {(rows as InsightRow[]).length ? (rows as InsightRow[]).slice(0, 4).map((row) => (
+                                        <div key={row.label}>
+                                            <div className="flex items-center justify-between text-xs text-gray-600">
+                                                <span>{row.label}</span>
+                                                <span>{row.conversion_rate}%</span>
+                                            </div>
+                                            <div className="mt-1 h-2 rounded-full bg-gray-100">
+                                                <div className="h-2 rounded-full bg-sleep-500" style={{ width: `${Math.min(row.conversion_rate || 0, 100)}%` }} />
+                                            </div>
+                                        </div>
+                                    )) : (
+                                        <p className="text-sm text-gray-500">More stage progression data is needed to rank this driver.</p>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </section>
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-2">
+            <div>
                 <section className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
                     <div className="flex items-center gap-3"><PhoneCall className="h-5 w-5 text-sleep-600" /><h2 className="text-xl font-bold text-gray-900">Communication Intelligence</h2></div>
                     <p className="mt-1 text-sm text-gray-500">{data.communication.commentary}</p>
+                    <div className="mt-5 grid gap-4 md:grid-cols-2">
+                        <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                            <div className="text-xs uppercase tracking-wide text-gray-500">Best time to call</div>
+                            <div className="mt-2 text-2xl font-bold text-gray-900">{data.communication.best_time_of_day}</div>
+                            <div className="mt-1 text-sm text-gray-500">Based on actual answer-rate patterns in your pipeline</div>
+                        </div>
+                        <div className="rounded-3xl border border-gray-200 bg-gray-50 p-4">
+                            <div className="text-xs uppercase tracking-wide text-gray-500">Best channel</div>
+                            <div className="mt-2 text-2xl font-bold text-gray-900">{data.communication.best_contact_method}</div>
+                            <div className="mt-1 text-sm text-gray-500">Current outreach method with the best success rate</div>
+                        </div>
+                    </div>
                     <div className="mt-5 grid gap-4 md:grid-cols-2">
                         <div className="h-64 rounded-3xl bg-gray-50 p-3">
                             <ResponsiveContainer width="100%" height="100%"><BarChart data={data.communication.timing_rows}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis tickLine={false} axisLine={false} /><Tooltip /><Bar dataKey="positive_rate" fill="#4a6fa5" radius={[8,8,0,0]} /></BarChart></ResponsiveContainer>
@@ -297,42 +389,19 @@ export default function AIInsightsPage() {
                         </div>
                     </div>
                     <div className="mt-5 space-y-3">
-                        {data.communication.templates.map((template) => (
+                        {data.communication.templates.length ? data.communication.templates.map((template) => (
                             <div key={template.id} className="rounded-2xl border border-gray-200 p-4">
                                 <div className="flex items-center justify-between gap-3"><div className="text-sm font-semibold text-gray-900">{template.title}</div><button onClick={() => void copyText(template.body, `${template.title} copied`)} className="text-sleep-600 hover:text-sleep-700"><Copy className="h-4 w-4" /></button></div>
-                                <p className="mt-2 text-sm text-gray-600">{template.body}</p>
+                                <p className="mt-2 text-sm leading-6 text-gray-600">{template.body}</p>
                             </div>
-                        ))}
+                        )) : (
+                            <div className="rounded-3xl border border-dashed border-sleep-200 bg-sleep-50/70 p-6 text-sm text-sleep-900">
+                                SleepReach will surface stage-specific scripts here once enough outreach history exists to tune the recommendations.
+                            </div>
+                        )}
                     </div>
                 </section>
 
-                <section className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
-                    <div className="flex items-center gap-3"><Wallet className="h-5 w-5 text-emerald-600" /><h2 className="text-xl font-bold text-gray-900">Revenue & Growth Intelligence</h2></div>
-                    <p className="mt-1 text-sm text-gray-500">{data.revenue_growth.commentary}</p>
-                    <div className="mt-5 grid gap-4 md:grid-cols-3">
-                        <div className="rounded-3xl bg-gray-950 p-5 text-white"><div className="text-xs uppercase tracking-wide text-white/60">Pipeline value</div><div className="mt-2 text-2xl font-bold">{currency(data.revenue_growth.estimated_pipeline_value)}</div></div>
-                        <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5"><div className="text-xs uppercase tracking-wide text-gray-500">Revenue at risk</div><div className="mt-2 text-2xl font-bold text-gray-900">{currency(data.revenue_growth.revenue_at_risk)}</div></div>
-                        <div className="rounded-3xl border border-gray-200 bg-gray-50 p-5"><div className="text-xs uppercase tracking-wide text-gray-500">Insured open leads</div><div className="mt-2 text-2xl font-bold text-gray-900">{data.revenue_growth.insured_open_leads}</div></div>
-                    </div>
-                    <div className="mt-5 grid gap-4 md:grid-cols-3">
-                        {[['By Source', data.revenue_growth.conversion_by_source], ['By Condition', data.revenue_growth.conversion_by_condition], ['By Insurance', data.revenue_growth.conversion_by_insurance]].map(([title, rows]) => (
-                            <div key={title as string} className="rounded-2xl border border-gray-200 p-4">
-                                <h3 className="text-sm font-semibold text-gray-900">{title as string}</h3>
-                                <div className="mt-3 space-y-3">
-                                    {(rows as InsightRow[]).slice(0, 5).map((row) => (
-                                        <div key={row.label}>
-                                            <div className="flex items-center justify-between text-xs text-gray-600"><span>{row.label}</span><span>{row.conversion_rate}%</span></div>
-                                            <div className="mt-1 h-2 rounded-full bg-gray-100"><div className="h-2 rounded-full bg-emerald-500" style={{ width: `${Math.min(row.conversion_rate || 0, 100)}%` }} /></div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="mt-5 space-y-2">
-                        {data.revenue_growth.recommendations.map((item) => <div key={item} className="rounded-2xl bg-sleep-50 px-4 py-3 text-sm text-sleep-900">{item}</div>)}
-                    </div>
-                </section>
             </div>
 
             <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
@@ -340,27 +409,41 @@ export default function AIInsightsPage() {
                     <div className="flex items-center gap-3"><Building2 className="h-5 w-5 text-sleep-600" /><h2 className="text-xl font-bold text-gray-900">Provider Intelligence</h2></div>
                     <p className="mt-1 text-sm text-gray-500">{data.provider_intelligence.commentary}</p>
                     <div className="mt-5 space-y-3">
-                        {data.provider_intelligence.providers.slice(0, 6).map((provider) => (
+                        {data.provider_intelligence.providers.length ? data.provider_intelligence.providers.slice(0, 6).map((provider) => (
                             <div key={provider.id} className="rounded-2xl border border-gray-200 p-4">
                                 <div className="flex items-center justify-between gap-3"><div><div className="font-semibold text-gray-900">{provider.name}</div><div className="text-xs text-gray-500">{provider.practice_name || provider.specialty}</div></div><div className="text-right"><div className="text-lg font-bold text-gray-900">{provider.conversion_rate}%</div><div className="text-xs text-gray-500">{provider.referrals} referrals</div></div></div>
                             </div>
-                        ))}
+                        )) : (
+                            <div className="rounded-3xl border border-dashed border-sleep-200 bg-sleep-50/70 p-6 text-sm text-sleep-900">
+                                Provider intelligence will fill in once referral partners are linked to leads and at least a few referred patients move through the pipeline.
+                            </div>
+                        )}
                     </div>
                     <div className="mt-5 space-y-2">
-                        {data.provider_intelligence.recommendations.map((item) => <div key={item} className="rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-700">{item}</div>)}
+                        {data.provider_intelligence.recommendations.length ? data.provider_intelligence.recommendations.map((item) => <div key={item} className="rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-700">{item}</div>) : (
+                            <div className="rounded-2xl bg-gray-50 px-4 py-3 text-sm text-gray-700">Referral relationship recommendations will appear here as provider performance data grows.</div>
+                        )}
                     </div>
                 </section>
 
                 <section className="rounded-[28px] border border-gray-200 bg-white p-6 shadow-sm">
                     <div className="flex items-center gap-3"><LineChartIcon className="h-5 w-5 text-sleep-600" /><h2 className="text-xl font-bold text-gray-900">Trends & Forecasting</h2></div>
                     <p className="mt-1 text-sm text-gray-500">{data.trends.commentary}</p>
-                    <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                        <div className="h-72 rounded-3xl bg-gray-50 p-3">
-                            <ResponsiveContainer width="100%" height="100%"><AreaChart data={data.trends.weekly}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis tickLine={false} axisLine={false} /><Tooltip /><Area dataKey="leads" stroke="#4a6fa5" fill="#4a6fa5" fillOpacity={0.18} /><Area dataKey="scheduled" stroke="#26a9b5" fill="#26a9b5" fillOpacity={0.14} /></AreaChart></ResponsiveContainer>
-                        </div>
-                        <div className="h-72 rounded-3xl bg-gray-50 p-3">
-                            <ResponsiveContainer width="100%" height="100%"><LineChart data={data.trends.monthly}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis tickLine={false} axisLine={false} /><Tooltip /><Line type="monotone" dataKey="leads" stroke="#4a6fa5" strokeWidth={3} /><Line type="monotone" dataKey="completed" stroke="#ee9a1d" strokeWidth={3} /></LineChart></ResponsiveContainer>
-                        </div>
+                    <div className="mt-5">
+                        {data.trends.weekly.length || data.trends.monthly.length ? (
+                            <div className="grid gap-4 lg:grid-cols-2">
+                                <div className="h-72 rounded-3xl bg-gray-50 p-3">
+                                    <ResponsiveContainer width="100%" height="100%"><AreaChart data={data.trends.weekly}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis tickLine={false} axisLine={false} /><Tooltip /><Area dataKey="leads" stroke="#4a6fa5" fill="#4a6fa5" fillOpacity={0.18} /><Area dataKey="scheduled" stroke="#26a9b5" fill="#26a9b5" fillOpacity={0.14} /></AreaChart></ResponsiveContainer>
+                                </div>
+                                <div className="h-72 rounded-3xl bg-gray-50 p-3">
+                                    <ResponsiveContainer width="100%" height="100%"><LineChart data={data.trends.monthly}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="label" tickLine={false} axisLine={false} /><YAxis tickLine={false} axisLine={false} /><Tooltip /><Line type="monotone" dataKey="leads" stroke="#4a6fa5" strokeWidth={3} /><Line type="monotone" dataKey="completed" stroke="#ee9a1d" strokeWidth={3} /></LineChart></ResponsiveContainer>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="rounded-3xl border border-dashed border-sleep-200 bg-sleep-50/70 p-6 text-sm text-sleep-900">
+                                Trend charts will appear once enough weekly and monthly pipeline history exists to show reliable movement over time.
+                            </div>
+                        )}
                     </div>
                     <div className="mt-5 rounded-3xl bg-gray-950 p-5 text-white">
                         <div className="flex items-center gap-2 text-sm font-semibold text-white/80"><TrendingUp className="h-4 w-4" />Forecast</div>

@@ -560,6 +560,11 @@ class CacheService:
         
         # Invalidate ALL cohort retention caches (per-filter keys: months:3, year:2026, etc.)
         self.delete_pattern(f"{self.PREFIX_COHORT}:*")
+
+        # Deleted leads recovery view uses dedicated short-lived cache keys that
+        # also contain decrypted PHI. Clear them immediately on soft delete,
+        # restore, and permanent delete so admins never see stale rows.
+        self.delete_pattern("deleted_leads:*")
         
         logger.debug("Lead change cache invalidation completed (all related caches cleared)")
     

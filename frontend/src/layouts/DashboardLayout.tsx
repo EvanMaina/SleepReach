@@ -3,10 +3,10 @@ import Sidebar from '../components/Sidebar'
 
 export default function DashboardLayout() {
     return (
-        <div className="min-h-screen bg-gray-50/80">
+        <div className="h-screen overflow-hidden bg-gray-50/80">
             <Sidebar />
-            <main className="pl-[260px] min-h-screen">
-                <div className="p-8">
+            <main className="h-screen overflow-hidden pl-[260px]">
+                <div className="h-full overflow-y-auto p-8">
                     <Outlet />
                 </div>
             </main>

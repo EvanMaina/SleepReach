@@ -7,6 +7,7 @@ and lead retrieval for the dashboard.
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 import re
 from typing import List, Optional
 from uuid import UUID
@@ -18,9 +19,11 @@ from sqlalchemy import desc, func, or_
 from ..core.config import settings
 from ..core.database import get_db
 from ..models.lead import Lead, PriorityType, LeadStatus, ContactOutcome, LeadSource, ConditionType, DurationType, UrgencyType
+from ..models.attachment import LeadAttachment
 from ..models.provider import ReferringProvider
 from ..models.lead_note import LeadNote
 from ..models.user import User
+from ..models.audit_log import AuditLog, AuditAction
 from ..schemas.lead import (
     LeadCreate,
     LeadUpdate,
@@ -57,6 +60,7 @@ from ..services.lead_scoring_v2 import is_in_service_area as _check_service_area
 
 
 router = APIRouter(prefix="/api/leads", tags=["Leads"])
+ATTACHMENTS_DIR = Path(__file__).resolve().parent.parent.parent / "static" / "attachments"
 
 
 # =============================================================================
@@ -1352,6 +1356,45 @@ async def list_deleted_leads(
             .all()
         )
 
+        deleted_by_lookup: dict[str, str] = {}
+        lead_ids = [lead.id for lead in paginated_leads]
+        if lead_ids:
+            audit_rows = (
+                db.query(
+                    AuditLog.record_id,
+                    AuditLog.user_id,
+                    AuditLog.user_email,
+                    AuditLog.created_at,
+                )
+                .filter(
+                    AuditLog.table_name == "leads",
+                    AuditLog.action == AuditAction.DELETE,
+                    AuditLog.record_id.in_(lead_ids),
+                )
+                .order_by(AuditLog.record_id, desc(AuditLog.created_at))
+                .all()
+            )
+
+            user_ids = [row.user_id for row in audit_rows if row.user_id]
+            user_lookup: dict[str, str] = {}
+            if user_ids:
+                user_lookup = {
+                    str(user_id): email
+                    for user_id, email in db.query(User.id, User.email)
+                    .filter(User.id.in_(user_ids))
+                    .all()
+                }
+
+            for row in audit_rows:
+                key = str(row.record_id)
+                if key in deleted_by_lookup:
+                    continue
+                deleted_by_lookup[key] = (
+                    row.user_email
+                    or user_lookup.get(str(row.user_id))
+                    or "Administrator"
+                )
+
         def decrypt_deleted_lead(lead):
             decrypted = EncryptionService.decrypt_lead_phi(lead)
             return {
@@ -1368,6 +1411,7 @@ async def list_deleted_leads(
                 "status": lead.status.value if lead.status else None,
                 "created_at": lead.created_at.isoformat() if lead.created_at else None,
                 "deleted_at": lead.deleted_at.isoformat() if lead.deleted_at else None,
+                "deleted_by": deleted_by_lookup.get(str(lead.id), "Administrator"),
                 "is_referral": lead.is_referral if lead.is_referral else False,
                 "referring_provider_name": lead.referring_provider.name if lead.referring_provider else None,
             }
@@ -2923,6 +2967,7 @@ async def delete_lead(
     lead_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     """
     Soft delete a lead.
@@ -2980,6 +3025,8 @@ async def delete_lead(
             audit_service.log_delete(
                 table_name="leads",
                 record_id=lead.id,
+                user_id=current_user.id,
+                user_email=current_user.email,
                 ip_address=get_client_ip(request),
                 endpoint=f"/api/leads/{lead_id}",
                 request_method="DELETE",
@@ -3022,6 +3069,7 @@ async def restore_lead(
     lead_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> LeadResponse:
     """
     Restore a soft-deleted lead.
@@ -3075,6 +3123,8 @@ async def restore_lead(
             audit_service.log_update(
                 table_name="leads",
                 record_id=lead.id,
+                user_id=current_user.id,
+                user_email=current_user.email,
                 ip_address=get_client_ip(request),
                 endpoint=f"/api/leads/{lead_id}/restore",
                 request_method="POST",
@@ -3116,6 +3166,7 @@ async def permanent_delete_lead(
     lead_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> dict:
     """
     Permanently delete a lead record.
@@ -3157,6 +3208,8 @@ async def permanent_delete_lead(
             audit_service.log_delete(
                 table_name="leads",
                 record_id=lead.id,
+                user_id=current_user.id,
+                user_email=current_user.email,
                 ip_address=get_client_ip(request),
                 endpoint=f"/api/leads/{lead_id}/permanent",
                 request_method="DELETE",
@@ -3165,6 +3218,32 @@ async def permanent_delete_lead(
             )
         except Exception as e:
             logger.warning(f"Audit log failed for permanent delete {lead_id}: {e}")
+
+        # Explicitly remove child records first. The live DB schema uses
+        # NOT NULL lead_ids on lead_notes, so relying on ORM relationship
+        # cleanup can cause SQLAlchemy to issue a NULLing UPDATE instead of a
+        # DELETE. Deleting children here keeps permanent delete reliable.
+        attachments = (
+            db.query(LeadAttachment)
+            .filter(LeadAttachment.lead_id == lead.id)
+            .all()
+        )
+        for attachment in attachments:
+            attachment_path = ATTACHMENTS_DIR / attachment.stored_filename
+            try:
+                if attachment_path.exists():
+                    attachment_path.unlink()
+            except Exception as file_err:
+                logger.warning(
+                    "Failed to remove attachment file %s during permanent delete: %s",
+                    attachment.stored_filename,
+                    file_err,
+                )
+            db.delete(attachment)
+
+        db.query(LeadNote).filter(LeadNote.lead_id == lead.id).delete(
+            synchronize_session=False
+        )
 
         # Hard delete
         db.delete(lead)

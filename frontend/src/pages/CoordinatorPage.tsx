@@ -1289,8 +1289,8 @@ export default function CoordinatorPage({
   const PageIcon = pageMeta.icon;
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      <div className="sticky top-0 z-20 -mx-2 space-y-5 bg-gray-50/95 px-2 pb-4 pt-1 backdrop-blur">
+    <div className="flex h-full min-h-0 flex-col gap-5 overflow-hidden overscroll-none animate-fade-in">
+      <div className="sticky top-0 z-30 -mx-2 shrink-0 space-y-5 bg-gray-50/95 px-2 pb-4 pt-1 backdrop-blur">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -1470,7 +1470,7 @@ export default function CoordinatorPage({
         </div>
       </div>
 
-      <div className="flex flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
         {/* Table */}
         {isLoading ? (
           <div className="text-center py-16">
@@ -1490,7 +1490,10 @@ export default function CoordinatorPage({
             </p>
           </div>
         ) : (
-          <div className="max-h-[calc(100vh-22rem)] min-h-0 flex-1 overflow-auto">
+          <div
+            className="min-h-0 flex-1 overflow-auto overscroll-contain"
+            style={{ scrollbarGutter: "stable both-edges" }}
+          >
             <table className="w-full" style={{ minWidth: "1100px" }}>
               <thead className="sticky top-0 z-10">
                 <tr className="border-b border-gray-200 bg-gray-50">
