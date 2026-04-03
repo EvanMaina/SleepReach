@@ -251,7 +251,14 @@ const CONTACT_OUTCOME_CONFIG: Record<
   },
 };
 
-const QUICK_FILTERS = ["All", "Hot", "Medium", "Low", "Scheduled", "Referral"];
+const QUICK_FILTERS = [
+  { key: "All", icon: null },
+  { key: "Hot", icon: Flame },
+  { key: "Medium", icon: Zap },
+  { key: "Low", icon: User },
+  { key: "Scheduled", icon: Calendar },
+  { key: "Referral", icon: UserCheck },
+];
 const PAGE_SIZE = 20;
 
 const QUEUE_META: Record<
@@ -1402,11 +1409,12 @@ export default function CoordinatorPage({
                 </span>
                 {QUICK_FILTERS.map((f) => (
                   <button
-                    key={f}
-                    onClick={() => setActiveFilter(f)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-all ${activeFilter === f ? "bg-sleep-600 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                    key={f.key}
+                    onClick={() => setActiveFilter(f.key)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all duration-150 ${activeFilter === f.key ? "bg-sleep-600 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
                   >
-                    {f}
+                    {f.icon && <f.icon size={12} />}
+                    {f.key}
                   </button>
                 ))}
               </div>

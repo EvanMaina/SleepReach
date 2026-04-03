@@ -1,9 +1,9 @@
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
-    Moon, LayoutDashboard, Headphones, Users, Trash2,
+    LayoutDashboard, Headphones, Users, Trash2,
     Stethoscope, BarChart3, Settings, LogOut, ChevronLeft,
     ChevronDown, Inbox, Phone, Clock, PhoneOff, Calendar,
-    CheckCircle2, XCircle, Star, AlertTriangle, ArrowUpRight, Sparkles
+    CheckCircle2, XCircle, Flame, Diamond, CircleDot, Sparkles
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import clsx from 'clsx'
@@ -19,9 +19,9 @@ const coordinatorQueues = [
     { key: 'completed', label: 'Completed', icon: CheckCircle2 },
     { key: 'unreachable', label: 'Unreachable', icon: XCircle },
     { key: 'not_interested', label: 'Not Interested', icon: XCircle },
-    { key: 'hot', label: 'Hot Priority', icon: Star },
-    { key: 'medium', label: 'Medium Priority', icon: AlertTriangle },
-    { key: 'low', label: 'Low Priority', icon: ArrowUpRight },
+    { key: 'hot', label: 'Hot Priority', icon: Flame },
+    { key: 'medium', label: 'Medium Priority', icon: Diamond },
+    { key: 'low', label: 'Low Priority', icon: CircleDot },
 ]
 
 /* ─── Standard nav items (excluding Coordinator which is special) ─── */
@@ -42,13 +42,11 @@ export default function Sidebar() {
     const [collapsed, setCollapsed] = useState(false)
     const [coordinatorExpanded, setCoordinatorExpanded] = useState(false)
 
-    // Auto-expand coordinator when on a coordinator route
     const isCoordinatorRoute = location.pathname.startsWith('/coordinator')
     useEffect(() => {
         if (isCoordinatorRoute) setCoordinatorExpanded(true)
     }, [isCoordinatorRoute])
 
-    // Extract active queue from path: /coordinator/new → "new", /coordinator → "new" (default)
     const activeQueue = isCoordinatorRoute
         ? (location.pathname.split('/coordinator/')[1] || 'new')
         : ''
@@ -60,18 +58,13 @@ export default function Sidebar() {
 
     const handleCoordinatorClick = () => {
         if (collapsed) {
-            // If sidebar is collapsed, navigate to coordinator and expand sidebar
             setCollapsed(false)
             setCoordinatorExpanded(true)
             navigate('/coordinator/new')
         } else {
-            // Toggle expand/collapse of queue sub-items
             if (!coordinatorExpanded) {
                 setCoordinatorExpanded(true)
-                // Also navigate to coordinator if not already there
-                if (!isCoordinatorRoute) {
-                    navigate('/coordinator/new')
-                }
+                if (!isCoordinatorRoute) navigate('/coordinator/new')
             } else {
                 setCoordinatorExpanded(false)
             }
@@ -82,11 +75,8 @@ export default function Sidebar() {
         navigate(`/coordinator/${queueKey}`)
     }
 
-    // Collapse coordinator queues when navigating away
     useEffect(() => {
-        if (!isCoordinatorRoute) {
-            setCoordinatorExpanded(false)
-        }
+        if (!isCoordinatorRoute) setCoordinatorExpanded(false)
     }, [isCoordinatorRoute])
 
     return (
@@ -96,10 +86,15 @@ export default function Sidebar() {
                 collapsed ? 'w-[72px]' : 'w-[260px]'
             )}
         >
-            {/* Brand */}
-            <div className="flex items-center gap-3 h-16 px-5 border-b border-gray-100 shrink-0">
-                <div className="w-9 h-9 rounded-xl bg-sleep-900 flex items-center justify-center shrink-0">
-                    <Moon className="w-5 h-5 text-sleep-200" />
+            {/* Brand — Sleep Institute Logo */}
+            <div className="flex items-center gap-3 h-16 px-4 border-b border-gray-100 shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-sleep-900 flex items-center justify-center shrink-0 overflow-hidden p-[3px]">
+                    <img
+                        src="/images/sleep-logo.png"
+                        alt="Sleep Institute"
+                        className="w-full h-full object-contain"
+                        style={{ filter: 'brightness(0) invert(1) opacity(0.9)' }}
+                    />
                 </div>
                 {!collapsed && (
                     <div className="flex flex-col min-w-0">
@@ -120,7 +115,7 @@ export default function Sidebar() {
 
             {/* Navigation */}
             <nav className="flex-1 py-3 px-3 space-y-0.5 overflow-y-auto">
-                {/* Dashboard (first item) */}
+                {/* Dashboard */}
                 <NavLink
                     to="/"
                     end
@@ -137,7 +132,7 @@ export default function Sidebar() {
                     {!collapsed && <span>Dashboard</span>}
                 </NavLink>
 
-                {/* ─── Coordinator with expandable queues ─── */}
+                {/* Coordinator with expandable queues */}
                 <div>
                     <button
                         onClick={handleCoordinatorClick}
@@ -162,7 +157,6 @@ export default function Sidebar() {
                         )}
                     </button>
 
-                    {/* Queue sub-items */}
                     {coordinatorExpanded && !collapsed && (
                         <div className="mt-0.5 ml-3 pl-4 border-l-2 border-gray-100 space-y-0.5">
                             {coordinatorQueues.map((q) => (
@@ -204,25 +198,25 @@ export default function Sidebar() {
                 ))}
             </nav>
 
-            {/* User section */}
+            {/* User section — premium */}
             <div className="border-t border-gray-100 p-3">
                 {user && !collapsed && (
-                    <div className="flex items-center gap-3 px-3 py-2 mb-1">
-                        <div className="w-8 h-8 rounded-full bg-sleep-100 flex items-center justify-center text-sleep-700 text-xs font-bold shrink-0">
+                    <div className="flex items-center gap-3 px-3 py-2.5 mb-1 rounded-xl bg-gray-50/60">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-sleep-100 to-sleep-200 flex items-center justify-center text-sleep-700 text-xs font-bold shrink-0 ring-2 ring-white shadow-sm">
                             {user.first_name[0]}{user.last_name[0]}
                         </div>
                         <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">
+                            <p className="text-sm font-semibold text-gray-900 truncate leading-tight">
                                 {user.first_name} {user.last_name}
                             </p>
-                            <p className="text-xs text-gray-400 truncate capitalize">{user.role.replace('_', ' ')}</p>
+                            <p className="text-[11px] text-gray-400 truncate capitalize leading-tight mt-0.5">{user.role.replace('_', ' ')}</p>
                         </div>
                     </div>
                 )}
                 <button
                     onClick={handleLogout}
                     className={clsx(
-                        'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:text-red-600 hover:bg-red-50 transition-all duration-100',
+                        'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-red-600 hover:bg-red-50/80 transition-all duration-150',
                         collapsed && 'justify-center'
                     )}
                 >

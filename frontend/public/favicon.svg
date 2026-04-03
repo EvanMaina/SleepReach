@@ -1,1 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#2C3E5A"/><text x="16" y="21" text-anchor="middle" font-family="Arial,sans-serif" font-weight="bold" font-size="14" fill="white">SR</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="8" fill="#2C3E5A"/>
+  <g transform="translate(4,3) scale(0.15)" fill="white" opacity="0.92">
+    <!-- Simplified sleep face icon inspired by Sleep Institute logo -->
+    <circle cx="80" cy="80" r="70" fill="none" stroke="white" stroke-width="8"/>
+    <path d="M80 10 C36 10 10 42 10 80 C10 118 36 150 80 150 C60 130 50 108 50 80 C50 52 60 30 80 10Z" fill="white"/>
+    <ellipse cx="95" cy="75" rx="8" ry="3" fill="#2C3E5A" transform="rotate(-10 95 75)"/>
+    <path d="M75 100 Q90 115 105 100" fill="none" stroke="#2C3E5A" stroke-width="5" stroke-linecap="round"/>
+  </g>
+</svg>
