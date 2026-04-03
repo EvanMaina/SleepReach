@@ -24,7 +24,7 @@ const coordinatorQueues = [
     { key: 'low', label: 'Low Priority', icon: CircleDot },
 ]
 
-/* ─── Standard nav items (excluding Coordinator which is special) ─── */
+/* ─── Standard nav items ─── */
 const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'All Leads', href: '/leads', icon: Users },
@@ -71,9 +71,7 @@ export default function Sidebar() {
         }
     }
 
-    const handleQueueClick = (queueKey: string) => {
-        navigate(`/coordinator/${queueKey}`)
-    }
+    const handleQueueClick = (queueKey: string) => navigate(`/coordinator/${queueKey}`)
 
     useEffect(() => {
         if (!isCoordinatorRoute) setCoordinatorExpanded(false)
@@ -87,7 +85,7 @@ export default function Sidebar() {
             )}
         >
             {/* Brand — Sleep Institute Logo */}
-            <div className="flex items-center gap-3 h-16 px-4 border-b border-gray-100 shrink-0">
+            <div className="flex items-center gap-3 h-[60px] px-4 border-b border-gray-100 shrink-0">
                 <div className="w-9 h-9 rounded-xl bg-sleep-900 flex items-center justify-center shrink-0 overflow-hidden p-[3px]">
                     <img
                         src="/images/sleep-logo.png"
@@ -121,9 +119,9 @@ export default function Sidebar() {
                     end
                     className={({ isActive }) =>
                         clsx(
-                            'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-100',
+                            'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all duration-150',
                             isActive
-                                ? 'bg-sleep-50 text-sleep-800 shadow-sm'
+                                ? 'bg-sleep-50 text-sleep-800 shadow-sm border border-sleep-100/60'
                                 : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                         )
                     }
@@ -137,9 +135,9 @@ export default function Sidebar() {
                     <button
                         onClick={handleCoordinatorClick}
                         className={clsx(
-                            'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-100',
+                            'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all duration-150',
                             isCoordinatorRoute
-                                ? 'bg-sleep-50 text-sleep-800 shadow-sm'
+                                ? 'bg-sleep-50 text-sleep-800 shadow-sm border border-sleep-100/60'
                                 : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                         )}
                     >
@@ -158,15 +156,15 @@ export default function Sidebar() {
                     </button>
 
                     {coordinatorExpanded && !collapsed && (
-                        <div className="mt-0.5 ml-3 pl-4 border-l-2 border-gray-100 space-y-0.5">
+                        <div className="mt-1 ml-[18px] pl-4 border-l-2 border-sleep-100 space-y-0.5">
                             {coordinatorQueues.map((q) => (
                                 <button
                                     key={q.key}
                                     onClick={() => handleQueueClick(q.key)}
                                     className={clsx(
-                                        'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all duration-100',
+                                        'w-full flex items-center gap-2.5 px-3 py-[7px] rounded-lg text-[13px] font-medium transition-all duration-150',
                                         activeQueue === q.key
-                                            ? 'bg-sleep-100/80 text-sleep-800'
+                                            ? 'bg-sleep-100/80 text-sleep-800 font-semibold'
                                             : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
                                     )}
                                 >
@@ -185,9 +183,9 @@ export default function Sidebar() {
                         to={item.href}
                         className={({ isActive }) =>
                             clsx(
-                                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-100',
+                                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13.5px] font-medium transition-all duration-150',
                                 isActive
-                                    ? 'bg-sleep-50 text-sleep-800 shadow-sm'
+                                    ? 'bg-sleep-50 text-sleep-800 shadow-sm border border-sleep-100/60'
                                     : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                             )
                         }
@@ -198,29 +196,32 @@ export default function Sidebar() {
                 ))}
             </nav>
 
-            {/* User section — premium */}
-            <div className="border-t border-gray-100 p-3">
+            {/* User section */}
+            <div className="border-t border-gray-100 px-3 py-3 space-y-2">
                 {user && !collapsed && (
-                    <div className="flex items-center gap-3 px-3 py-2.5 mb-1 rounded-xl bg-gray-50/60">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-sleep-100 to-sleep-200 flex items-center justify-center text-sleep-700 text-xs font-bold shrink-0 ring-2 ring-white shadow-sm">
+                    <div className="flex items-center gap-3 px-3 py-2.5">
+                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-sleep-500 to-sleep-700 flex items-center justify-center text-white text-[11px] font-bold shrink-0 shadow-sm">
                             {user.first_name[0]}{user.last_name[0]}
                         </div>
                         <div className="min-w-0">
-                            <p className="text-sm font-semibold text-gray-900 truncate leading-tight">
+                            <p className="text-[13px] font-semibold text-gray-900 truncate leading-tight">
                                 {user.first_name} {user.last_name}
                             </p>
-                            <p className="text-[11px] text-gray-400 truncate capitalize leading-tight mt-0.5">{user.role.replace('_', ' ')}</p>
+                            <p className="text-[11px] text-gray-400 truncate capitalize leading-tight mt-0.5">
+                                {user.role.replace(/_/g, ' ')}
+                            </p>
                         </div>
                     </div>
                 )}
                 <button
                     onClick={handleLogout}
                     className={clsx(
-                        'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-red-600 hover:bg-red-50/80 transition-all duration-150',
+                        'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150',
+                        'text-gray-400 hover:text-red-600 hover:bg-red-50',
                         collapsed && 'justify-center'
                     )}
                 >
-                    <LogOut className="w-[18px] h-[18px] shrink-0" />
+                    <LogOut className="w-[17px] h-[17px] shrink-0" />
                     {!collapsed && <span>Sign out</span>}
                 </button>
             </div>

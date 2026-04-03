@@ -252,12 +252,12 @@ const CONTACT_OUTCOME_CONFIG: Record<
 };
 
 const QUICK_FILTERS = [
-  { key: "All", icon: null },
-  { key: "Hot", icon: Flame },
-  { key: "Medium", icon: Zap },
-  { key: "Low", icon: User },
-  { key: "Scheduled", icon: Calendar },
-  { key: "Referral", icon: UserCheck },
+  { key: "All", icon: null, activeColor: "" },
+  { key: "Hot", icon: Flame, activeColor: "bg-red-600" },
+  { key: "Medium", icon: Zap, activeColor: "bg-amber-500" },
+  { key: "Low", icon: User, activeColor: "bg-blue-500" },
+  { key: "Scheduled", icon: Calendar, activeColor: "bg-violet-600" },
+  { key: "Referral", icon: UserCheck, activeColor: "bg-emerald-600" },
 ];
 const PAGE_SIZE = 20;
 
@@ -1352,7 +1352,7 @@ export default function CoordinatorPage({
         </div>
 
         {/* Toolbar */}
-        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
           <div className="px-4 py-3">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
@@ -1407,16 +1407,20 @@ export default function CoordinatorPage({
                 <span className="text-sm text-gray-500 mr-1">
                   Quick filters:
                 </span>
-                {QUICK_FILTERS.map((f) => (
-                  <button
-                    key={f.key}
-                    onClick={() => setActiveFilter(f.key)}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all duration-150 ${activeFilter === f.key ? "bg-sleep-600 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-                  >
-                    {f.icon && <f.icon size={12} />}
-                    {f.key}
-                  </button>
-                ))}
+                {QUICK_FILTERS.map((f) => {
+                  const isActive = activeFilter === f.key;
+                  const activeBg = f.activeColor || "bg-sleep-600";
+                  return (
+                    <button
+                      key={f.key}
+                      onClick={() => setActiveFilter(f.key)}
+                      className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${isActive ? `${activeBg} text-white shadow-md shadow-black/10` : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-gray-300"}`}
+                    >
+                      {f.icon && <f.icon size={13} className={isActive ? "text-white" : "text-gray-400"} />}
+                      {f.key}
+                    </button>
+                  );
+                })}
               </div>
               <div className="flex items-center gap-2">
                 <div className="relative">
@@ -1450,14 +1454,14 @@ export default function CoordinatorPage({
                     <Settings size={16} />
                   </button>
                   {showColToggle && (
-                    <div className="absolute right-0 top-10 z-50 w-52 bg-white border border-gray-200 rounded-xl shadow-xl py-2">
-                      <div className="flex items-center justify-between px-3 pb-2 mb-1 border-b border-gray-100">
-                        <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                    <div className="absolute right-0 top-11 z-[60] w-56 bg-white border border-gray-200 rounded-2xl shadow-2xl py-2.5 animate-fade-in">
+                      <div className="flex items-center justify-between px-4 pb-2.5 mb-1 border-b border-gray-100">
+                        <span className="text-xs font-bold text-gray-800 uppercase tracking-wider">
                           Columns
                         </span>
                         <button
                           onClick={() => setVisibleCols(new Set(COLUMN_KEYS))}
-                          className="text-xs text-sleep-600 hover:text-sleep-800 font-medium"
+                          className="text-[11px] text-sleep-600 hover:text-sleep-800 font-semibold transition-colors"
                         >
                           Reset
                         </button>
@@ -1467,7 +1471,7 @@ export default function CoordinatorPage({
                         return (
                           <label
                             key={col}
-                            className={`flex items-center gap-2.5 px-3 py-1.5 ${isLocked ? "opacity-60 cursor-not-allowed" : "hover:bg-gray-50 cursor-pointer"}`}
+                            className={`flex items-center gap-3 px-4 py-2 ${isLocked ? "opacity-50 cursor-not-allowed" : "hover:bg-sleep-50/50 cursor-pointer"} transition-colors`}
                           >
                             <input
                               type="checkbox"
@@ -1481,11 +1485,13 @@ export default function CoordinatorPage({
                                   return n;
                                 });
                               }}
-                              className="w-3.5 h-3.5 rounded text-sleep-600 focus:ring-sleep-500 disabled:opacity-50"
+                              className="w-4 h-4 rounded border-gray-300 text-sleep-600 focus:ring-sleep-500 disabled:opacity-50"
                             />
-                            <span className="text-xs text-gray-700">
+                            <span className="text-[13px] text-gray-700 font-medium flex items-center gap-1.5">
                               {COLUMN_LABELS[col]}
-                              {isLocked ? " ✦" : ""}
+                              {isLocked && (
+                                <span className="text-[9px] text-gray-400 bg-gray-100 px-1 py-0.5 rounded font-semibold">LOCKED</span>
+                              )}
                             </span>
                           </label>
                         );
