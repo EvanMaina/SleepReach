@@ -585,7 +585,16 @@ async def submit_lead(
                 _cached_resp = _cache.get(_redis_key)
                 if _cached_resp:
                     _dedup_logger.info("Duplicate widget submission blocked (submission_id=%s)", sub_id)
-                    return LeadSubmitResponse(**_cached_resp)
+                    cached_lead_number = _cached_resp.get("lead_number") if isinstance(_cached_resp, dict) else None
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=(
+                            f"A lead with this submission already exists"
+                            f"{f' ({cached_lead_number}).' if cached_lead_number else '.'}"
+                        ),
+                    )
+            except HTTPException:
+                raise
             except Exception:
                 pass  # Redis down — proceed normally (fail open)
 
@@ -603,7 +612,16 @@ async def submit_lead(
                 _dedup_logger.info(
                     "Duplicate widget submission blocked (content hash=%s)", _content_hash
                 )
-                return LeadSubmitResponse(**_cached_content)
+                cached_lead_number = _cached_content.get("lead_number") if isinstance(_cached_content, dict) else None
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"A lead with this submission already exists"
+                        f"{f' ({cached_lead_number}).' if cached_lead_number else '.'}"
+                    ),
+                )
+        except HTTPException:
+            raise
         except Exception:
             pass  # Redis down — proceed normally
 
@@ -613,20 +631,17 @@ async def submit_lead(
             phone=lead_data.phone,
         )
         if duplicate_match:
-            # Silent duplicate handling — the lead sees a normal success screen.
-            # Log it on the backend but never show an error to the patient.
             duplicate_field, duplicate_lead = duplicate_match
             _dedup_logger.info(
                 "Duplicate widget submission (by %s) — original lead %s preserved",
                 duplicate_field, duplicate_lead.lead_number,
             )
-            return LeadSubmitResponse(
-                success=True,
-                message="Thank you! Your information has been received. A care coordinator will reach out soon.",
-                lead_id=duplicate_lead.id,
-                lead_number=duplicate_lead.lead_number,
-                priority=PriorityType.HOT,
-                estimated_response_time="Within 24 hours",
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"A lead with this {duplicate_field} already exists "
+                    f"({duplicate_lead.lead_number})."
+                ),
             )
 
         # =====================================================================
@@ -720,9 +735,18 @@ async def submit_lead(
         # Step 2.5: Handle Referral (if is_referral=True from widget)
         # =====================================================================
         referring_provider_id = None
+        referring_provider_raw = None
         is_referral = lead_input.referred_by_provider
         
         if is_referral and lead_input.referring_provider_name:
+            referring_provider_raw = {
+                "provider_name": lead_input.referring_provider_name,
+                "provider_specialty": lead_input.referring_provider_specialty,
+                "clinic_name": lead_input.referring_clinic,
+                "provider_email": lead_input.referring_provider_email,
+                "source": "widget",
+                "timestamp": consent_timestamp.isoformat(),
+            }
             # Look up or create referring provider
             # IMPORTANT: Ensure empty/whitespace emails become None, not empty string
             email_raw = (lead_input.referring_provider_email or "").lower().strip()
@@ -833,6 +857,7 @@ async def submit_lead(
             # Referral tracking (NEW - Widget now supports referrals like Jotform)
             is_referral=is_referral,
             referring_provider_id=referring_provider_id,
+            referring_provider_raw=referring_provider_raw,
             # UTM tracking
             **utm_data,
             # Metadata
@@ -1221,6 +1246,7 @@ async def search_leads_phi(
     while len(matching_leads) < max_results:
         batch = (
             db.query(Lead)
+            .options(joinedload(Lead.referring_provider))
             .filter(Lead.deleted_at.is_(None))  # GAP 2 FIX: exclude soft-deleted leads from PHI search
             .order_by(desc(Lead.created_at))
             .offset(offset)
@@ -1283,6 +1309,12 @@ async def search_leads_phi(
                 contact_outcome=lead.contact_outcome or ContactOutcome.NEW,
                 contact_attempts=lead.contact_attempts or 0,
                 last_contact_attempt=lead.last_contact_attempt,
+                is_referral=lead.is_referral if lead.is_referral else False,
+                referring_provider_id=lead.referring_provider_id,
+                referring_provider_name=lead.referring_provider.name if lead.referring_provider else None,
+                follow_up_reason=lead.follow_up_reason,
+                source=lead.source.value if lead.source else None,
+                last_updated_at=lead.last_updated_at,
             )
         )
 

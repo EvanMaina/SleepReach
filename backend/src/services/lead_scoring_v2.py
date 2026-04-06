@@ -5,13 +5,13 @@ Sleep clinic scoring for The Insomnia and Sleep Institute of Arizona.
 Supports multi-condition intake and granular score breakdown.
 
 SCORING RULES:
-- Condition Score: max of selected conditions (insomnia/sleep_apnea/restless_leg/narcolepsy = 50, other = 25)
-- Sleep Treatment Interest: CPAP/BiPAP=15, Sleep Study=10, Not Sure=0
+- Condition Score: weighted by sleep concern, with small bonus for multiple concerns
+- Sleep Treatment Interest: CPAP/BiPAP/Inspire highest, CBT-I moderate, "Not Sure Yet" lowest
 - Insurance: in-network=+30, other/out-of-network=+20, no insurance=-20
 - Duration: >12 months=+20, 6-12 months=+10, <6 months=0
-- Treatment: cpap=+20, medication=+15, both=+10 bonus
-- Location: AZ ZIP (85xxx/86xxx)=+25, out of area=-100
-- Urgency: ASAP=+25, within_30_days=+10, exploring=0
+- Treatment history: prior trials add modest complexity/new-patient points
+- Location: AZ ZIP (85xxx/86xxx)=+15, out of area=-100
+- Urgency: ASAP=+30, within_30_days=+10, exploring=0
 - Age: under 18 = disqualified (-100)
 
 PRIORITY THRESHOLDS:
@@ -36,16 +36,20 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 CONDITION_SCORES = {
-    "insomnia": 50,
-    "sleep_apnea": 50,
-    "restless_leg": 50,
-    "narcolepsy": 50,
-    "other": 25,
+    "insomnia": 12,
+    "sleep_apnea": 18,
+    "restless_leg": 10,
+    "narcolepsy": 14,
+    "other": 5,
 }
+MULTI_CONDITION_BONUS = 5
+MAX_MULTI_CONDITION_BONUS = 10
 
 SLEEP_TREATMENT_INTEREST_SCORES = {
-    "cpap_bipap": 15,
-    "sleep_study": 10,
+    "cpap_bipap": 20,
+    "inspire": 20,
+    "therapy_cbt": 15,
+    "sleep_study": 12,
     "medication": 5,
     "not_sure": 0,
 }
@@ -60,23 +64,24 @@ DURATION_SCORES = {
     "less_than_6_months": 0,
 }
 
-TREATMENT_CPAP_SCORE = 20
-TREATMENT_MEDICATION_SCORE = 15
-TREATMENT_SLEEP_STUDY_SCORE = 10
-TREATMENT_THERAPY_SCORE = 15
-TREATMENT_BOTH_BONUS = 10
+TREATMENT_CPAP_SCORE = 8
+TREATMENT_MEDICATION_SCORE = 4
+TREATMENT_SLEEP_STUDY_SCORE = 6
+TREATMENT_THERAPY_SCORE = 5
+TREATMENT_NO_PRIOR_SCORE = 5
+TREATMENT_COMPLEXITY_BONUS = 5
 
-LOCATION_IN_SERVICE_AREA_SCORE = 25
+LOCATION_IN_SERVICE_AREA_SCORE = 15
 LOCATION_OUT_OF_SERVICE_AREA_SCORE = -100
 
 URGENCY_SCORES = {
-    "asap": 25,
+    "asap": 30,
     "within_30_days": 10,
     "exploring": 0,
 }
 
 UNDER_18_PENALTY = -100
-REFERRAL_BONUS = 15
+REFERRAL_BONUS = 20
 
 HOT_THRESHOLD = 120
 MEDIUM_THRESHOLD = 70
@@ -166,7 +171,12 @@ def calculate_lead_score(lead_input: LeadInput, referred_by_provider: bool = Fal
     for condition in lead_input.conditions:
         points = CONDITION_SCORES.get(condition, 0)
         condition_points.append(points)
-    breakdown.condition_score = max(condition_points) if condition_points else 0
+    base_condition_score = max(condition_points) if condition_points else 0
+    extra_conditions = max(0, len(set(lead_input.conditions)) - 1)
+    breakdown.condition_score = base_condition_score + min(
+        extra_conditions * MULTI_CONDITION_BONUS,
+        MAX_MULTI_CONDITION_BONUS,
+    )
 
     # SLEEP TREATMENT INTEREST SCORE
     breakdown.therapy_interest_score = SLEEP_TREATMENT_INTEREST_SCORES.get(
@@ -196,6 +206,7 @@ def calculate_lead_score(lead_input: LeadInput, referred_by_provider: bool = Fal
     has_med = "medication" in lead_input.prior_treatments
     has_study = "sleep_study" in lead_input.prior_treatments
     has_therapy = "therapy_cbt" in lead_input.prior_treatments
+    has_none = "none" in lead_input.prior_treatments
 
     treatment_score = 0
     if has_cpap:
@@ -206,8 +217,11 @@ def calculate_lead_score(lead_input: LeadInput, referred_by_provider: bool = Fal
         treatment_score += TREATMENT_SLEEP_STUDY_SCORE
     if has_therapy:
         treatment_score += TREATMENT_THERAPY_SCORE
-    if has_cpap and has_med:
-        treatment_score += TREATMENT_BOTH_BONUS
+    if has_none:
+        treatment_score += TREATMENT_NO_PRIOR_SCORE
+    tried_count = sum((has_cpap, has_med, has_study, has_therapy))
+    if tried_count >= 2:
+        treatment_score += TREATMENT_COMPLEXITY_BONUS
     breakdown.treatment_score = treatment_score
 
     # SERVICE AREA SCORE

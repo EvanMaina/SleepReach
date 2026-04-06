@@ -41,6 +41,7 @@ from ..services.encryption import EncryptionService
 from ..services.audit import AuditService
 from ..services.lead_number import generate_unique_lead_number
 from ..services.cache import get_cache
+from .leads import find_duplicate_lead
 from ..services.intake_mapping import (
     map_jotform_submission_to_lead_input,
     LeadInput,
@@ -182,6 +183,30 @@ def parse_jotform_payload(raw_request: str) -> Dict[str, Any]:
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse Jotform payload: {e}")
         raise ValueError(f"Invalid JSON in rawRequest: {e}")
+
+
+def form_data_to_payload(form_data: Any) -> Dict[str, Any]:
+    """
+    Preserve repeated checkbox values from Starlette FormData.
+
+    Casting FormData to dict() keeps only the last value for repeated keys such
+    as q6_q6_checkbox4[] / q10_q10_checkbox8[], which breaks multi-select
+    parsing. This helper keeps those keys as lists.
+    """
+    payload: Dict[str, Any] = {}
+    items = form_data.multi_items() if hasattr(form_data, "multi_items") else form_data.items()
+
+    for key, value in items:
+        if key in payload:
+            existing = payload[key]
+            if isinstance(existing, list):
+                existing.append(value)
+            else:
+                payload[key] = [existing, value]
+        else:
+            payload[key] = value
+
+    return payload
 
 
 def map_condition(conditions: List[str]) -> ConditionType:
@@ -557,19 +582,20 @@ async def jotform_webhook(
     try:
         logger.info(f"Jotform webhook received - Form ID: {formID}")
         form_data = await request.form()
+        form_payload = form_data_to_payload(form_data)
         
         if not formID:
-            formID = form_data.get("formID", "")
+            formID = form_payload.get("formID", "")
         
         if formID != JOTFORM_FORM_ID:
             logger.warning(f"Invalid form ID: {formID}")
             raise HTTPException(status_code=400, detail=f"Invalid form ID")
         
-        raw_request_data = rawRequest or form_data.get("rawRequest", "")
-        if not raw_request_data:
-            data = dict(form_data)
+        raw_request_data = rawRequest or form_payload.get("rawRequest", "")
+        if raw_request_data:
+            data = {**form_payload, **parse_jotform_payload(raw_request_data)}
         else:
-            data = parse_jotform_payload(raw_request_data)
+            data = form_payload
         
         # =====================================================================
         # IDEMPOTENCY CHECK
@@ -589,14 +615,12 @@ async def jotform_webhook(
             ).first()
             if dup:
                 logger.warning(f"Jotform duplicate detected via submissionID={submission_id}")
-                return JSONResponse(
-                    status_code=200,
-                    content={
-                        "success": True,
-                        "message": "Duplicate submission detected, original lead preserved",
-                        "lead_number": dup.lead_number,
-                        "duplicate": True,
-                    },
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"A lead with this submission already exists "
+                        f"({dup.lead_number})."
+                    ),
                 )
         else:
             client_ip_early = get_client_ip(request)
@@ -610,14 +634,12 @@ async def jotform_webhook(
                 ).first()
                 if duplicate:
                     logger.warning(f"Jotform duplicate detected via IP hash")
-                    return JSONResponse(
-                        status_code=200,
-                        content={
-                            "success": True,
-                            "message": "Duplicate submission detected, original lead preserved",
-                            "lead_number": duplicate.lead_number,
-                            "duplicate": True,
-                        },
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=(
+                            f"A lead with this submission already exists "
+                            f"({duplicate.lead_number})."
+                        ),
                     )
 
         # =====================================================================
@@ -625,9 +647,21 @@ async def jotform_webhook(
         # =====================================================================
         lead_input: LeadInput = map_jotform_submission_to_lead_input(data)
         logger.info(f"Jotform mapped conditions: {lead_input.conditions}, primary: {lead_input.primary_condition}")
-        
-        # Also extract legacy mapped data for backward compatibility
-        mapped_data = extract_jotform_data(data)
+
+        duplicate_match = find_duplicate_lead(
+            db,
+            email=lead_input.email,
+            phone=lead_input.phone,
+        )
+        if duplicate_match:
+            duplicate_field, duplicate_lead = duplicate_match
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"A lead with this {duplicate_field} already exists "
+                    f"({duplicate_lead.lead_number})."
+                ),
+            )
         
         # =====================================================================
         # V2: Use new scoring engine with multi-condition support
@@ -669,6 +703,7 @@ async def jotform_webhook(
         if is_referral:
             referring_provider_raw = {
                 "provider_name": lead_input.referring_provider_name,
+                "provider_specialty": lead_input.referring_provider_specialty,
                 "clinic_name": lead_input.referring_clinic,
                 "provider_email": lead_input.referring_provider_email,
                 "source": "jotform",
@@ -688,7 +723,7 @@ async def jotform_webhook(
                 provider_name=lead_input.referring_provider_name,
                 practice_name=lead_input.referring_clinic,
                 provider_email=lead_input.referring_provider_email,
-                provider_specialty=mapped_data.get("referring_provider_specialty", ""),
+                provider_specialty=lead_input.referring_provider_specialty,
             )
         
         # Set source based on referral status
@@ -742,8 +777,8 @@ async def jotform_webhook(
         
         # Map preferred contact method
         contact_method_map = {
-            "phone_call": "phone",
-            "text": "sms",
+            "phone_call": "phone_call",
+            "text": "text",
             "email": "email",
             "any": "any",
         }

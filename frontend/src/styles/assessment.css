@@ -633,7 +633,11 @@ body {
 }
 
 .assess-trust-footer {
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
     margin-top: 14px;
     font-size: 14px;
     color: #718096;

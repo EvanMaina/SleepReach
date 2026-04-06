@@ -8,11 +8,12 @@ Conditions: insomnia, sleep_apnea, restless_leg, narcolepsy, other
 Treatments: cpap_bipap, medication, sleep_study, therapy_cbt, none, other
 """
 
+import ast
 import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
-from datetime import date
+from datetime import date, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ class LeadInput:
     other_condition_text: str = ""
 
     # Sleep Treatment Interest
-    sleep_treatment_interest: str = ""  # cpap_bipap, sleep_study, medication, not_sure
+    sleep_treatment_interest: str = ""  # cpap_bipap, inspire, therapy_cbt, sleep_study, medication, not_sure
 
     # Preferred Contact Method
     preferred_contact_method: str = ""  # phone_call, text, email, any
@@ -104,6 +105,67 @@ def sanitize_input(value: Any) -> str:
     return str(value).strip()
 
 
+def has_value(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, dict):
+        return any(has_value(item) for item in value.values())
+    if isinstance(value, (list, tuple, set)):
+        return any(has_value(item) for item in value)
+    return True
+
+
+def get_first_non_empty(data: Dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        if key in data and has_value(data[key]):
+            return data[key]
+    return None
+
+
+def extract_multi_values(raw_value: Any) -> List[str]:
+    values: List[str] = []
+
+    def _collect(value: Any) -> None:
+        if value is None:
+            return
+
+        if isinstance(value, dict):
+            for nested in value.values():
+                _collect(nested)
+            return
+
+        if isinstance(value, (list, tuple, set)):
+            for nested in value:
+                _collect(nested)
+            return
+
+        text = str(value).strip()
+        if not text:
+            return
+
+        if (text.startswith("[") and text.endswith("]")) or (
+            text.startswith("{") and text.endswith("}")
+        ):
+            try:
+                parsed = ast.literal_eval(text)
+            except (SyntaxError, ValueError):
+                parsed = None
+            if parsed is not None and parsed != value:
+                _collect(parsed)
+                return
+
+        parts = re.split(r"\s*,\s*", text) if "," in text else [text]
+        for part in parts:
+            cleaned = part.strip().strip("\"'").strip()
+            if cleaned:
+                values.append(cleaned)
+
+    _collect(raw_value)
+    return values
+
+
 def normalize_phone(phone: str) -> str:
     if not phone:
         return ""
@@ -126,7 +188,31 @@ def parse_yes_no(value: Any) -> bool:
         return False
     if isinstance(value, bool):
         return value
-    return str(value).lower().strip() in ["yes", "true", "1", "y"]
+    if isinstance(value, dict):
+        return any(parse_yes_no(item) for item in value.values())
+    if isinstance(value, (list, tuple, set)):
+        return any(parse_yes_no(item) for item in value)
+
+    normalized = re.sub(r"\s+", " ", str(value).lower().strip())
+    if not normalized:
+        return False
+
+    false_values = {
+        "no",
+        "false",
+        "0",
+        "n",
+        "off",
+        "no insurance",
+    }
+    if normalized in false_values or normalized.startswith("no "):
+        return False
+
+    true_values = {"yes", "true", "1", "y", "on", "checked"}
+    if normalized in true_values or normalized.startswith("yes"):
+        return True
+
+    return any(token in normalized for token in ("consent", "agree", "acknowledge"))
 
 
 def safe_int(value: Any, default: Optional[int] = None) -> Optional[int]:
@@ -155,9 +241,10 @@ def normalize_condition(condition_str: str) -> str:
     if not condition_str:
         return "other"
     condition_lower = condition_str.lower().strip()
+    condition_normalized = condition_lower.replace("_", " ").replace("-", " ")
     for key, keywords in CONDITION_KEYWORDS.items():
         for keyword in keywords:
-            if keyword in condition_lower:
+            if keyword in condition_lower or keyword in condition_normalized:
                 return key
     return "other"
 
@@ -165,12 +252,7 @@ def normalize_condition(condition_str: str) -> str:
 def normalize_conditions_list(conditions_raw: Any) -> List[str]:
     if not conditions_raw:
         return []
-    if isinstance(conditions_raw, str):
-        raw_list = [c.strip() for c in conditions_raw.split(",") if c.strip()]
-    elif isinstance(conditions_raw, list):
-        raw_list = [str(c).strip() for c in conditions_raw if c]
-    else:
-        raw_list = [str(conditions_raw).strip()]
+    raw_list = extract_multi_values(conditions_raw)
 
     normalized = []
     for raw in raw_list:
@@ -227,23 +309,21 @@ TREATMENT_KEYWORDS = {
         "therapy", "cbt", "cognitive", "counseling", "cbt-i",
         "behavioral", "psychotherapy"
     ],
-    "none": ["none", "no treatment", "nothing"],
+    "none": ["none", "no treatment", "no prior treatment", "nothing"],
 }
 
 
 def normalize_treatments(treatments_raw: Any) -> List[str]:
     if not treatments_raw:
         return []
-    if isinstance(treatments_raw, str):
-        raw_list = [c.strip() for c in treatments_raw.split(",") if c.strip()]
-    elif isinstance(treatments_raw, list):
-        raw_list = [str(c).strip() for c in treatments_raw if c]
-    else:
-        raw_list = [str(treatments_raw).strip()]
+    raw_list = extract_multi_values(treatments_raw)
 
     normalized = set()
     for raw in raw_list:
         raw_lower = raw.lower()
+        if any(keyword in raw_lower for keyword in TREATMENT_KEYWORDS["none"]):
+            normalized.add("none")
+            continue
         matched = False
         for key, keywords in TREATMENT_KEYWORDS.items():
             if key == "none":
@@ -253,7 +333,7 @@ def normalize_treatments(treatments_raw: Any) -> List[str]:
                     normalized.add(key)
                     matched = True
                     break
-        if not matched and raw_lower not in ["none", "no treatment", "nothing"]:
+        if not matched and raw_lower not in ["none", "no treatment", "no prior treatment", "nothing"]:
             normalized.add("other")
     return list(normalized) if normalized else []
 
@@ -296,11 +376,21 @@ SLEEP_TREATMENT_MAP = {
     "bipap": "cpap_bipap",
     "cpap_bipap": "cpap_bipap",
     "cpap/bipap": "cpap_bipap",
+    "inspire": "inspire",
+    "inspire therapy": "inspire",
+    "therapy_cbt": "therapy_cbt",
+    "cbt-i": "therapy_cbt",
+    "cbt i": "therapy_cbt",
+    "cbti": "therapy_cbt",
+    "therapy or cbt-i": "therapy_cbt",
+    "cbt-i therapy": "therapy_cbt",
     "sleep study": "sleep_study",
     "sleep_study": "sleep_study",
     "medication": "medication",
+    "medication review": "medication",
     "not sure": "not_sure",
     "not_sure": "not_sure",
+    "not sure yet": "not_sure",
     "unsure": "not_sure",
 }
 
@@ -392,9 +482,7 @@ def extract_patient_name_from_jotform(data: Dict[str, Any]) -> Tuple[str, str]:
     first_name = ""
     last_name = ""
 
-    name_fields = [
-        "q30_fullName", "q30_name", "full_name", "name",
-    ]
+    name_fields = ["q30_fullName", "q30_name", "full_name", "name"]
 
     for fld in name_fields:
         if fld in data:
@@ -412,6 +500,11 @@ def extract_patient_name_from_jotform(data: Dict[str, Any]) -> Tuple[str, str]:
                 break
 
     if not first_name:
+        bracket_first = sanitize_input(get_first_non_empty(data, "q30_fullName[first]", "q30_first"))
+        bracket_last = sanitize_input(get_first_non_empty(data, "q30_fullName[last]", "q30_last"))
+        if bracket_first or bracket_last:
+            return bracket_first, bracket_last
+
         for fld in ["first_name", "firstName"]:
             if fld in data and data[fld]:
                 first_name = sanitize_input(str(data[fld]))
@@ -449,91 +542,255 @@ def map_jotform_submission_to_lead_input(form_data: Dict[str, Any]) -> LeadInput
     first_name, last_name = extract_patient_name_from_jotform(form_data)
 
     # q19 — Email
-    email = sanitize_input(form_data.get("q19_email", "") or form_data.get("q19_emailAddress", ""))
+    email = sanitize_input(
+        get_first_non_empty(
+            form_data,
+            "q19_q19_email17",
+            "q19_email",
+            "q19_emailAddress",
+        ) or ""
+    )
 
     # q20 — Phone
     phone = ""
-    phone_data = form_data.get("q20_phoneNumber", form_data.get("q20_phone", ""))
+    phone_data = get_first_non_empty(
+        form_data,
+        "q20_q20_phone18",
+        "q20_q20_phone18[full]",
+        "q20_phoneNumber",
+        "q20_phone",
+    )
     if isinstance(phone_data, dict):
-        phone = normalize_phone(sanitize_input(phone_data.get("full", "")))
+        phone = normalize_phone(
+            sanitize_input(phone_data.get("full", "") or phone_data.get("phone", ""))
+        )
     elif phone_data:
         phone = normalize_phone(sanitize_input(phone_data))
 
+    # q21 — Date of birth (optional)
+    date_of_birth = None
+    dob_data = get_first_non_empty(
+        form_data,
+        "q21_q21_datetime19",
+        "q21_dateOfBirth",
+        "q21_date",
+    )
+    if isinstance(dob_data, dict):
+        month = sanitize_input(dob_data.get("month", ""))
+        day = sanitize_input(dob_data.get("day", ""))
+        year = sanitize_input(dob_data.get("year", ""))
+    else:
+        month = sanitize_input(get_first_non_empty(form_data, "q21_q21_datetime19[month]") or "")
+        day = sanitize_input(get_first_non_empty(form_data, "q21_q21_datetime19[day]") or "")
+        year = sanitize_input(get_first_non_empty(form_data, "q21_q21_datetime19[year]") or "")
+        if dob_data and not (month and day and year):
+            text = sanitize_input(dob_data)
+            for fmt in ("%m/%d/%Y", "%Y-%m-%d"):
+                try:
+                    if fmt == "%Y-%m-%d":
+                        date_of_birth = date.fromisoformat(text)
+                    else:
+                        date_of_birth = datetime.strptime(text, fmt).date()
+                    break
+                except Exception:
+                    continue
+    if date_of_birth is None and month and day and year:
+        try:
+            date_of_birth = date(int(year), int(month), int(day))
+        except (TypeError, ValueError):
+            date_of_birth = None
+
     # q6 — Sleep concerns (multi-select)
-    conditions_raw = form_data.get("q6_whatSleep", form_data.get("q6_sleepConcerns", None))
+    conditions_raw = get_first_non_empty(
+        form_data,
+        "q6_q6_checkbox4[]",
+        "q6_q6_checkbox4",
+        "q6_whatSleep",
+        "q6_sleepConcerns",
+    )
     conditions = normalize_conditions_list(conditions_raw)
 
     # q7 — Other sleep concern text
-    other_condition_text = sanitize_input(form_data.get("q7_tellUs", "") or form_data.get("q7_sleepConcern", ""))
+    other_condition_text = sanitize_input(
+        get_first_non_empty(
+            form_data,
+            "q7_q7_textbox5",
+            "q7_tellUs",
+            "q7_sleepConcern",
+        ) or ""
+    )
+    if other_condition_text and "other" not in conditions:
+        conditions.append("other")
 
     # q8 — Treatment interest
     sleep_interest = normalize_sleep_treatment_interest(
-        sanitize_input(form_data.get("q8_whatAre", "") or form_data.get("q8_treatmentInterest", ""))
+        sanitize_input(
+            get_first_non_empty(
+                form_data,
+                "q8_q8_radio6",
+                "q8_whatAre",
+                "q8_treatmentInterest",
+            ) or ""
+        )
     )
 
     # q22 — Preferred contact method
     preferred_contact = normalize_contact_method(
-        sanitize_input(form_data.get("q22_howWould", "") or form_data.get("q22_preferredContact", ""))
+        sanitize_input(
+            get_first_non_empty(
+                form_data,
+                "q22_q22_radio20",
+                "q22_howWould",
+                "q22_preferredContact",
+            ) or ""
+        )
     )
 
     # q9 — Symptom duration
     duration = normalize_duration(
-        sanitize_input(form_data.get("q9_howLong", "") or form_data.get("q9_symptomDuration", ""))
+        sanitize_input(
+            get_first_non_empty(
+                form_data,
+                "q9_q9_radio7",
+                "q9_howLong",
+                "q9_symptomDuration",
+            ) or ""
+        )
     )
 
     # q10 — Prior treatments (multi-select)
-    treatments_raw = form_data.get("q10_whatHave", form_data.get("q10_treatmentHistory", []))
+    treatments_raw = get_first_non_empty(
+        form_data,
+        "q10_q10_checkbox8[]",
+        "q10_q10_checkbox8",
+        "q10_whatHave",
+        "q10_treatmentHistory",
+    )
     treatments = normalize_treatments(treatments_raw if treatments_raw else [])
 
     # q24 — Insurance
     has_insurance = parse_yes_no(
-        sanitize_input(form_data.get("q24_doYou", "") or form_data.get("q24_insurance", ""))
+        get_first_non_empty(
+            form_data,
+            "q24_q24_radio22",
+            "q24_doYou",
+            "q24_insurance",
+        )
     )
     # q25 — Insurance provider
-    insurance_provider_raw = sanitize_input(form_data.get("q25_insuranceProvider", "") or form_data.get("q25_insurance", ""))
+    insurance_provider_raw = sanitize_input(
+        get_first_non_empty(
+            form_data,
+            "q25_q25_textbox23",
+            "q25_insuranceProvider",
+            "q25_insurance",
+        ) or ""
+    )
     insurance_provider, is_other_insurance = normalize_insurance_provider(insurance_provider_raw)
     other_insurance = sanitize_input(form_data.get("q25b_otherInsurance", "")) if is_other_insurance else ""
 
     # q26 — ZIP code
-    zip_code = normalize_zip(sanitize_input(form_data.get("q26_zipCode", "") or form_data.get("q26_whatIs", "")))
+    zip_code = normalize_zip(
+        sanitize_input(
+            get_first_non_empty(
+                form_data,
+                "q26_q26_textbox24",
+                "q26_zipCode",
+                "q26_whatIs",
+            ) or ""
+        )
+    )
 
     # q11 — Urgency
     urgency = normalize_urgency(
-        sanitize_input(form_data.get("q11_howSoon", "") or form_data.get("q11_urgency", ""))
+        sanitize_input(
+            get_first_non_empty(
+                form_data,
+                "q11_q11_radio9",
+                "q11_howSoon",
+                "q11_urgency",
+            ) or ""
+        )
     )
 
     # q5 — Privacy/HIPAA consent
     hipaa_consent = parse_yes_no(
-        sanitize_input(form_data.get("q5_privacyConsent", "") or form_data.get("q5_consent", ""))
+        get_first_non_empty(
+            form_data,
+            "q5_q5_checkbox3[]",
+            "q5_q5_checkbox3",
+            "q5_privacyConsent",
+            "q5_consent",
+        )
     )
     # q23 — SMS consent
     sms_consent = parse_yes_no(
-        sanitize_input(form_data.get("q23_smsConsent", "") or form_data.get("q23_sms", ""))
+        get_first_non_empty(
+            form_data,
+            "q23_q23_checkbox21[]",
+            "q23_q23_checkbox21",
+            "q23_smsConsent",
+            "q23_sms",
+        )
     )
 
     # q12 — Referred by provider (Yes/No)
     referred_by_provider = parse_yes_no(
-        sanitize_input(form_data.get("q12_wereYou", "") or form_data.get("q12_referral", ""))
+        get_first_non_empty(
+            form_data,
+            "q12_q12_radio10",
+            "q12_wereYou",
+            "q12_referral",
+        )
     )
     # q13 — Provider name
-    referring_provider_name = sanitize_input(form_data.get("q13_providerName", "") or form_data.get("q13_provider", ""))
+    referring_provider_name = sanitize_input(
+        get_first_non_empty(
+            form_data,
+            "q13_q13_textbox11",
+            "q13_providerName",
+            "q13_provider",
+        ) or ""
+    )
     # q16 — Clinic/practice
-    referring_clinic = sanitize_input(form_data.get("q16_clinicOr", "") or form_data.get("q16_clinic", ""))
+    referring_clinic = sanitize_input(
+        get_first_non_empty(
+            form_data,
+            "q16_q16_textbox14",
+            "q16_clinicOr",
+            "q16_clinic",
+        ) or ""
+    )
 
     # q15 — Provider email
     referring_provider_email = ""
-    raw_email = sanitize_input(form_data.get("q15_providerEmail", "") or form_data.get("q15_providersEmail", ""))
+    raw_email = sanitize_input(
+        get_first_non_empty(
+            form_data,
+            "q15_q15_email13",
+            "q15_providerEmail",
+            "q15_providersEmail",
+        ) or ""
+    )
     if raw_email and "@" in raw_email:
         referring_provider_email = raw_email.lower()
 
     # q14 — Provider specialty
-    referring_provider_specialty = sanitize_input(form_data.get("q14_specialty", "") or form_data.get("q14_providerSpecialty", ""))
+    referring_provider_specialty = sanitize_input(
+        get_first_non_empty(
+            form_data,
+            "q14_q14_textbox12",
+            "q14_specialty",
+            "q14_providerSpecialty",
+        ) or ""
+    )
 
     return LeadInput(
         first_name=first_name,
         last_name=last_name,
         email=email,
         phone=phone,
+        date_of_birth=date_of_birth,
         conditions=conditions,
         other_condition_text=other_condition_text,
         sleep_treatment_interest=sleep_interest,
