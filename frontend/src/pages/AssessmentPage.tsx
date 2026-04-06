@@ -372,7 +372,6 @@ export const AssessmentPage: React.FC<AssessmentPageProps> = ({ apiUrl }) => {
                 )
             case 9:
                 if (!formData.preferredContactMethod) return false
-                if (needsSmsConsent && !formData.smsConsent) return false
                 return true
             case 10:
                 if (formData.hasInsurance === null) return false
@@ -793,7 +792,7 @@ export const AssessmentPage: React.FC<AssessmentPageProps> = ({ apiUrl }) => {
                     <div className="space-y-4">
                         <div className="space-y-2 assess-step-intro">
                             <h3>How would you prefer us to follow up?</h3>
-                            <p>Select your preferred contact method, then confirm SMS consent if texting is allowed.</p>
+                            <p>Select your preferred contact method so we can reach you the way you prefer.</p>
                         </div>
 
                         <div className="assess-choice-grid">
@@ -817,30 +816,6 @@ export const AssessmentPage: React.FC<AssessmentPageProps> = ({ apiUrl }) => {
                                 )
                             })}
                         </div>
-
-                        <div className="nr-sms-consent-card">
-                            <label className="flex items-start gap-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.smsConsent}
-                                    onChange={(event) => updateField('smsConsent', event.target.checked)}
-                                    className="nr-sms-checkbox mt-0.5"
-                                    disabled={!needsSmsConsent}
-                                />
-                                <span className="text-sm text-gray-700">
-                                    I consent to receive SMS messages about my assessment and scheduling. Message and
-                                    data rates may apply. Reply STOP to opt out.
-                                </span>
-                            </label>
-                        </div>
-
-                        {!needsSmsConsent && (
-                            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                                <p className="text-xs text-gray-600">
-                                    SMS consent is only needed if you want text follow-up.
-                                </p>
-                            </div>
-                        )}
                     </div>
                 )
             case 10:
@@ -897,6 +872,22 @@ export const AssessmentPage: React.FC<AssessmentPageProps> = ({ apiUrl }) => {
                                 onChange={(event) => updateField('zipCode', event.target.value.replace(/\D/g, '').slice(0, 5))}
                                 placeholder="Enter ZIP"
                             />
+                        </div>
+
+                        {/* SMS Consent — last question before Submit */}
+                        <div className="nr-sms-consent-card">
+                            <label className="flex items-start gap-3 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={formData.smsConsent}
+                                    onChange={(event) => updateField('smsConsent', event.target.checked)}
+                                    className="nr-sms-checkbox mt-0.5"
+                                />
+                                <span className="text-sm text-gray-700">
+                                    I consent to receive SMS messages about my assessment and scheduling. Message and
+                                    data rates may apply. Reply STOP to opt out.
+                                </span>
+                            </label>
                         </div>
                     </div>
                 )

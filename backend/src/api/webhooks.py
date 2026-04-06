@@ -66,7 +66,7 @@ router = APIRouter(prefix="/api/webhooks", tags=["Webhooks"])
 # Configuration
 # =============================================================================
 
-JOTFORM_FORM_ID = "260267308720050"
+JOTFORM_FORM_ID = "260953996150062"
 
 # Idempotency window: reject duplicate submissions within this many seconds.
 # Jotform may retry on timeout — this prevents duplicate leads.
@@ -352,8 +352,9 @@ def extract_patient_name(data: Dict[str, Any]) -> tuple:
     """Extract patient name from Jotform submission."""
     first_name = ""
     last_name = ""
-    
+
     name_fields = [
+        "q30_fullName", "q30_name",
         "q38_contactInformation", "q3_fullName", "q3_name",
         "q4_fullName", "q4_name", "name", "full_name",
         "patient_name", "patientName", "contact_information",
@@ -391,6 +392,7 @@ def extract_patient_name(data: Dict[str, Any]) -> tuple:
 def extract_provider_email(data: Dict[str, Any]) -> str:
     """Extract provider email from Jotform."""
     email_fields = [
+        "q15_providerEmail", "q15_providersEmail",
         "q46_providersEmail", "q46_providerEmail",
         "q47_providersEmail", "q47_providerEmail",
         "providersEmail", "providerEmail",
@@ -413,6 +415,7 @@ def extract_provider_email(data: Dict[str, Any]) -> str:
 def extract_provider_specialty(data: Dict[str, Any]) -> str:
     """Extract provider specialty from Jotform."""
     specialty_fields = [
+        "q14_specialty", "q14_providerSpecialty",
         "q48_providerSpecialty", "q47_providerSpecialty",
         "providerSpecialty", "providersSpecialty",
         "provider_specialty", "specialty", "Specialty",
@@ -432,37 +435,87 @@ def extract_provider_specialty(data: Dict[str, Any]) -> str:
 
 
 def extract_jotform_data(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract and map all fields from Jotform payload."""
+    """
+    Extract and map all fields from Jotform payload.
+
+    NEW Jotform form ID: 260953996150062
+    Field mapping (question ID → field):
+      q5  → privacy_consent          q6  → sleep_concerns (multi)
+      q7  → sleep_concern_other      q8  → treatment_interest
+      q9  → symptom_duration         q10 → treatment_history (multi)
+      q11 → urgency                  q12 → referred_by_provider (Yes/No)
+      q13 → referral_provider_name   q14 → referral_specialty
+      q15 → referral_provider_email  q16 → referral_clinic
+      q30 → full_name (first/last)   q19 → email
+      q20 → phone                    q21 → date_of_birth
+      q22 → preferred_contact_method q24 → has_insurance
+      q25 → insurance_provider       q26 → zip_code
+      q23 → sms_consent
+    """
     first_name, last_name = extract_patient_name(data)
-    email = sanitize_input(data.get("q39_email", ""))
-    
-    phone_data = data.get("q40_phoneNumber", {})
+
+    # Email — q19
+    email = sanitize_input(
+        data.get("q19_email", "") or data.get("q19_emailAddress", "")
+        or data.get("q39_email", "") or data.get("email", "")
+    )
+
+    # Phone — q20
+    phone_data = data.get("q20_phoneNumber", data.get("q20_phone", data.get("q40_phoneNumber", {})))
     if isinstance(phone_data, dict):
         phone = normalize_phone(sanitize_input(phone_data.get("full", "")))
     else:
         phone = normalize_phone(sanitize_input(phone_data))
-    
-    conditions_raw = data.get("q12_whatCondition", [])
+
+    # Sleep concerns — q6 (multi-select)
+    conditions_raw = data.get("q6_whatSleep", data.get("q6_sleepConcerns", data.get("q12_whatCondition", [])))
     if isinstance(conditions_raw, str):
         conditions_raw = [conditions_raw]
     conditions = map_condition(conditions_raw)
-    
-    duration = map_duration(sanitize_input(data.get("q21_howLong", "")))
-    
-    treatments_raw = data.get("q22_whatTreatments", [])
+
+    # Other sleep concern text — q7
+    # (stored in other_condition_text via intake_mapping)
+
+    # Symptom duration — q9
+    duration = map_duration(sanitize_input(
+        data.get("q9_howLong", "") or data.get("q9_symptomDuration", "")
+        or data.get("q21_howLong", "")
+    ))
+
+    # Treatment history — q10 (multi-select)
+    treatments_raw = data.get("q10_whatHave", data.get("q10_treatmentHistory", data.get("q22_whatTreatments", [])))
     if isinstance(treatments_raw, str):
         treatments_raw = [treatments_raw]
     treatments = map_treatments(treatments_raw)
-    
-    has_insurance = parse_yes_no(sanitize_input(data.get("q24_doYou", "")))
-    insurance_provider = sanitize_input(data.get("q25_insuranceProvider", ""))
-    zip_code = normalize_zip(sanitize_input(data.get("q26_whatIs", "")))
-    urgency = map_urgency(sanitize_input(data.get("q27_whenWould", "")))
-    referred_by_provider = parse_yes_no(sanitize_input(data.get("q43_wereYou", "")))
-    
+
+    # Insurance — q24
+    has_insurance = parse_yes_no(sanitize_input(
+        data.get("q24_doYou", "") or data.get("q24_insurance", "")
+    ))
+    insurance_provider = sanitize_input(
+        data.get("q25_insuranceProvider", "") or data.get("q25_insurance", "")
+    )
+
+    # ZIP code — q26
+    zip_code = normalize_zip(sanitize_input(
+        data.get("q26_zipCode", "") or data.get("q26_whatIs", "")
+    ))
+
+    # Urgency — q11
+    urgency = map_urgency(sanitize_input(
+        data.get("q11_howSoon", "") or data.get("q11_urgency", "")
+        or data.get("q27_whenWould", "")
+    ))
+
+    # Referral — q12 (Yes/No), q13 (provider name), q16 (clinic)
+    referred_by_provider = parse_yes_no(sanitize_input(
+        data.get("q12_wereYou", "") or data.get("q12_referral", "")
+        or data.get("q43_wereYou", "")
+    ))
+
     referring_provider_email = extract_provider_email(data)
     referring_provider_specialty = extract_provider_specialty(data)
-    
+
     return {
         "first_name": first_name,
         "last_name": last_name,
@@ -476,8 +529,14 @@ def extract_jotform_data(data: Dict[str, Any]) -> Dict[str, Any]:
         "zip_code": zip_code,
         "urgency": urgency,
         "referred_by_provider": referred_by_provider,
-        "referring_provider_name": sanitize_input(data.get("q44_referringProviders", "")),
-        "referring_clinic": sanitize_input(data.get("q45_clinicpracticeName", "")),
+        "referring_provider_name": sanitize_input(
+            data.get("q13_providerName", "") or data.get("q13_provider", "")
+            or data.get("q44_referringProviders", "")
+        ),
+        "referring_clinic": sanitize_input(
+            data.get("q16_clinicOr", "") or data.get("q16_clinic", "")
+            or data.get("q45_clinicpracticeName", "")
+        ),
         "referring_provider_email": referring_provider_email,
         "referring_provider_specialty": referring_provider_specialty,
     }
