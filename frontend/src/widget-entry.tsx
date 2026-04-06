@@ -205,11 +205,21 @@ const STYLES = `
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: 3px;
     font-size: 10px;
     line-height: 1.4;
     letter-spacing: 0.02em;
     color: #8c98a8;
+}
+
+.sr-trust-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.sr-trust-item svg {
+    flex-shrink: 0;
 }
 
 .sr-card-trust-sep {
@@ -543,11 +553,18 @@ function WidgetApp() {
                         <span className="sr-card-cta-arrow">&rarr;</span>
                     </a>
                     <div className="sr-card-trust" aria-hidden="true">
-                        <span>Confidential</span>
-                        <span className="sr-card-trust-sep">&middot;</span>
-                        <span>HIPAA</span>
-                        <span className="sr-card-trust-sep">&middot;</span>
-                        <span>256-bit</span>
+                        <span className="sr-trust-item">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#c0963a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            Confidential
+                        </span>
+                        <span className="sr-trust-item">
+                            <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="#48bb78"/></svg>
+                            HIPAA
+                        </span>
+                        <span className="sr-trust-item">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#c0963a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            256-bit
+                        </span>
                     </div>
                 </div>
                 <div className="sr-card-bar-bottom" />

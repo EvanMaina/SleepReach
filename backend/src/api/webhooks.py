@@ -354,10 +354,7 @@ def extract_patient_name(data: Dict[str, Any]) -> tuple:
     last_name = ""
 
     name_fields = [
-        "q30_fullName", "q30_name",
-        "q38_contactInformation", "q3_fullName", "q3_name",
-        "q4_fullName", "q4_name", "name", "full_name",
-        "patient_name", "patientName", "contact_information",
+        "q30_fullName", "q30_name", "full_name", "name",
     ]
     
     for field in name_fields:
@@ -393,10 +390,6 @@ def extract_provider_email(data: Dict[str, Any]) -> str:
     """Extract provider email from Jotform."""
     email_fields = [
         "q15_providerEmail", "q15_providersEmail",
-        "q46_providersEmail", "q46_providerEmail",
-        "q47_providersEmail", "q47_providerEmail",
-        "providersEmail", "providerEmail",
-        "referring_provider_email", "referrerEmail",
     ]
     for field in email_fields:
         value = data.get(field, "")
@@ -416,9 +409,6 @@ def extract_provider_specialty(data: Dict[str, Any]) -> str:
     """Extract provider specialty from Jotform."""
     specialty_fields = [
         "q14_specialty", "q14_providerSpecialty",
-        "q48_providerSpecialty", "q47_providerSpecialty",
-        "providerSpecialty", "providersSpecialty",
-        "provider_specialty", "specialty", "Specialty",
     ]
     for field in specialty_fields:
         value = data.get(field, "")

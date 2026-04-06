@@ -651,9 +651,11 @@ export default function WidgetPage() {
 
                 {/* Footer */}
                 <div className="px-6 pb-5 text-center">
-                    <p className="sr-widget-trust-row text-xs text-gray-400 flex items-center justify-center">
-                        <Shield className="w-3 h-3" /> 256-bit encryption • HIPAA compliant
-                    </p>
+                    <div className="flex items-center justify-center gap-4 text-xs text-gray-400">
+                        <span className="flex items-center gap-1"><Lock className="w-3 h-3 text-amber-600" /> Confidential</span>
+                        <span className="flex items-center gap-1"><Shield className="w-3 h-3 text-emerald-500" /> HIPAA</span>
+                        <span className="flex items-center gap-1"><Lock className="w-3 h-3 text-amber-600" /> 256-bit</span>
+                    </div>
                     <p className="sr-widget-footer-note mt-1.5 text-[10px] text-gray-300">© 2026 The Insomnia and Sleep Institute of Arizona. All rights reserved.</p>
                 </div>
             </div>

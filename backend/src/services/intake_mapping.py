@@ -393,10 +393,7 @@ def extract_patient_name_from_jotform(data: Dict[str, Any]) -> Tuple[str, str]:
     last_name = ""
 
     name_fields = [
-        "q30_fullName", "q30_name",
-        "q38_contactInformation", "q3_fullName", "q3_name",
-        "q4_fullName", "q4_name", "name", "full_name",
-        "patient_name", "patientName",
+        "q30_fullName", "q30_name", "full_name", "name",
     ]
 
     for fld in name_fields:
@@ -435,7 +432,8 @@ def map_jotform_submission_to_lead_input(form_data: Dict[str, Any]) -> LeadInput
     """
     Map Jotform submission data to canonical LeadInput for sleep clinic.
 
-    NEW Jotform form (260953996150062) question ID mapping:
+    Jotform form ID: 260953996150062
+    Question ID → Field (exact mapping, no fallbacks):
       q5  → privacy_consent          q6  → sleep_concerns (multi)
       q7  → sleep_concern_other      q8  → treatment_interest
       q9  → symptom_duration         q10 → treatment_history (multi)
@@ -447,138 +445,89 @@ def map_jotform_submission_to_lead_input(form_data: Dict[str, Any]) -> LeadInput
       q22 → preferred_contact        q24 → has_insurance
       q25 → insurance_provider       q26 → zip_code
       q23 → sms_consent
-
-    Each field tries the new q-ID first, then falls back to old IDs for compatibility.
     """
     first_name, last_name = extract_patient_name_from_jotform(form_data)
 
-    # Email — q19 (new) or q39 (old)
-    email = ""
-    for fld in ["q19_email", "q19_emailAddress", "q39_email", "q38_email", "email"]:
-        if fld in form_data and form_data[fld]:
-            email = sanitize_input(form_data[fld])
-            break
+    # q19 — Email
+    email = sanitize_input(form_data.get("q19_email", "") or form_data.get("q19_emailAddress", ""))
 
-    # Phone — q20 (new) or q40 (old)
+    # q20 — Phone
     phone = ""
-    for fld in ["q20_phoneNumber", "q20_phone", "q40_phoneNumber", "q39_phoneNumber", "phoneNumber", "phone"]:
-        if fld in form_data:
-            phone_data = form_data[fld]
-            if isinstance(phone_data, dict):
-                phone = normalize_phone(sanitize_input(phone_data.get("full", "")))
-            else:
-                phone = normalize_phone(sanitize_input(phone_data))
-            if phone:
-                break
+    phone_data = form_data.get("q20_phoneNumber", form_data.get("q20_phone", ""))
+    if isinstance(phone_data, dict):
+        phone = normalize_phone(sanitize_input(phone_data.get("full", "")))
+    elif phone_data:
+        phone = normalize_phone(sanitize_input(phone_data))
 
-    # Sleep concerns (conditions) — q6 (new) or q12 (old)
-    conditions_raw = None
-    for fld in ["q6_whatSleep", "q6_sleepConcerns", "q12_whatCondition", "q12_condition", "condition", "conditions"]:
-        if fld in form_data and form_data[fld]:
-            conditions_raw = form_data[fld]
-            break
+    # q6 — Sleep concerns (multi-select)
+    conditions_raw = form_data.get("q6_whatSleep", form_data.get("q6_sleepConcerns", None))
     conditions = normalize_conditions_list(conditions_raw)
 
-    # Other sleep concern text — q7 (new) or q13_otherCondition (old)
-    other_condition_text = ""
-    for fld in ["q7_tellUs", "q7_sleepConcern", "q13_otherCondition", "otherCondition", "other_condition", "condition_other"]:
-        if fld in form_data and form_data[fld]:
-            other_condition_text = sanitize_input(form_data[fld])
-            break
+    # q7 — Other sleep concern text
+    other_condition_text = sanitize_input(form_data.get("q7_tellUs", "") or form_data.get("q7_sleepConcern", ""))
 
-    # Sleep treatment interest — q8 (new) or q14 (old)
-    sleep_interest = ""
-    for fld in ["q8_whatAre", "q8_treatmentInterest", "q14_sleepTreatment", "q14_tmsInterest"]:
-        val = form_data.get(fld, "")
-        if val:
-            sleep_interest = normalize_sleep_treatment_interest(sanitize_input(val))
-            break
+    # q8 — Treatment interest
+    sleep_interest = normalize_sleep_treatment_interest(
+        sanitize_input(form_data.get("q8_whatAre", "") or form_data.get("q8_treatmentInterest", ""))
+    )
 
-    # Preferred contact method — q22 (new) or q41/q42 (old)
-    preferred_contact = ""
-    for fld in ["q22_howWould", "q22_preferredContact", "q41_preferredContact", "q42_preferredContact", "preferredContact"]:
-        if fld in form_data and form_data[fld]:
-            preferred_contact = normalize_contact_method(sanitize_input(form_data[fld]))
-            break
+    # q22 — Preferred contact method
+    preferred_contact = normalize_contact_method(
+        sanitize_input(form_data.get("q22_howWould", "") or form_data.get("q22_preferredContact", ""))
+    )
 
-    # Symptom duration — q9 (new) or q21 (old)
-    duration = normalize_duration(sanitize_input(
-        form_data.get("q9_howLong", "") or form_data.get("q9_symptomDuration", "")
-        or form_data.get("q21_howLong", "")
-    ))
+    # q9 — Symptom duration
+    duration = normalize_duration(
+        sanitize_input(form_data.get("q9_howLong", "") or form_data.get("q9_symptomDuration", ""))
+    )
 
-    # Prior treatments — q10 (new) or q22 (old, but q22 is now preferred_contact in new form)
-    treatments_raw = None
-    for fld in ["q10_whatHave", "q10_treatmentHistory", "q22_whatTreatments"]:
-        if fld in form_data and form_data[fld]:
-            treatments_raw = form_data[fld]
-            break
+    # q10 — Prior treatments (multi-select)
+    treatments_raw = form_data.get("q10_whatHave", form_data.get("q10_treatmentHistory", []))
     treatments = normalize_treatments(treatments_raw if treatments_raw else [])
 
-    # Insurance — q24
-    has_insurance = parse_yes_no(sanitize_input(
-        form_data.get("q24_doYou", "") or form_data.get("q24_insurance", "")
-    ))
-    insurance_provider_raw = sanitize_input(
-        form_data.get("q25_insuranceProvider", "") or form_data.get("q25_insurance", "")
+    # q24 — Insurance
+    has_insurance = parse_yes_no(
+        sanitize_input(form_data.get("q24_doYou", "") or form_data.get("q24_insurance", ""))
     )
+    # q25 — Insurance provider
+    insurance_provider_raw = sanitize_input(form_data.get("q25_insuranceProvider", "") or form_data.get("q25_insurance", ""))
     insurance_provider, is_other_insurance = normalize_insurance_provider(insurance_provider_raw)
     other_insurance = sanitize_input(form_data.get("q25b_otherInsurance", "")) if is_other_insurance else ""
 
-    # ZIP code — q26
-    zip_code = normalize_zip(sanitize_input(
-        form_data.get("q26_zipCode", "") or form_data.get("q26_whatIs", "")
-    ))
+    # q26 — ZIP code
+    zip_code = normalize_zip(sanitize_input(form_data.get("q26_zipCode", "") or form_data.get("q26_whatIs", "")))
 
-    # Urgency — q11 (new) or q27 (old)
-    urgency = normalize_urgency(sanitize_input(
-        form_data.get("q11_howSoon", "") or form_data.get("q11_urgency", "")
-        or form_data.get("q27_whenWould", "")
-    ))
-
-    # Consent — q5 (privacy/HIPAA), q23 (SMS)
-    hipaa_consent = parse_yes_no(sanitize_input(
-        form_data.get("q5_privacyConsent", "") or form_data.get("q5_consent", "")
-        or form_data.get("q28_hipaaConsent", "")
-    ))
-    sms_consent = parse_yes_no(sanitize_input(
-        form_data.get("q23_smsConsent", "") or form_data.get("q23_sms", "")
-        or form_data.get("q29_smsConsent", "")
-    ))
-
-    # Referral — q12 (new Yes/No) or q43 (old)
-    referred_by_provider = parse_yes_no(sanitize_input(
-        form_data.get("q12_wereYou", "") or form_data.get("q12_referral", "")
-        or form_data.get("q43_wereYou", "")
-    ))
-
-    # Provider name — q13 (new) or q44 (old)
-    referring_provider_name = sanitize_input(
-        form_data.get("q13_providerName", "") or form_data.get("q13_provider", "")
-        or form_data.get("q44_referringProviders", "")
+    # q11 — Urgency
+    urgency = normalize_urgency(
+        sanitize_input(form_data.get("q11_howSoon", "") or form_data.get("q11_urgency", ""))
     )
 
-    # Clinic — q16 (new) or q45 (old)
-    referring_clinic = sanitize_input(
-        form_data.get("q16_clinicOr", "") or form_data.get("q16_clinic", "")
-        or form_data.get("q45_clinicpracticeName", "")
+    # q5 — Privacy/HIPAA consent
+    hipaa_consent = parse_yes_no(
+        sanitize_input(form_data.get("q5_privacyConsent", "") or form_data.get("q5_consent", ""))
+    )
+    # q23 — SMS consent
+    sms_consent = parse_yes_no(
+        sanitize_input(form_data.get("q23_smsConsent", "") or form_data.get("q23_sms", ""))
     )
 
-    # Provider email — q15 (new) or q46/q47 (old)
+    # q12 — Referred by provider (Yes/No)
+    referred_by_provider = parse_yes_no(
+        sanitize_input(form_data.get("q12_wereYou", "") or form_data.get("q12_referral", ""))
+    )
+    # q13 — Provider name
+    referring_provider_name = sanitize_input(form_data.get("q13_providerName", "") or form_data.get("q13_provider", ""))
+    # q16 — Clinic/practice
+    referring_clinic = sanitize_input(form_data.get("q16_clinicOr", "") or form_data.get("q16_clinic", ""))
+
+    # q15 — Provider email
     referring_provider_email = ""
-    for fld in ["q15_providerEmail", "q15_providersEmail", "q46_providersEmail", "q46_providerEmail", "q47_providersEmail", "providerEmail"]:
-        value = form_data.get(fld, "")
-        if value and isinstance(value, str) and "@" in value:
-            referring_provider_email = sanitize_input(value).lower()
-            break
+    raw_email = sanitize_input(form_data.get("q15_providerEmail", "") or form_data.get("q15_providersEmail", ""))
+    if raw_email and "@" in raw_email:
+        referring_provider_email = raw_email.lower()
 
-    # Provider specialty — q14 (new) or q48 (old)
-    referring_provider_specialty = ""
-    for fld in ["q14_specialty", "q14_providerSpecialty", "q48_providerSpecialty", "q47_providerSpecialty", "providerSpecialty", "specialty"]:
-        value = form_data.get(fld, "")
-        if value and isinstance(value, str) and value.strip():
-            referring_provider_specialty = sanitize_input(value).strip()
-            break
+    # q14 — Provider specialty
+    referring_provider_specialty = sanitize_input(form_data.get("q14_specialty", "") or form_data.get("q14_providerSpecialty", ""))
 
     return LeadInput(
         first_name=first_name,

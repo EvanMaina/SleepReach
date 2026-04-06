@@ -613,13 +613,20 @@ async def submit_lead(
             phone=lead_data.phone,
         )
         if duplicate_match:
+            # Silent duplicate handling — the lead sees a normal success screen.
+            # Log it on the backend but never show an error to the patient.
             duplicate_field, duplicate_lead = duplicate_match
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"A lead with this {duplicate_field} already exists "
-                    f"({duplicate_lead.lead_number})."
-                ),
+            _dedup_logger.info(
+                "Duplicate widget submission (by %s) — original lead %s preserved",
+                duplicate_field, duplicate_lead.lead_number,
+            )
+            return LeadSubmitResponse(
+                success=True,
+                message="Thank you! Your information has been received. A care coordinator will reach out soon.",
+                lead_id=duplicate_lead.id,
+                lead_number=duplicate_lead.lead_number,
+                priority=PriorityType.HOT,
+                estimated_response_time="Within 24 hours",
             )
 
         # =====================================================================
