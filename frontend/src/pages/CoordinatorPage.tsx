@@ -1709,13 +1709,15 @@ export default function CoordinatorPage({
                       </td>
                     )}
                     {visibleCols.has("condition") && (
-                      <td className="px-4 py-3 max-w-[180px]">
-                        <span
-                          className="text-sm text-gray-600 capitalize truncate block"
-                          title={conditionLabel(lead)}
-                        >
-                          {conditionLabel(lead)}
-                        </span>
+                      <td className="px-4 py-3">
+                        <div className="max-w-[200px]">
+                          <span
+                            className="text-sm text-gray-600 capitalize block overflow-hidden text-ellipsis whitespace-nowrap"
+                            title={conditionLabel(lead)}
+                          >
+                            {conditionLabel(lead)}
+                          </span>
+                        </div>
                       </td>
                     )}
                     {visibleCols.has("priority") && (
