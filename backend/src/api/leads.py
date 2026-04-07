@@ -50,7 +50,11 @@ from ..services.lead_scoring_v2 import (
     get_confirmation_message,
     ScoreBreakdown,
 )
-from ..services.intake_mapping import map_widget_submission_to_lead_input, LeadInput
+from ..services.intake_mapping import (
+    map_widget_submission_to_lead_input,
+    LeadInput,
+    is_masked_placeholder,
+)
 from ..services.encryption import EncryptionService
 from ..services.audit import AuditService
 from ..services.lead_number import generate_unique_lead_number
@@ -131,6 +135,8 @@ def build_display_conditions(lead: Lead) -> list[str]:
         raw_conditions = [lead.condition.value.lower()]
 
     other_text = (lead.other_condition_text or lead.condition_other or "").strip()
+    if is_masked_placeholder(other_text):
+        other_text = ""
     display_conditions: list[str] = []
 
     for raw in raw_conditions:
@@ -150,24 +156,31 @@ def build_display_conditions(lead: Lead) -> list[str]:
     return display_conditions
 
 
+def sanitize_display_value(value: Optional[str]) -> str:
+    text = (value or "").strip()
+    if not text or is_masked_placeholder(text):
+        return ""
+    return text
+
+
 def build_lead_response(lead: Lead, decrypted: dict[str, str]) -> LeadResponse:
     """Build a consistent LeadResponse payload for any lead endpoint."""
     return LeadResponse(
         id=lead.id,
         lead_number=lead.lead_number,
-        first_name=decrypted["first_name"],
-        last_name=decrypted["last_name"],
-        email=decrypted["email"],
-        phone=decrypted["phone"],
+        first_name=sanitize_display_value(decrypted["first_name"]),
+        last_name=sanitize_display_value(decrypted["last_name"]),
+        email=sanitize_display_value(decrypted["email"]),
+        phone=sanitize_display_value(decrypted["phone"]),
         condition=lead.condition,
-        condition_other=lead.condition_other,
+        condition_other=sanitize_display_value(lead.condition_other),
         conditions=build_display_conditions(lead),
-        other_condition_text=lead.other_condition_text,
+        other_condition_text=sanitize_display_value(lead.other_condition_text),
         preferred_contact_method=lead.preferred_contact_method,
         symptom_duration=lead.symptom_duration,
         prior_treatments=lead.prior_treatments if lead.prior_treatments else [],
         has_insurance=lead.has_insurance,
-        insurance_provider=lead.insurance_provider,
+        insurance_provider=sanitize_display_value(lead.insurance_provider),
         zip_code=lead.zip_code,
         in_service_area=lead.in_service_area,
         urgency=lead.urgency,
@@ -1110,14 +1123,14 @@ async def list_leads(
             return LeadListResponse(
                 id=lead.id,
                 lead_number=lead.lead_number,
-                first_name=decrypted["first_name"],
-                last_name=decrypted["last_name"],
-                email=decrypted["email"],
-                phone=decrypted["phone"],
+                first_name=sanitize_display_value(decrypted["first_name"]),
+                last_name=sanitize_display_value(decrypted["last_name"]),
+                email=sanitize_display_value(decrypted["email"]),
+                phone=sanitize_display_value(decrypted["phone"]),
                 condition=lead.condition,
                 # Multi-condition support
                 conditions=build_display_conditions(lead),
-                other_condition_text=lead.other_condition_text,
+                other_condition_text=sanitize_display_value(lead.other_condition_text),
                 # Preferred contact method
                 preferred_contact_method=lead.preferred_contact_method,
                 score=lead.score,
@@ -1292,13 +1305,13 @@ async def search_leads_phi(
             LeadListResponse(
                 id=lead.id,
                 lead_number=lead.lead_number,
-                first_name=decrypted["first_name"],
-                last_name=decrypted["last_name"],
-                email=decrypted["email"],
-                phone=decrypted["phone"],
+                first_name=sanitize_display_value(decrypted["first_name"]),
+                last_name=sanitize_display_value(decrypted["last_name"]),
+                email=sanitize_display_value(decrypted["email"]),
+                phone=sanitize_display_value(decrypted["phone"]),
                 condition=lead.condition,
                 conditions=build_display_conditions(lead),
-                other_condition_text=lead.other_condition_text,
+                other_condition_text=sanitize_display_value(lead.other_condition_text),
                 preferred_contact_method=lead.preferred_contact_method,
                 score=lead.score,
                 priority=lead.priority,
@@ -1439,13 +1452,13 @@ async def list_deleted_leads(
             return {
                 "id": str(lead.id),
                 "lead_number": lead.lead_number,
-                "first_name": decrypted["first_name"],
-                "last_name": decrypted["last_name"],
-                "email": decrypted["email"],
-                "phone": decrypted["phone"],
+                "first_name": sanitize_display_value(decrypted["first_name"]),
+                "last_name": sanitize_display_value(decrypted["last_name"]),
+                "email": sanitize_display_value(decrypted["email"]),
+                "phone": sanitize_display_value(decrypted["phone"]),
                 "condition": lead.condition.value if lead.condition else None,
                 "conditions": build_display_conditions(lead),
-                "other_condition_text": lead.other_condition_text,
+                "other_condition_text": sanitize_display_value(lead.other_condition_text),
                 "priority": lead.priority.value if lead.priority else None,
                 "status": lead.status.value if lead.status else None,
                 "created_at": lead.created_at.isoformat() if lead.created_at else None,

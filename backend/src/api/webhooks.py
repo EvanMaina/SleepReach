@@ -23,6 +23,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Form, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from ..core.config import settings
 from ..core.database import get_db
 from ..core.security import is_in_service_area
 from ..models.lead import (
@@ -45,12 +46,14 @@ from .leads import find_duplicate_lead
 from ..services.intake_mapping import (
     map_jotform_submission_to_lead_input,
     LeadInput,
+    validate_canonical_lead_input,
     normalize_conditions_list,
     normalize_duration,
     normalize_treatments,
     normalize_urgency,
     normalize_contact_method,
 )
+from ..services.jotform_api import fetch_submission_form_data
 from ..services.lead_scoring_v2 import (
     calculate_lead_score,
     ScoreBreakdown,
@@ -643,10 +646,44 @@ async def jotform_webhook(
                     )
 
         # =====================================================================
-        # V2: Use canonical mapping layer
+        # V2: Use canonical mapping layer + authoritative recovery
         # =====================================================================
         lead_input: LeadInput = map_jotform_submission_to_lead_input(data)
         logger.info(f"Jotform mapped conditions: {lead_input.conditions}, primary: {lead_input.primary_condition}")
+
+        validation_errors = validate_canonical_lead_input(lead_input)
+        if validation_errors and submission_id:
+            authoritative_form_data = await fetch_submission_form_data(submission_id)
+            if authoritative_form_data:
+                data = {**data, **authoritative_form_data}
+                lead_input = map_jotform_submission_to_lead_input(data)
+                validation_errors = validate_canonical_lead_input(lead_input)
+                logger.info(
+                    "Jotform submission %s recovered from API; conditions=%s primary=%s",
+                    submission_id,
+                    lead_input.conditions,
+                    lead_input.primary_condition,
+                )
+
+        if validation_errors:
+            logger.warning(
+                "Rejecting Jotform submission %s due to invalid or masked payload: %s",
+                submission_id or "unknown",
+                validation_errors,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "message": (
+                        "Jotform submission did not include usable patient data. "
+                        "Enable 'Send PHI to Webhooks' in Jotform or configure "
+                        "JOTFORM_API_KEY so SleepReach can recover the full submission."
+                    ),
+                    "errors": validation_errors,
+                    "submission_id": submission_id or None,
+                    "api_recovery_attempted": bool(submission_id and settings.jotform_api_key),
+                },
+            )
 
         duplicate_match = find_duplicate_lead(
             db,

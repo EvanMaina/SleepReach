@@ -17,6 +17,9 @@ from datetime import date, datetime
 
 logger = logging.getLogger(__name__)
 
+MASKED_PLACEHOLDER_PATTERN = re.compile(r"^[\*\u2022\u25cf\u25a0#xX\-_\. ]+$")
+EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
 
 # =============================================================================
 # Canonical LeadInput Dataclass
@@ -105,16 +108,108 @@ def sanitize_input(value: Any) -> str:
     return str(value).strip()
 
 
+def is_masked_placeholder(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, dict):
+        return any(is_masked_placeholder(item) for item in value.values())
+    if isinstance(value, (list, tuple, set)):
+        return any(is_masked_placeholder(item) for item in value)
+
+    text = str(value).strip()
+    if not text:
+        return False
+
+    if "@" in text:
+        local_part = text.split("@", 1)[0].strip()
+        if local_part and MASKED_PLACEHOLDER_PATTERN.fullmatch(local_part):
+            return True
+
+    return bool(MASKED_PLACEHOLDER_PATTERN.fullmatch(text)) and any(
+        marker in text for marker in ("*", "\u2022", "\u25cf", "\u25a0", "#")
+    )
+
+
 def has_value(value: Any) -> bool:
     if value is None:
         return False
     if isinstance(value, str):
-        return bool(value.strip())
+        return bool(value.strip()) and not is_masked_placeholder(value)
     if isinstance(value, dict):
         return any(has_value(item) for item in value.values())
     if isinstance(value, (list, tuple, set)):
         return any(has_value(item) for item in value)
     return True
+
+
+def validate_canonical_lead_input(lead_input: LeadInput) -> List[str]:
+    """
+    Validate canonical lead input before persistence.
+
+    This is especially important for Jotform HIPAA webhooks, which may mask PHI
+    as "***" if the form is not configured to send PHI to webhooks.
+    """
+    errors: List[str] = []
+
+    def _add(message: str) -> None:
+        if message not in errors:
+            errors.append(message)
+
+    if not lead_input.hipaa_consent:
+        _add("HIPAA consent is required.")
+
+    if not lead_input.first_name or is_masked_placeholder(lead_input.first_name):
+        _add("First name is missing or masked.")
+    if not lead_input.last_name or is_masked_placeholder(lead_input.last_name):
+        _add("Last name is missing or masked.")
+
+    email = (lead_input.email or "").strip()
+    if not email or is_masked_placeholder(email) or not EMAIL_PATTERN.fullmatch(email):
+        _add("Email address is missing or invalid.")
+
+    phone_digits = re.sub(r"\D", "", lead_input.phone or "")
+    if not phone_digits or len(phone_digits) < 10:
+        _add("Phone number is missing or invalid.")
+
+    if not lead_input.conditions:
+        _add("At least one sleep concern is required.")
+
+    if "other" in lead_input.conditions:
+        if not lead_input.other_condition_text or is_masked_placeholder(lead_input.other_condition_text):
+            _add("Other sleep concern details are missing or masked.")
+
+    if not lead_input.sleep_treatment_interest:
+        _add("Treatment interest is required.")
+
+    if not lead_input.symptom_duration:
+        _add("Symptom duration is required.")
+
+    if not lead_input.prior_treatments:
+        _add("Treatment history is required.")
+
+    if not lead_input.urgency:
+        _add("Urgency is required.")
+
+    if not lead_input.preferred_contact_method:
+        _add("Preferred contact method is required.")
+
+    zip_code = (lead_input.zip_code or "").strip()
+    if not re.fullmatch(r"\d{5}", zip_code or "") or zip_code == "00000":
+        _add("ZIP code must be a valid 5-digit service-area ZIP.")
+
+    if lead_input.has_insurance:
+        if not lead_input.insurance_provider or is_masked_placeholder(lead_input.insurance_provider):
+            _add("Insurance provider is required when insurance is selected.")
+
+    if lead_input.referred_by_provider:
+        if not lead_input.referring_provider_name or is_masked_placeholder(lead_input.referring_provider_name):
+            _add("Referring provider name is required when referral is selected.")
+        if lead_input.referring_provider_email:
+            email_value = lead_input.referring_provider_email.strip()
+            if is_masked_placeholder(email_value) or not EMAIL_PATTERN.fullmatch(email_value):
+                _add("Referring provider email is invalid.")
+
+    return errors
 
 
 def get_first_non_empty(data: Dict[str, Any], *keys: str) -> Any:

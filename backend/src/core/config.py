@@ -200,6 +200,18 @@ class Settings(BaseSettings):
     )
 
     # ==========================================================================
+    # Jotform Configuration
+    # ==========================================================================
+    jotform_api_key: str = Field(
+        default="",
+        description="Jotform API key used to recover full submission data when HIPAA webhooks mask PHI",
+    )
+    jotform_api_base_url: str = Field(
+        default="https://hipaa-api.jotform.com",
+        description="Base URL for Jotform submission API",
+    )
+
+    # ==========================================================================
     # Google Ads Configuration
     # ==========================================================================
     google_ads_developer_token: str = Field(
