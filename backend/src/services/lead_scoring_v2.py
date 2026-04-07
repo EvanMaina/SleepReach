@@ -35,57 +35,65 @@ logger = logging.getLogger(__name__)
 # Scoring Constants
 # =============================================================================
 
+# Condition scores — multiple conditions ADD together
 CONDITION_SCORES = {
-    "insomnia": 12,
-    "sleep_apnea": 18,
-    "restless_leg": 10,
-    "narcolepsy": 14,
+    "insomnia": 10,
+    "sleep_apnea": 15,
+    "restless_leg": 8,
+    "narcolepsy": 10,
     "other": 5,
 }
 MULTI_CONDITION_BONUS = 5
 MAX_MULTI_CONDITION_BONUS = 10
 
+# Treatment interest — what the lead wants to explore
 SLEEP_TREATMENT_INTEREST_SCORES = {
-    "cpap_bipap": 20,
-    "inspire": 20,
-    "therapy_cbt": 15,
-    "sleep_study": 12,
-    "medication": 5,
-    "not_sure": 0,
+    "cpap_bipap": 15,
+    "inspire": 15,
+    "therapy_cbt": 8,
+    "sleep_study": 10,
+    "medication": 8,
+    "not_sure": 5,
 }
 
-INSURANCE_IN_NETWORK_SCORE = 30
-INSURANCE_OTHER_SCORE = 20
-INSURANCE_NONE_SCORE = -20
+# Insurance — never penalize
+INSURANCE_IN_NETWORK_SCORE = 25
+INSURANCE_OTHER_SCORE = 25
+INSURANCE_NONE_SCORE = 10  # No insurance still gets points (they still need help)
 
+# Duration — longer = more established need
 DURATION_SCORES = {
-    "more_than_12_months": 20,
+    "more_than_12_months": 15,
     "6_to_12_months": 10,
-    "less_than_6_months": 0,
+    "less_than_6_months": 5,
 }
 
-TREATMENT_CPAP_SCORE = 8
-TREATMENT_MEDICATION_SCORE = 4
-TREATMENT_SLEEP_STUDY_SCORE = 6
+# Treatment history scores
+TREATMENT_CPAP_SCORE = 5
+TREATMENT_MEDICATION_SCORE = 5
+TREATMENT_SLEEP_STUDY_SCORE = 5
 TREATMENT_THERAPY_SCORE = 5
-TREATMENT_NO_PRIOR_SCORE = 5
-TREATMENT_COMPLEXITY_BONUS = 5
+TREATMENT_NO_PRIOR_SCORE = 10  # New patient = higher value
+TREATMENT_COMPLEXITY_BONUS = 3
 
-LOCATION_IN_SERVICE_AREA_SCORE = 15
-LOCATION_OUT_OF_SERVICE_AREA_SCORE = -100
+# Location — never disqualify, just bonus for in-area
+LOCATION_IN_SERVICE_AREA_SCORE = 10
+LOCATION_OUT_OF_SERVICE_AREA_SCORE = 0  # No penalty — they might still become patients
 
+# Urgency — most impactful factor
 URGENCY_SCORES = {
-    "asap": 30,
-    "within_30_days": 10,
-    "exploring": 0,
+    "asap": 50,
+    "within_30_days": 40,
+    "exploring": 15,
 }
 
-UNDER_18_PENALTY = -100
+UNDER_18_PENALTY = 0  # Don't disqualify minors — route them appropriately
 REFERRAL_BONUS = 20
 
-HOT_THRESHOLD = 120
-MEDIUM_THRESHOLD = 70
-DISQUALIFIED_THRESHOLD = 0
+# Thresholds — more leads score HOT/MEDIUM
+HOT_THRESHOLD = 80
+MEDIUM_THRESHOLD = 40
+DISQUALIFIED_THRESHOLD = -999  # Never disqualify from scoring alone
 
 
 # =============================================================================
@@ -258,17 +266,13 @@ def calculate_lead_score(lead_input: LeadInput, referred_by_provider: bool = Fal
         breakdown.referral_bonus
     )
 
-    if breakdown.is_under_18:
-        breakdown.lead_score = UNDER_18_PENALTY
-        breakdown.priority = "disqualified"
-    elif breakdown.lead_score >= HOT_THRESHOLD:
+    # Priority assignment — NEVER disqualify from scoring
+    if breakdown.lead_score >= HOT_THRESHOLD:
         breakdown.priority = "hot"
     elif breakdown.lead_score >= MEDIUM_THRESHOLD:
         breakdown.priority = "medium"
-    elif breakdown.lead_score >= DISQUALIFIED_THRESHOLD:
-        breakdown.priority = "low"
     else:
-        breakdown.priority = "disqualified"
+        breakdown.priority = "low"
 
     logger.info(
         f"Lead scoring complete: score={breakdown.lead_score}, priority={breakdown.priority}, "
