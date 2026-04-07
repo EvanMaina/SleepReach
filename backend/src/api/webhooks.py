@@ -626,14 +626,11 @@ async def jotform_webhook(
         # =====================================================================
         # V2: Use canonical mapping layer + authoritative recovery
         # =====================================================================
-        # Log payload keys for debugging field matching
-        q_keys = sorted([k for k in data.keys() if k.startswith("q")])
-        logger.info("Jotform payload q-keys (%d): %s", len(q_keys), q_keys)
-        logger.info(
-            "Jotform _jget: email=%s phone=%s conditions=%s name=%s consent=%s",
-            _jget(data, "19"), _jget(data, "20"), _jget(data, "6"),
-            _jget(data, "30"), _jget(data, "5"),
-        )
+        # Log FULL payload for debugging — every key/value pair
+        logger.info("Jotform FULL payload keys (%d): %s", len(data), sorted(data.keys()))
+        for k, v in sorted(data.items()):
+            if k.startswith("q"):
+                logger.info("  Jotform field %s = %r (type=%s)", k, v, type(v).__name__)
 
         lead_input: LeadInput = map_jotform_submission_to_lead_input(data)
         logger.info(f"Jotform mapped conditions: {lead_input.conditions}, primary: {lead_input.primary_condition}")

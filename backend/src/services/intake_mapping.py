@@ -664,38 +664,20 @@ def map_jotform_submission_to_lead_input(form_data: Dict[str, Any]) -> LeadInput
 
     # q19 — Email
     email = sanitize_input(
-        get_first_non_empty(
-            form_data,
-            "q19_q19_email17",
-            "q19_email",
-            "q19_emailAddress",
-        ) or ""
+        _jget(form_data, "19") or get_first_non_empty(form_data, "q19_q19_email17", "q19_email", "q19_emailAddress") or ""
     )
 
     # q20 — Phone
     phone = ""
-    phone_data = get_first_non_empty(
-        form_data,
-        "q20_q20_phone18",
-        "q20_q20_phone18[full]",
-        "q20_phoneNumber",
-        "q20_phone",
-    )
+    phone_data = _jget(form_data, "20") or get_first_non_empty(form_data, "q20_q20_phone18", "q20_q20_phone18[full]", "q20_phoneNumber", "q20_phone")
     if isinstance(phone_data, dict):
-        phone = normalize_phone(
-            sanitize_input(phone_data.get("full", "") or phone_data.get("phone", ""))
-        )
+        phone = normalize_phone(sanitize_input(phone_data.get("full", "") or phone_data.get("phone", "")))
     elif phone_data:
         phone = normalize_phone(sanitize_input(phone_data))
 
     # q21 — Date of birth (optional)
     date_of_birth = None
-    dob_data = get_first_non_empty(
-        form_data,
-        "q21_q21_datetime19",
-        "q21_dateOfBirth",
-        "q21_date",
-    )
+    dob_data = _jget(form_data, "21") or get_first_non_empty(form_data, "q21_q21_datetime19", "q21_dateOfBirth", "q21_date")
     if isinstance(dob_data, dict):
         month = sanitize_input(dob_data.get("month", ""))
         day = sanitize_input(dob_data.get("day", ""))
@@ -722,188 +704,98 @@ def map_jotform_submission_to_lead_input(form_data: Dict[str, Any]) -> LeadInput
             date_of_birth = None
 
     # q6 — Sleep concerns (multi-select)
-    conditions_raw = get_first_non_empty(
-        form_data,
-        "q6_q6_checkbox4[]",
-        "q6_q6_checkbox4",
-        "q6_whatSleep",
-        "q6_sleepConcerns",
+    conditions_raw = (
+        _jget(form_data, "6")
+        or get_first_non_empty(form_data, "q6_q6_checkbox4[]", "q6_q6_checkbox4", "q6_whatSleep", "q6_sleepConcerns")
     )
     conditions = normalize_conditions_list(conditions_raw)
+    logger.info("Jotform q6 conditions: raw=%r normalized=%s", conditions_raw, conditions)
 
     # q7 — Other sleep concern text
     other_condition_text = sanitize_input(
-        get_first_non_empty(
-            form_data,
-            "q7_q7_textbox5",
-            "q7_tellUs",
-            "q7_sleepConcern",
-        ) or ""
+        _jget(form_data, "7")
+        or get_first_non_empty(form_data, "q7_q7_textbox5", "q7_tellUs", "q7_sleepConcern")
+        or ""
     )
     if other_condition_text and "other" not in conditions:
         conditions.append("other")
 
     # q8 — Treatment interest
     sleep_interest = normalize_sleep_treatment_interest(
-        sanitize_input(
-            get_first_non_empty(
-                form_data,
-                "q8_q8_radio6",
-                "q8_whatAre",
-                "q8_treatmentInterest",
-            ) or ""
-        )
+        sanitize_input(_jget(form_data, "8") or get_first_non_empty(form_data, "q8_q8_radio6", "q8_whatAre", "q8_treatmentInterest") or "")
     )
 
     # q22 — Preferred contact method
     preferred_contact = normalize_contact_method(
-        sanitize_input(
-            get_first_non_empty(
-                form_data,
-                "q22_q22_radio20",
-                "q22_howWould",
-                "q22_preferredContact",
-            ) or ""
-        )
+        sanitize_input(_jget(form_data, "22") or get_first_non_empty(form_data, "q22_q22_radio20", "q22_howWould", "q22_preferredContact") or "")
     )
 
     # q9 — Symptom duration
     duration = normalize_duration(
-        sanitize_input(
-            get_first_non_empty(
-                form_data,
-                "q9_q9_radio7",
-                "q9_howLong",
-                "q9_symptomDuration",
-            ) or ""
-        )
+        sanitize_input(_jget(form_data, "9") or get_first_non_empty(form_data, "q9_q9_radio7", "q9_howLong", "q9_symptomDuration") or "")
     )
 
     # q10 — Prior treatments (multi-select)
-    treatments_raw = get_first_non_empty(
-        form_data,
-        "q10_q10_checkbox8[]",
-        "q10_q10_checkbox8",
-        "q10_whatHave",
-        "q10_treatmentHistory",
+    treatments_raw = (
+        _jget(form_data, "10")
+        or get_first_non_empty(form_data, "q10_q10_checkbox8[]", "q10_q10_checkbox8", "q10_whatHave", "q10_treatmentHistory")
     )
     treatments = normalize_treatments(treatments_raw if treatments_raw else [])
 
     # q24 — Insurance
     has_insurance = parse_yes_no(
-        get_first_non_empty(
-            form_data,
-            "q24_q24_radio22",
-            "q24_doYou",
-            "q24_insurance",
-        )
+        _jget(form_data, "24") or get_first_non_empty(form_data, "q24_q24_radio22", "q24_doYou", "q24_insurance")
     )
     # q25 — Insurance provider
     insurance_provider_raw = sanitize_input(
-        get_first_non_empty(
-            form_data,
-            "q25_q25_textbox23",
-            "q25_insuranceProvider",
-            "q25_insurance",
-        ) or ""
+        _jget(form_data, "25") or get_first_non_empty(form_data, "q25_q25_textbox23", "q25_insuranceProvider", "q25_insurance") or ""
     )
     insurance_provider, is_other_insurance = normalize_insurance_provider(insurance_provider_raw)
     other_insurance = sanitize_input(form_data.get("q25b_otherInsurance", "")) if is_other_insurance else ""
 
     # q26 — ZIP code
     zip_code = normalize_zip(
-        sanitize_input(
-            get_first_non_empty(
-                form_data,
-                "q26_q26_textbox24",
-                "q26_zipCode",
-                "q26_whatIs",
-            ) or ""
-        )
+        sanitize_input(_jget(form_data, "26") or get_first_non_empty(form_data, "q26_q26_textbox24", "q26_zipCode", "q26_whatIs") or "")
     )
 
     # q11 — Urgency
     urgency = normalize_urgency(
-        sanitize_input(
-            get_first_non_empty(
-                form_data,
-                "q11_q11_radio9",
-                "q11_howSoon",
-                "q11_urgency",
-            ) or ""
-        )
+        sanitize_input(_jget(form_data, "11") or get_first_non_empty(form_data, "q11_q11_radio9", "q11_howSoon", "q11_urgency") or "")
     )
 
     # q5 — Privacy/HIPAA consent
     hipaa_consent = parse_yes_no(
-        get_first_non_empty(
-            form_data,
-            "q5_q5_checkbox3[]",
-            "q5_q5_checkbox3",
-            "q5_privacyConsent",
-            "q5_consent",
-        )
+        _jget(form_data, "5") or get_first_non_empty(form_data, "q5_q5_checkbox3[]", "q5_q5_checkbox3", "q5_privacyConsent", "q5_consent")
     )
     # q23 — SMS consent
     sms_consent = parse_yes_no(
-        get_first_non_empty(
-            form_data,
-            "q23_q23_checkbox21[]",
-            "q23_q23_checkbox21",
-            "q23_smsConsent",
-            "q23_sms",
-        )
+        _jget(form_data, "23") or get_first_non_empty(form_data, "q23_q23_checkbox21[]", "q23_q23_checkbox21", "q23_smsConsent", "q23_sms")
     )
 
     # q12 — Referred by provider (Yes/No)
     referred_by_provider = parse_yes_no(
-        get_first_non_empty(
-            form_data,
-            "q12_q12_radio10",
-            "q12_wereYou",
-            "q12_referral",
-        )
+        _jget(form_data, "12") or get_first_non_empty(form_data, "q12_q12_radio10", "q12_wereYou", "q12_referral")
     )
     # q13 — Provider name
     referring_provider_name = sanitize_input(
-        get_first_non_empty(
-            form_data,
-            "q13_q13_textbox11",
-            "q13_providerName",
-            "q13_provider",
-        ) or ""
+        _jget(form_data, "13") or get_first_non_empty(form_data, "q13_q13_textbox11", "q13_providerName", "q13_provider") or ""
     )
     # q16 — Clinic/practice
     referring_clinic = sanitize_input(
-        get_first_non_empty(
-            form_data,
-            "q16_q16_textbox14",
-            "q16_clinicOr",
-            "q16_clinic",
-        ) or ""
+        _jget(form_data, "16") or get_first_non_empty(form_data, "q16_q16_textbox14", "q16_clinicOr", "q16_clinic") or ""
     )
 
     # q15 — Provider email
     referring_provider_email = ""
     raw_email = sanitize_input(
-        get_first_non_empty(
-            form_data,
-            "q15_q15_email13",
-            "q15_providerEmail",
-            "q15_providersEmail",
-        ) or ""
+        _jget(form_data, "15") or get_first_non_empty(form_data, "q15_q15_email13", "q15_providerEmail", "q15_providersEmail") or ""
     )
     if raw_email and "@" in raw_email:
         referring_provider_email = raw_email.lower()
 
     # q14 — Provider specialty
     referring_provider_specialty = sanitize_input(
-        get_first_non_empty(
-            form_data,
-            "q14_q14_textbox12",
-            "q14_specialty",
-            "q14_providerSpecialty",
-        ) or ""
+        _jget(form_data, "14") or get_first_non_empty(form_data, "q14_q14_textbox12", "q14_specialty", "q14_providerSpecialty") or ""
     )
 
     return LeadInput(
