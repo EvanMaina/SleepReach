@@ -108,6 +108,20 @@ def sanitize_input(value: Any) -> str:
     return str(value).strip()
 
 
+def _jget(data: Dict[str, Any], qid: str) -> Any:
+    """
+    Get a Jotform field by question ID prefix.
+
+    Jotform generates field names like q19_q19_email17, q6_q6_checkbox4,
+    q30_fullName. This helper finds the first key starting with 'q{id}_'.
+    """
+    prefix = f"q{qid}_"
+    for key in data:
+        if key.startswith(prefix):
+            return data[key]
+    return None
+
+
 def is_masked_placeholder(value: Any) -> bool:
     if value is None:
         return False
@@ -576,6 +590,18 @@ def normalize_insurance_provider(provider: str) -> Tuple[str, bool]:
 def extract_patient_name_from_jotform(data: Dict[str, Any]) -> Tuple[str, str]:
     first_name = ""
     last_name = ""
+
+    # Try _jget for q30 first (matches q30_fullName, q30_q30_xxx, etc.)
+    q30_val = _jget(data, "30")
+    if q30_val:
+        if isinstance(q30_val, dict):
+            first = sanitize_input(q30_val.get("first", "") or q30_val.get("firstName", ""))
+            last = sanitize_input(q30_val.get("last", "") or q30_val.get("lastName", ""))
+            if first or last:
+                return first, last
+        elif isinstance(q30_val, str) and q30_val.strip():
+            parts = q30_val.strip().split(' ', 1)
+            return sanitize_input(parts[0]), sanitize_input(parts[1]) if len(parts) > 1 else ""
 
     name_fields = ["q30_fullName", "q30_name", "full_name", "name"]
 

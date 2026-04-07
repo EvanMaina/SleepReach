@@ -169,6 +169,23 @@ def sanitize_input(value: Any) -> str:
     return str(value).strip()
 
 
+def _jget(data: Dict[str, Any], qid: str) -> Any:
+    """
+    Get a Jotform field value by question ID prefix.
+
+    Jotform generates field names like q19_q19_email17, q6_q6_checkbox4,
+    q30_fullName, etc. This helper finds the first key that starts with
+    'q{id}_' and returns its value, so we don't need to hardcode the
+    exact Jotform-generated suffix.
+    """
+    prefix = f"q{qid}_"
+    # Try exact common patterns first (fast path)
+    for key in data:
+        if key.startswith(prefix):
+            return data[key]
+    return None
+
+
 def get_client_ip(request: Request) -> Optional[str]:
     """Extract client IP from request headers."""
     forwarded = request.headers.get("X-Forwarded-For")
@@ -377,9 +394,21 @@ def find_or_create_provider(
 
 
 def extract_patient_name(data: Dict[str, Any]) -> tuple:
-    """Extract patient name from Jotform submission."""
+    """Extract patient name from Jotform submission (q30)."""
     first_name = ""
     last_name = ""
+
+    # Try _jget for q30 first (matches q30_fullName, q30_name, etc.)
+    q30_value = _jget(data, "30")
+    if q30_value:
+        if isinstance(q30_value, dict):
+            first = sanitize_input(q30_value.get("first", "") or q30_value.get("firstName", ""))
+            last = sanitize_input(q30_value.get("last", "") or q30_value.get("lastName", ""))
+            if first or last:
+                return first, last
+        elif isinstance(q30_value, str) and q30_value.strip():
+            parts = q30_value.strip().split(' ', 1)
+            return sanitize_input(parts[0]), sanitize_input(parts[1]) if len(parts) > 1 else ""
 
     name_fields = [
         "q30_fullName", "q30_name", "full_name", "name",
@@ -415,20 +444,18 @@ def extract_patient_name(data: Dict[str, Any]) -> tuple:
 
 
 def extract_provider_email(data: Dict[str, Any]) -> str:
-    """Extract provider email from Jotform."""
-    for field in ["q15_providerEmail", "q15_providersEmail"]:
-        value = data.get(field, "")
-        if value and isinstance(value, str) and "@" in value:
-            return sanitize_input(value).lower()
+    """Extract provider email from Jotform (q15)."""
+    value = _jget(data, "15")
+    if value and isinstance(value, str) and "@" in value:
+        return sanitize_input(value).lower()
     return ""
 
 
 def extract_provider_specialty(data: Dict[str, Any]) -> str:
-    """Extract provider specialty from Jotform."""
-    for field in ["q14_specialty", "q14_providerSpecialty"]:
-        value = data.get(field, "")
-        if value and isinstance(value, str) and value.strip():
-            return sanitize_input(value).strip()
+    """Extract provider specialty from Jotform (q14)."""
+    value = _jget(data, "14")
+    if value and isinstance(value, str) and value.strip():
+        return sanitize_input(value).strip()
     return ""
 
 
@@ -452,43 +479,44 @@ def extract_jotform_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     first_name, last_name = extract_patient_name(data)
 
-    # q19 — Email
-    email = sanitize_input(data.get("q19_email", "") or data.get("q19_emailAddress", ""))
+    # q19 — Email (Jotform sends as q19_q19_email17)
+    email = sanitize_input(_jget(data, "q19"))
 
-    # q20 — Phone
-    phone_data = data.get("q20_phoneNumber", data.get("q20_phone", ""))
+    # q20 — Phone (Jotform sends as q20_q20_phone18)
+    phone_data = _jget(data, "q20")
     if isinstance(phone_data, dict):
         phone = normalize_phone(sanitize_input(phone_data.get("full", "")))
     else:
-        phone = normalize_phone(sanitize_input(phone_data))
+        phone = normalize_phone(sanitize_input(phone_data or ""))
 
-    # q6 — Sleep concerns (multi-select)
-    conditions_raw = data.get("q6_whatSleep", data.get("q6_sleepConcerns", []))
+    # q6 — Sleep concerns (multi-select, Jotform sends as q6_q6_checkbox4)
+    conditions_raw = _jget(data, "q6") or []
     if isinstance(conditions_raw, str):
         conditions_raw = [conditions_raw]
     conditions = map_condition(conditions_raw)
 
-    # q9 — Symptom duration
-    duration = map_duration(sanitize_input(data.get("q9_howLong", "") or data.get("q9_symptomDuration", "")))
+    # q9 — Symptom duration (Jotform sends as q9_q9_radio7)
+    duration = map_duration(sanitize_input(_jget(data, "q9") or ""))
 
-    # q10 — Treatment history (multi-select)
-    treatments_raw = data.get("q10_whatHave", data.get("q10_treatmentHistory", []))
+    # q10 — Treatment history (multi-select, Jotform sends as q10_q10_checkbox8)
+    treatments_raw = _jget(data, "q10") or []
     if isinstance(treatments_raw, str):
         treatments_raw = [treatments_raw]
     treatments = map_treatments(treatments_raw)
 
-    # q24 — Insurance
-    has_insurance = parse_yes_no(sanitize_input(data.get("q24_doYou", "") or data.get("q24_insurance", "")))
-    insurance_provider = sanitize_input(data.get("q25_insuranceProvider", "") or data.get("q25_insurance", ""))
+    # q24 — Insurance (Jotform sends as q24_q24_radio22)
+    has_insurance = parse_yes_no(sanitize_input(_jget(data, "q24") or ""))
+    # q25 — Insurance provider (Jotform sends as q25_q25_textbox23)
+    insurance_provider = sanitize_input(_jget(data, "q25") or "")
 
-    # q26 — ZIP code
-    zip_code = normalize_zip(sanitize_input(data.get("q26_zipCode", "") or data.get("q26_whatIs", "")))
+    # q26 — ZIP code (Jotform sends as q26_q26_textbox24)
+    zip_code = normalize_zip(sanitize_input(_jget(data, "q26") or ""))
 
-    # q11 — Urgency
-    urgency = map_urgency(sanitize_input(data.get("q11_howSoon", "") or data.get("q11_urgency", "")))
+    # q11 — Urgency (Jotform sends as q11_q11_radio9)
+    urgency = map_urgency(sanitize_input(_jget(data, "q11") or ""))
 
-    # q12 — Referral (Yes/No)
-    referred_by_provider = parse_yes_no(sanitize_input(data.get("q12_wereYou", "") or data.get("q12_referral", "")))
+    # q12 — Referral (Jotform sends as q12_q12_radio10)
+    referred_by_provider = parse_yes_no(sanitize_input(_jget(data, "q12") or ""))
 
     referring_provider_email = extract_provider_email(data)
     referring_provider_specialty = extract_provider_specialty(data)
@@ -506,8 +534,8 @@ def extract_jotform_data(data: Dict[str, Any]) -> Dict[str, Any]:
         "zip_code": zip_code,
         "urgency": urgency,
         "referred_by_provider": referred_by_provider,
-        "referring_provider_name": sanitize_input(data.get("q13_providerName", "") or data.get("q13_provider", "")),
-        "referring_clinic": sanitize_input(data.get("q16_clinicOr", "") or data.get("q16_clinic", "")),
+        "referring_provider_name": sanitize_input(_jget(data, "q13") or ""),
+        "referring_clinic": sanitize_input(_jget(data, "q16") or ""),
         "referring_provider_email": referring_provider_email,
         "referring_provider_specialty": referring_provider_specialty,
     }
@@ -598,6 +626,15 @@ async def jotform_webhook(
         # =====================================================================
         # V2: Use canonical mapping layer + authoritative recovery
         # =====================================================================
+        # Log payload keys for debugging field matching
+        q_keys = sorted([k for k in data.keys() if k.startswith("q")])
+        logger.info("Jotform payload q-keys (%d): %s", len(q_keys), q_keys)
+        logger.info(
+            "Jotform _jget: email=%s phone=%s conditions=%s name=%s consent=%s",
+            _jget(data, "19"), _jget(data, "20"), _jget(data, "6"),
+            _jget(data, "30"), _jget(data, "5"),
+        )
+
         lead_input: LeadInput = map_jotform_submission_to_lead_input(data)
         logger.info(f"Jotform mapped conditions: {lead_input.conditions}, primary: {lead_input.primary_condition}")
 
