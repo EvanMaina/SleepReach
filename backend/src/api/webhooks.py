@@ -624,14 +624,14 @@ async def jotform_webhook(
         # =====================================================================
         # V2: Use canonical mapping layer + authoritative recovery
         # =====================================================================
-        # Log FULL payload for debugging — every key/value pair
-        logger.info("Jotform FULL payload keys (%d): %s", len(data), sorted(data.keys()))
+        # DEBUG: print() to guarantee visibility in docker logs
+        print(f"[JOTFORM DEBUG] data has {len(data)} keys: {sorted(data.keys())}", flush=True)
         for k, v in sorted(data.items()):
-            if k.startswith("q"):
-                logger.info("  Jotform field %s = %r (type=%s)", k, v, type(v).__name__)
+            if str(k).startswith("q") or str(k) in ("formID", "rawRequest", "submissionID", "fullName"):
+                print(f"  [JOTFORM] {k} = {repr(v)[:200]} (type={type(v).__name__})", flush=True)
 
         lead_input: LeadInput = map_jotform_submission_to_lead_input(data)
-        logger.info(f"Jotform mapped conditions: {lead_input.conditions}, primary: {lead_input.primary_condition}")
+        print(f"[JOTFORM DEBUG] mapped: email={lead_input.email!r} phone={lead_input.phone!r} conditions={lead_input.conditions} zip={lead_input.zip_code!r} consent={lead_input.hipaa_consent}", flush=True)
 
         validation_errors = validate_canonical_lead_input(lead_input)
         if validation_errors and submission_id:
@@ -648,24 +648,11 @@ async def jotform_webhook(
                 )
 
         if validation_errors:
-            logger.warning(
-                "Rejecting Jotform submission %s due to invalid or masked payload: %s",
-                submission_id or "unknown",
-                validation_errors,
-            )
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail={
-                    "message": (
-                        "Jotform submission did not include usable patient data. "
-                        "Enable 'Send PHI to Webhooks' in Jotform or configure "
-                        "JOTFORM_API_KEY so SleepReach can recover the full submission."
-                    ),
-                    "errors": validation_errors,
-                    "submission_id": submission_id or None,
-                    "api_recovery_attempted": bool(submission_id and settings.jotform_api_key),
-                },
-            )
+            # Log but DO NOT reject — accept the lead anyway so we can
+            # diagnose the actual payload and fix field mapping.
+            # NeuroReach never rejects Jotform submissions with 422.
+            print(f"[JOTFORM WARN] Validation issues for {submission_id}: {validation_errors}", flush=True)
+            print(f"[JOTFORM WARN] Proceeding anyway — lead will be created with available data", flush=True)
 
         duplicate_match = find_duplicate_lead(
             db,
