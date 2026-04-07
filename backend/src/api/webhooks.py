@@ -195,12 +195,45 @@ def get_client_ip(request: Request) -> Optional[str]:
 
 
 def parse_jotform_payload(raw_request: str) -> Dict[str, Any]:
-    """Parse Jotform rawRequest JSON string."""
+    """
+    Parse Jotform rawRequest JSON and flatten the answers structure.
+
+    Jotform rawRequest is a JSON object where keys are numeric question IDs
+    and values are objects like:
+        {"5": {"name": "q5_checkbox3", "answer": [...], "type": "control_checkbox"}}
+        {"30": {"name": "fullName", "answer": {"first": "K", "last": "M"}, "type": "control_fullname"}}
+
+    This function extracts the "answer" from each question and builds a flat
+    dict keyed by BOTH the numeric ID ("6") and the field name ("q6_checkbox4"):
+        {"6": ["Insomnia"], "q6_checkbox4": ["Insomnia"], "19": "email@...", "q19_email17": "email@..."}
+    """
     try:
-        return json.loads(raw_request)
+        raw = json.loads(raw_request)
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse Jotform payload: {e}")
         raise ValueError(f"Invalid JSON in rawRequest: {e}")
+
+    # If it's already a flat dict (from our curl tests), return as-is
+    first_val = next(iter(raw.values()), None) if raw else None
+    if not isinstance(first_val, dict) or "type" not in (first_val or {}):
+        return raw
+
+    # It's the Jotform answers structure — extract answer values
+    result: Dict[str, Any] = {}
+    for qid, entry in raw.items():
+        if not isinstance(entry, dict):
+            continue
+        answer = entry.get("answer")
+        name = entry.get("name", "")
+
+        # Store under numeric ID (primary key for _jget)
+        if answer is not None:
+            result[qid] = answer
+        # Also store under the field name (for get_first_non_empty fallback)
+        if name and answer is not None:
+            result[name] = answer
+
+    return result
 
 
 def form_data_to_payload(form_data: Any) -> Dict[str, Any]:
