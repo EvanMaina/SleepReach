@@ -1263,7 +1263,6 @@ export default function CoordinatorPage({
       setSmsMessage("");
       setSmsDialogLead(null);
       setSelectedSmsTemplate("custom");
-      fetchLeads();
     } catch {
       showToast("Failed to send SMS", "error");
     } finally {
@@ -1301,7 +1300,6 @@ export default function CoordinatorPage({
       setEmailBody("");
       setEmailDialogLead(null);
       setSelectedEmailTemplate("custom");
-      fetchLeads();
     } catch {
       showToast("Failed to send email", "error");
     } finally {
