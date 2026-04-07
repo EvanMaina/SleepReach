@@ -110,15 +110,23 @@ def sanitize_input(value: Any) -> str:
 
 def _jget(data: Dict[str, Any], qid: str) -> Any:
     """
-    Get a Jotform field by question ID prefix.
+    Get a Jotform field by question ID.
 
-    Jotform generates field names like q19_q19_email17, q6_q6_checkbox4,
-    q30_fullName. This helper finds the first key starting with 'q{id}_'.
+    Jotform rawRequest keys vary by form configuration:
+    - q19_q19_email17 (auto-generated)
+    - q6_whatSleep (human-readable)
+    - fullName (no q-prefix for name fields)
+    - "30" (bare numeric key from answers API)
+
+    Search order: q{id}_ prefix → bare numeric key → known aliases.
     """
     prefix = f"q{qid}_"
     for key in data:
         if key.startswith(prefix):
             return data[key]
+    # Bare numeric key (from Jotform answers API format)
+    if qid in data:
+        return data[qid]
     return None
 
 
@@ -603,7 +611,7 @@ def extract_patient_name_from_jotform(data: Dict[str, Any]) -> Tuple[str, str]:
             parts = q30_val.strip().split(' ', 1)
             return sanitize_input(parts[0]), sanitize_input(parts[1]) if len(parts) > 1 else ""
 
-    name_fields = ["q30_fullName", "q30_name", "full_name", "name"]
+    name_fields = ["q30_fullName", "q30_name", "fullName", "full_name", "name"]
 
     for fld in name_fields:
         if fld in data:
