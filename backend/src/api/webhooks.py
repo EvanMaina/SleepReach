@@ -19,7 +19,7 @@ import re
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Form, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -416,39 +416,19 @@ def extract_patient_name(data: Dict[str, Any]) -> tuple:
 
 def extract_provider_email(data: Dict[str, Any]) -> str:
     """Extract provider email from Jotform."""
-    email_fields = [
-        "q15_providerEmail", "q15_providersEmail",
-    ]
-    for field in email_fields:
+    for field in ["q15_providerEmail", "q15_providersEmail"]:
         value = data.get(field, "")
         if value and isinstance(value, str) and "@" in value:
             return sanitize_input(value).lower()
-    
-    for key, value in data.items():
-        key_lower = key.lower()
-        if "email" in key_lower and ("provider" in key_lower or "referr" in key_lower):
-            if value and isinstance(value, str) and "@" in value:
-                return sanitize_input(value).lower()
-    
     return ""
 
 
 def extract_provider_specialty(data: Dict[str, Any]) -> str:
     """Extract provider specialty from Jotform."""
-    specialty_fields = [
-        "q14_specialty", "q14_providerSpecialty",
-    ]
-    for field in specialty_fields:
+    for field in ["q14_specialty", "q14_providerSpecialty"]:
         value = data.get(field, "")
         if value and isinstance(value, str) and value.strip():
             return sanitize_input(value).strip()
-    
-    for key, value in data.items():
-        key_lower = key.lower()
-        if "specialty" in key_lower or "speciality" in key_lower:
-            if value and isinstance(value, str) and value.strip():
-                return sanitize_input(value).strip()
-    
     return ""
 
 
@@ -472,64 +452,43 @@ def extract_jotform_data(data: Dict[str, Any]) -> Dict[str, Any]:
     """
     first_name, last_name = extract_patient_name(data)
 
-    # Email — q19
-    email = sanitize_input(
-        data.get("q19_email", "") or data.get("q19_emailAddress", "")
-        or data.get("q39_email", "") or data.get("email", "")
-    )
+    # q19 — Email
+    email = sanitize_input(data.get("q19_email", "") or data.get("q19_emailAddress", ""))
 
-    # Phone — q20
-    phone_data = data.get("q20_phoneNumber", data.get("q20_phone", data.get("q40_phoneNumber", {})))
+    # q20 — Phone
+    phone_data = data.get("q20_phoneNumber", data.get("q20_phone", ""))
     if isinstance(phone_data, dict):
         phone = normalize_phone(sanitize_input(phone_data.get("full", "")))
     else:
         phone = normalize_phone(sanitize_input(phone_data))
 
-    # Sleep concerns — q6 (multi-select)
-    conditions_raw = data.get("q6_whatSleep", data.get("q6_sleepConcerns", data.get("q12_whatCondition", [])))
+    # q6 — Sleep concerns (multi-select)
+    conditions_raw = data.get("q6_whatSleep", data.get("q6_sleepConcerns", []))
     if isinstance(conditions_raw, str):
         conditions_raw = [conditions_raw]
     conditions = map_condition(conditions_raw)
 
-    # Other sleep concern text — q7
-    # (stored in other_condition_text via intake_mapping)
+    # q9 — Symptom duration
+    duration = map_duration(sanitize_input(data.get("q9_howLong", "") or data.get("q9_symptomDuration", "")))
 
-    # Symptom duration — q9
-    duration = map_duration(sanitize_input(
-        data.get("q9_howLong", "") or data.get("q9_symptomDuration", "")
-        or data.get("q21_howLong", "")
-    ))
-
-    # Treatment history — q10 (multi-select)
-    treatments_raw = data.get("q10_whatHave", data.get("q10_treatmentHistory", data.get("q22_whatTreatments", [])))
+    # q10 — Treatment history (multi-select)
+    treatments_raw = data.get("q10_whatHave", data.get("q10_treatmentHistory", []))
     if isinstance(treatments_raw, str):
         treatments_raw = [treatments_raw]
     treatments = map_treatments(treatments_raw)
 
-    # Insurance — q24
-    has_insurance = parse_yes_no(sanitize_input(
-        data.get("q24_doYou", "") or data.get("q24_insurance", "")
-    ))
-    insurance_provider = sanitize_input(
-        data.get("q25_insuranceProvider", "") or data.get("q25_insurance", "")
-    )
+    # q24 — Insurance
+    has_insurance = parse_yes_no(sanitize_input(data.get("q24_doYou", "") or data.get("q24_insurance", "")))
+    insurance_provider = sanitize_input(data.get("q25_insuranceProvider", "") or data.get("q25_insurance", ""))
 
-    # ZIP code — q26
-    zip_code = normalize_zip(sanitize_input(
-        data.get("q26_zipCode", "") or data.get("q26_whatIs", "")
-    ))
+    # q26 — ZIP code
+    zip_code = normalize_zip(sanitize_input(data.get("q26_zipCode", "") or data.get("q26_whatIs", "")))
 
-    # Urgency — q11
-    urgency = map_urgency(sanitize_input(
-        data.get("q11_howSoon", "") or data.get("q11_urgency", "")
-        or data.get("q27_whenWould", "")
-    ))
+    # q11 — Urgency
+    urgency = map_urgency(sanitize_input(data.get("q11_howSoon", "") or data.get("q11_urgency", "")))
 
-    # Referral — q12 (Yes/No), q13 (provider name), q16 (clinic)
-    referred_by_provider = parse_yes_no(sanitize_input(
-        data.get("q12_wereYou", "") or data.get("q12_referral", "")
-        or data.get("q43_wereYou", "")
-    ))
+    # q12 — Referral (Yes/No)
+    referred_by_provider = parse_yes_no(sanitize_input(data.get("q12_wereYou", "") or data.get("q12_referral", "")))
 
     referring_provider_email = extract_provider_email(data)
     referring_provider_specialty = extract_provider_specialty(data)
@@ -547,14 +506,8 @@ def extract_jotform_data(data: Dict[str, Any]) -> Dict[str, Any]:
         "zip_code": zip_code,
         "urgency": urgency,
         "referred_by_provider": referred_by_provider,
-        "referring_provider_name": sanitize_input(
-            data.get("q13_providerName", "") or data.get("q13_provider", "")
-            or data.get("q44_referringProviders", "")
-        ),
-        "referring_clinic": sanitize_input(
-            data.get("q16_clinicOr", "") or data.get("q16_clinic", "")
-            or data.get("q45_clinicpracticeName", "")
-        ),
+        "referring_provider_name": sanitize_input(data.get("q13_providerName", "") or data.get("q13_provider", "")),
+        "referring_clinic": sanitize_input(data.get("q16_clinicOr", "") or data.get("q16_clinic", "")),
         "referring_provider_email": referring_provider_email,
         "referring_provider_specialty": referring_provider_specialty,
     }
@@ -572,29 +525,26 @@ def extract_jotform_data(data: Dict[str, Any]) -> Dict[str, Any]:
 )
 async def jotform_webhook(
     request: Request,
-    rawRequest: str = Form(default=None),
-    formID: str = Form(default=None),
     db: Session = Depends(get_db),
 ):
     """
     Receive and process leads from Jotform.
-    
-    V2 UPDATE: Uses canonical mapping layer and new scoring engine.
-    Populates new fields: conditions[], preferred_contact_method, etc.
+
+    No Form() parameter declarations — reads everything from
+    request.form() to avoid 422 errors from unexpected Jotform fields.
     """
     try:
-        logger.info(f"Jotform webhook received - Form ID: {formID}")
         form_data = await request.form()
         form_payload = form_data_to_payload(form_data)
-        
-        if not formID:
-            formID = form_payload.get("formID", "")
-        
-        if formID != JOTFORM_FORM_ID:
-            logger.warning(f"Invalid form ID: {formID}")
-            raise HTTPException(status_code=400, detail=f"Invalid form ID")
-        
-        raw_request_data = rawRequest or form_payload.get("rawRequest", "")
+
+        formID = str(form_payload.get("formID", "")).strip()
+        logger.info(f"Jotform webhook received - Form ID: {formID}")
+
+        if formID and formID != JOTFORM_FORM_ID:
+            logger.warning(f"Rejected form ID: {formID} (expected {JOTFORM_FORM_ID})")
+            raise HTTPException(status_code=400, detail="Invalid form ID")
+
+        raw_request_data = str(form_payload.get("rawRequest", "")).strip()
         if raw_request_data:
             data = {**form_payload, **parse_jotform_payload(raw_request_data)}
         else:
