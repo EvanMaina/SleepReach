@@ -23,9 +23,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from ..core.config import settings
 from ..core.database import get_db
-from ..core.security import is_in_service_area
 from ..models.lead import (
     Lead,
     LeadSource,
@@ -47,17 +45,11 @@ from ..services.intake_mapping import (
     map_jotform_submission_to_lead_input,
     LeadInput,
     validate_canonical_lead_input,
-    normalize_conditions_list,
-    normalize_duration,
-    normalize_treatments,
-    normalize_urgency,
-    normalize_contact_method,
 )
 from ..services.jotform_api import fetch_submission_form_data
 from ..services.lead_scoring_v2 import (
     calculate_lead_score,
     ScoreBreakdown,
-    is_in_service_area as check_service_area,
 )
 from sqlalchemy import func
 
@@ -626,13 +618,10 @@ async def jotform_webhook(
                 Lead.created_at >= cutoff,
             ).first()
             if dup:
-                logger.warning(f"Jotform duplicate detected via submissionID={submission_id}")
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=(
-                        f"A lead with this submission already exists "
-                        f"({dup.lead_number})."
-                    ),
+                logger.info(f"Jotform duplicate (submissionID={submission_id}) — returning 200 silently")
+                return JSONResponse(
+                    status_code=200,
+                    content={"success": True, "message": "Lead received", "lead_number": dup.lead_number, "duplicate": True},
                 )
         else:
             client_ip_early = get_client_ip(request)
@@ -645,13 +634,10 @@ async def jotform_webhook(
                     Lead.created_at >= cutoff,
                 ).first()
                 if duplicate:
-                    logger.warning(f"Jotform duplicate detected via IP hash")
-                    raise HTTPException(
-                        status_code=status.HTTP_409_CONFLICT,
-                        detail=(
-                            f"A lead with this submission already exists "
-                            f"({duplicate.lead_number})."
-                        ),
+                    logger.info(f"Jotform duplicate (IP hash) — returning 200 silently")
+                    return JSONResponse(
+                        status_code=200,
+                        content={"success": True, "message": "Lead received", "lead_number": duplicate.lead_number, "duplicate": True},
                     )
 
         # =====================================================================
@@ -694,12 +680,10 @@ async def jotform_webhook(
         )
         if duplicate_match:
             duplicate_field, duplicate_lead = duplicate_match
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    f"A lead with this {duplicate_field} already exists "
-                    f"({duplicate_lead.lead_number})."
-                ),
+            logger.info(f"Jotform duplicate ({duplicate_field}) — returning 200 silently")
+            return JSONResponse(
+                status_code=200,
+                content={"success": True, "message": "Lead received", "lead_number": duplicate_lead.lead_number, "duplicate": True},
             )
         
         # =====================================================================
