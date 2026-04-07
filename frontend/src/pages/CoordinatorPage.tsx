@@ -17,6 +17,8 @@ import {
   UserPlus,
   TrendingUp,
   Phone,
+  Volume2,
+  VolumeX,
   MessageSquare,
   Mail,
   Search,
@@ -259,7 +261,7 @@ const QUICK_FILTERS = [
   { key: "Scheduled", icon: Calendar, activeColor: "bg-violet-600" },
   { key: "Referral", icon: UserCheck, activeColor: "bg-emerald-600" },
 ];
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50;
 
 const QUEUE_META: Record<
   string,
@@ -599,6 +601,49 @@ export default function CoordinatorPage({
       setIsLoading(false);
     }
   }, [activeQueue]);
+
+  // ── Real-Time Polling for New Leads ──────────────────────────────────────
+  const lastLeadCountRef = useRef<number | null>(null);
+  const soundEnabledRef = useRef(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const notifAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // Premium notification chime (short, professional)
+    notifAudioRef.current = new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleRgAYJrl0I9cDACBnOPReXgAAIar5OiSdBQAgrHu9oRaAAB4jN/qql4AAHqX6/N+WgAAe5jn76BoJgB0luf0gGAEAHqT5fKGWxIAf5rn9IpeBgCFme/uhFkRAIia6PKNWQsAhJju8I5TBQCKmO3vkVcHAI2Z7PKPUQQAjJfs8pFUBgCOmOvykVACAJKZ6vKTUQIAkpjq8ZRQAQCUmOnxlE8AAJaY6fGWTwAAlpfp8ZZNAACYl+nxlkwAAJqX6PGXSwAAmZbo8ZhLAACbl+jxmEoAAJyW6PKZSgAAnJbm8ppJAACelubymiYRAJ6W5vKbJwkAoJbm8pwlCACglubyKw8AAJmV5fMsDwAAnJXl8y0NAACaleTzLg0AAJuV5fMvCgAAnJXk8zALAACcleT0MQgAAJ2V5PQyBwAAn5Xk9DQGAQD//w==");
+    notifAudioRef.current.volume = 0.4;
+    return () => { notifAudioRef.current = null; };
+  }, []);
+
+  useEffect(() => { soundEnabledRef.current = soundEnabled; }, [soundEnabled]);
+
+  useEffect(() => {
+    if (isLoading) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await api.get("/leads/latest-check");
+        const total = res.data?.total ?? 0;
+        const sources = res.data?.recent_sources ?? [];
+        if (lastLeadCountRef.current !== null && total > lastLeadCountRef.current) {
+          // New lead detected — check it's organic (not manual)
+          const isOrganic = sources.some((s: string) => s !== "manual");
+          if (isOrganic && soundEnabledRef.current && notifAudioRef.current) {
+            notifAudioRef.current.currentTime = 0;
+            notifAudioRef.current.play().catch(() => {});
+          }
+          // Silently refresh the lead list
+          const [leadRes, countMap] = await Promise.all([
+            api.get("/leads", { params: { queue_type: activeQueue, page_size: 200 } }),
+            getAttachmentCounts().catch(() => ({})),
+          ]);
+          setLeads(leadRes.data?.items || []);
+          setAttachmentCounts(countMap || {});
+        }
+        lastLeadCountRef.current = total;
+      } catch { /* ignore polling errors */ }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [activeQueue, isLoading]);
 
   const mergeLeadIntoState = useCallback(
     (updatedLead: Partial<Lead> & { id: string }) => {
@@ -1326,6 +1371,15 @@ export default function CoordinatorPage({
               {pageMeta.subtitle}
             </p>
           </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setSoundEnabled((v) => !v)}
+              className={`p-2 rounded-lg transition-colors ${soundEnabled ? "text-sleep-600 hover:bg-sleep-50" : "text-gray-400 hover:bg-gray-100"}`}
+              title={soundEnabled ? "Mute new lead notifications" : "Unmute new lead notifications"}
+            >
+              {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+            </button>
+          </div>
         </div>
 
         {/* KPI Cards */}
@@ -1624,7 +1678,7 @@ export default function CoordinatorPage({
                     className="group border-t border-gray-50 transition-colors duration-100 hover:bg-sleep-50/30"
                   >
                     {visibleCols.has("leadId") && (
-                      <td className="px-5 py-3">
+                      <td className="px-5 py-3 whitespace-nowrap">
                         <span className="text-xs font-mono font-semibold text-sleep-600">
                           {lead.lead_number || "—"}
                         </span>
@@ -1655,8 +1709,11 @@ export default function CoordinatorPage({
                       </td>
                     )}
                     {visibleCols.has("condition") && (
-                      <td className="px-4 py-3">
-                        <span className="text-sm text-gray-600 capitalize">
+                      <td className="px-4 py-3 max-w-[180px]">
+                        <span
+                          className="text-sm text-gray-600 capitalize truncate block"
+                          title={conditionLabel(lead)}
+                        >
                           {conditionLabel(lead)}
                         </span>
                       </td>
@@ -2012,6 +2069,8 @@ export default function CoordinatorPage({
               Showing {(tablePage - 1) * PAGE_SIZE + 1}–
               {Math.min(tablePage * PAGE_SIZE, filteredLeads.length)} of{" "}
               {filteredLeads.length} leads
+              {" "}&middot;{" "}
+              <span className="text-gray-400">Sorted: {sortField} ({sortDir})</span>
             </span>
             {totalPages > 1 && (
               <div className="flex items-center gap-2">
