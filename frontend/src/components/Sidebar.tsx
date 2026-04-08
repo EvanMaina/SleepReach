@@ -39,8 +39,17 @@ export default function Sidebar() {
     const { user, logout } = useAuth()
     const navigate = useNavigate()
     const location = useLocation()
-    const [collapsed, setCollapsed] = useState(false)
+    const [collapsed, setCollapsed] = useState(() => window.innerWidth < 1280)
     const [coordinatorExpanded, setCoordinatorExpanded] = useState(false)
+
+    // Auto-collapse sidebar on screens smaller than xl (1280px)
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth < 1280) setCollapsed(true)
+        }
+        window.addEventListener('resize', handleResize)
+        return () => window.removeEventListener('resize', handleResize)
+    }, [])
 
     const isCoordinatorRoute = location.pathname.startsWith('/coordinator')
     useEffect(() => {
