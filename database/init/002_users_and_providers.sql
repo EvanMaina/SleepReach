@@ -63,7 +63,7 @@ VALUES (
 
 -- Provider enums
 DO $$ BEGIN CREATE TYPE provider_specialty AS ENUM ('sleep_medicine', 'pulmonology', 'neurology', 'ent', 'psychiatry', 'primary_care', 'cardiology', 'pediatrics', 'other'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN CREATE TYPE provider_status AS ENUM ('active', 'inactive', 'pending'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE provider_status AS ENUM ('active', 'inactive', 'pending', 'archived'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE provider_contact_method AS ENUM ('email', 'phone', 'fax', 'portal'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Referring providers table

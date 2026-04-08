@@ -887,6 +887,11 @@ export default function CoordinatorPage({
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
       setSortField(field);
+      // Time-based fields default to desc (newest first), others to asc
+      if (field === "lastUpdatedAt" || field === "submittedAt") {
+        setSortDir("desc");
+        return;
+      }
       setSortDir("asc");
     }
   };
