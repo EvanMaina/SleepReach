@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
+import toast from 'react-hot-toast'
 import {
     Bell,
     Building2,
@@ -342,13 +343,15 @@ function UsersTab() {
     }
 
     const handleDeactivate = async (userId: string) => {
+        if (!window.confirm('Are you sure you want to deactivate this user? They will no longer be able to log in.')) return
         setDeactivatingId(userId)
         setPageError(null)
         try {
             await usersAPI.delete(userId)
+            toast.success('User deactivated successfully')
             await fetchUsers()
         } catch (err) {
-            setPageError(parseApiError(err, 'Failed to deactivate user'))
+            toast.error(parseApiError(err, 'Failed to deactivate user'))
         } finally {
             setDeactivatingId(null)
         }
