@@ -263,10 +263,8 @@ export function LeadEditModal({ isOpen, lead, onClose, onSave }: LeadEditModalPr
     }
 
     const canSubmit = useMemo(() => {
-        if (!formData.first_name.trim()) return false
-        if (hasConditionOther && !formData.condition_other.trim()) return false
         return !isSaving
-    }, [formData.first_name, formData.condition_other, hasConditionOther, isSaving])
+    }, [isSaving])
 
     const handleSave = async () => {
         if (!lead || !canSubmit) return

@@ -293,7 +293,6 @@ function SelectionCard({
             />
             <div className="assess-choice-body">
                 <div className="assess-choice-head">
-                    {icon ? <span className="assess-choice-icon">{icon}</span> : null}
                     <span className="assess-choice-label">{label}</span>
                 </div>
                 {description ? <span className="assess-choice-description">{description}</span> : null}

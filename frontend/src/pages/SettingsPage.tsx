@@ -343,7 +343,19 @@ function UsersTab() {
     }
 
     const handleDeactivate = async (userId: string) => {
-        if (!window.confirm('Are you sure you want to deactivate this user? They will no longer be able to log in.')) return
+        const confirmed = await new Promise<boolean>((resolve) => {
+            toast((t) => (
+                <div className="flex flex-col gap-2">
+                    <p className="font-medium">Deactivate this user?</p>
+                    <p className="text-sm opacity-80">They will no longer be able to log in.</p>
+                    <div className="flex gap-2 mt-1">
+                        <button onClick={() => { toast.dismiss(t.id); resolve(false) }} className="px-3 py-1.5 text-sm rounded-lg bg-white/10 hover:bg-white/20">Cancel</button>
+                        <button onClick={() => { toast.dismiss(t.id); resolve(true) }} className="px-3 py-1.5 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600">Deactivate</button>
+                    </div>
+                </div>
+            ), { duration: 10000 })
+        })
+        if (!confirmed) return
         setDeactivatingId(userId)
         setPageError(null)
         try {

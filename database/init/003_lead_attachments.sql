@@ -3,7 +3,7 @@
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS lead_attachments (
-    id UUID NOT NULL DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     lead_id UUID NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
     filename VARCHAR(500) NOT NULL,
     stored_filename VARCHAR(500) NOT NULL,

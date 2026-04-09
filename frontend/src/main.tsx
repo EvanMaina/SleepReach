@@ -22,15 +22,22 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             <AuthProvider>
                 <App />
                 <Toaster
-                    position="top-right"
+                    position="bottom-center"
                     toastOptions={{
-                        duration: 4000,
+                        duration: 3000,
                         style: {
                             borderRadius: '12px',
                             background: '#1e293b',
                             color: '#fff',
                             fontSize: '14px',
-                            padding: '12px 16px',
+                            padding: '12px 20px',
+                            boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+                        },
+                        success: {
+                            iconTheme: { primary: '#10b981', secondary: '#fff' },
+                        },
+                        error: {
+                            iconTheme: { primary: '#ef4444', secondary: '#fff' },
                         },
                     }}
                 />

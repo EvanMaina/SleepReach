@@ -1194,13 +1194,20 @@ export default function CoordinatorPage({
     }
   };
 
+  const [deleteConfirmLead, setDeleteConfirmLead] = useState<Lead | null>(null);
+
   const handleDeleteLead = async (lead: Lead) => {
-    if (!window.confirm(`Delete lead ${lead.lead_number}?`)) return;
+    setDeleteConfirmLead(lead);
+  };
+
+  const confirmDeleteLead = async () => {
+    if (!deleteConfirmLead) return;
     try {
-      await leadsAPI.delete(lead.id);
-      showToast(`Lead ${lead.lead_number} deleted`);
+      await leadsAPI.delete(deleteConfirmLead.id);
+      showToast(`Lead ${deleteConfirmLead.lead_number} deleted`);
       setDetailLead(null);
-      setLeads((prev) => prev.filter((item) => item.id !== lead.id));
+      setDeleteConfirmLead(null);
+      setLeads((prev) => prev.filter((item) => item.id !== deleteConfirmLead.id));
     } catch {
       showToast("Failed to delete lead", "error");
     }
@@ -1399,8 +1406,8 @@ export default function CoordinatorPage({
   const PageIcon = pageMeta.icon;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-5 overflow-hidden overscroll-none animate-fade-in">
-      <div className="sticky top-0 z-30 -mx-2 shrink-0 space-y-5 bg-gray-50/95 px-2 pb-4 pt-1 backdrop-blur">
+    <div className="flex h-full min-h-0 flex-col gap-3 lg:gap-4 overflow-hidden overscroll-none animate-fade-in">
+      <div className="sticky top-0 z-30 -mx-2 shrink-0 space-y-3 lg:space-y-4 bg-gray-50/95 px-2 pb-2 lg:pb-3 pt-1 backdrop-blur">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -1424,11 +1431,11 @@ export default function CoordinatorPage({
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 lg:gap-3 xl:grid-cols-4">
           {kpis.map((card) => (
             <div
               key={card.label}
-              className={`relative overflow-hidden rounded-2xl p-5 bg-gradient-to-br ${card.gradient} text-white shadow-md`}
+              className={`relative overflow-hidden rounded-xl lg:rounded-2xl p-3 lg:p-5 bg-gradient-to-br ${card.gradient} text-white shadow-md`}
             >
               <div className="absolute top-0 right-0 h-20 w-20 translate-x-5 -translate-y-5 rounded-full bg-white/10" />
               <div className="relative z-10">
@@ -1792,8 +1799,8 @@ export default function CoordinatorPage({
                             {lead.status?.replace(/_/g, " ")}
                           </span>
                           {lead.follow_up_reason && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 w-fit">
-                              <Tag size={9} />
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-px text-[9px] font-medium rounded bg-indigo-50 text-indigo-600 border border-indigo-100 w-fit mt-0.5">
+                              <Tag size={7} />
                               {lead.follow_up_reason}
                             </span>
                           )}
@@ -2627,6 +2634,30 @@ export default function CoordinatorPage({
           showToast(`${leadNumber} created successfully`);
         }}
       />
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* DELETE CONFIRMATION MODAL                                       */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {deleteConfirmLead && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={() => setDeleteConfirmLead(null)}>
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100">
+                <Trash2 className="h-5 w-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-bold text-gray-900">Delete lead?</h3>
+                <p className="text-sm text-gray-500">{deleteConfirmLead.lead_number}</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-5">This will soft-delete the lead. It can be restored from Deleted Leads.</p>
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => setDeleteConfirmLead(null)} className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-xl hover:bg-gray-200">Cancel</button>
+              <button onClick={confirmDeleteLead} className="px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-xl hover:bg-red-700">Delete Lead</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* EDIT LEAD MODAL                                                */}
