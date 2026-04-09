@@ -66,24 +66,34 @@ DO $$ BEGIN CREATE TYPE provider_specialty AS ENUM ('sleep_medicine', 'pulmonolo
 DO $$ BEGIN CREATE TYPE provider_status AS ENUM ('active', 'inactive', 'pending', 'archived'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE provider_contact_method AS ENUM ('email', 'phone', 'fax', 'portal'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- Referring providers table
+-- Referring providers table (matches SQLAlchemy ReferringProvider model)
 CREATE TABLE IF NOT EXISTS referring_providers (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     practice_name VARCHAR(255),
-    specialty provider_specialty NOT NULL DEFAULT 'primary_care',
-    specialty_other TEXT,
+    practice_address TEXT,
+    practice_city VARCHAR(100),
+    practice_state VARCHAR(2),
+    practice_zip VARCHAR(10),
+    specialty TEXT,
+    credentials VARCHAR(50),
     email VARCHAR(255),
     phone VARCHAR(20),
     fax VARCHAR(20),
-    address TEXT,
+    npi_number VARCHAR(20),
     preferred_contact provider_contact_method DEFAULT 'email',
+    send_referral_updates BOOLEAN DEFAULT true,
     status provider_status NOT NULL DEFAULT 'active',
     notes TEXT,
-    referral_count INTEGER NOT NULL DEFAULT 0,
+    tags TEXT[],
+    total_referrals INTEGER NOT NULL DEFAULT 0,
+    converted_referrals INTEGER NOT NULL DEFAULT 0,
+    conversion_rate NUMERIC(5,2) DEFAULT 0.0,
     last_referral_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    verified_at TIMESTAMPTZ,
+    archived_at TIMESTAMPTZ
 );
 
 CREATE INDEX IF NOT EXISTS idx_providers_name ON referring_providers(name);
