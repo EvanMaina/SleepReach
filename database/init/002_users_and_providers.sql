@@ -2,11 +2,11 @@
 -- 002_users_and_providers.sql — Users, Providers, Notes, Settings
 -- =============================================================================
 
--- User role enum
-DO $$ BEGIN CREATE TYPE user_role AS ENUM ('administrator', 'coordinator', 'specialist'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- User role enum (includes primary_admin for top-level access)
+DO $$ BEGIN CREATE TYPE user_role AS ENUM ('primary_admin', 'administrator', 'coordinator', 'specialist'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE user_status AS ENUM ('active', 'inactive', 'pending'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- Users table
+-- Users table (matches SQLAlchemy User model)
 CREATE TABLE IF NOT EXISTS users (
     id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
     role user_role NOT NULL DEFAULT 'coordinator',
     status user_status NOT NULL DEFAULT 'pending',
     must_change_password BOOLEAN NOT NULL DEFAULT TRUE,
+    password_expires_at TIMESTAMPTZ,
     last_login TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
