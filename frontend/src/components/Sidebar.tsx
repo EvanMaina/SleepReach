@@ -90,6 +90,7 @@ export default function Sidebar() {
         <aside
             className={clsx(
                 'fixed inset-y-0 left-0 z-30 flex flex-col bg-white border-r border-gray-200/80 transition-all duration-200 ease-out',
+                'hidden md:flex',  // Hidden on mobile, visible on tablet+
                 collapsed ? 'w-[72px]' : 'w-[260px]'
             )}
         >
