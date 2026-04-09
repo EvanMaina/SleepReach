@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS lead_attachments (
     lead_id UUID NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
     filename VARCHAR(500) NOT NULL,
     stored_filename VARCHAR(500) NOT NULL,
-    file_type VARCHAR(100) NOT NULL,
+    file_type VARCHAR(100) NOT NULL DEFAULT 'application/octet-stream',
     file_size BIGINT NOT NULL DEFAULT 0,
     uploaded_by VARCHAR(255),
     uploaded_by_id UUID,
