@@ -496,6 +496,42 @@ export default function CoordinatorPage({
   const [showColToggle, setShowColToggle] = useState(false);
   const colToggleRef = useRef<HTMLDivElement>(null);
 
+  // ── Column Resizing ───────────────────────────────────────────────────
+  const DEFAULT_COL_WIDTHS: Record<ColKey, number> = {
+    leadId: 120, patient: 180, condition: 200, priority: 90,
+    status: 130, scheduledFor: 140, submitted: 140,
+    lastActivity: 120, preferred: 90, actions: 140,
+  };
+  const [colWidths, setColWidths] = useState<Record<string, number>>(DEFAULT_COL_WIDTHS);
+  const resizingCol = useRef<string | null>(null);
+  const resizeStartX = useRef(0);
+  const resizeStartW = useRef(0);
+
+  const handleResizeStart = useCallback((col: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    resizingCol.current = col;
+    resizeStartX.current = e.clientX;
+    resizeStartW.current = colWidths[col] || 120;
+    const onMove = (ev: MouseEvent) => {
+      if (!resizingCol.current) return;
+      const delta = ev.clientX - resizeStartX.current;
+      const newW = Math.max(60, resizeStartW.current + delta);
+      setColWidths((prev) => ({ ...prev, [resizingCol.current!]: newW }));
+    };
+    const onUp = () => {
+      resizingCol.current = null;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [colWidths]);
+
   // ── Panels (Task C) ────────────────────────────────────────────────────
   const [quickActionLead, setQuickActionLead] = useState<Lead | null>(null);
   const [consultationLead, setConsultationLead] = useState<Lead | null>(null);
@@ -1586,87 +1622,102 @@ export default function CoordinatorPage({
             className="min-h-0 flex-1 overflow-auto overscroll-contain"
             style={{ scrollbarGutter: "stable both-edges" }}
           >
-            <table className="w-full" style={{ minWidth: "1100px" }}>
+            <table className="w-full" style={{ minWidth: "1100px", tableLayout: "fixed" }}>
+              {/* Column widths via <colgroup> — resizable */}
+              <colgroup>
+                {COLUMN_KEYS.filter((c) => visibleCols.has(c)).map((col) => (
+                  <col key={col} style={{ width: colWidths[col] || 120 }} />
+                ))}
+              </colgroup>
               <thead className="sticky top-0 z-10">
                 <tr className="border-b border-gray-200 bg-gray-50">
                   {visibleCols.has("leadId") && (
                     <th
                       onClick={() => handleSort("leadId")}
-                      className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-5 py-3 cursor-pointer hover:bg-gray-100"
+                      className="relative text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-5 py-3 cursor-pointer hover:bg-gray-100"
                     >
                       <div className="flex items-center gap-1">
                         Lead ID {getSortIcon("leadId")}
                       </div>
+                      <div onMouseDown={(e) => handleResizeStart("leadId", e)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-sleep-400 active:bg-sleep-500" />
                     </th>
                   )}
                   {visibleCols.has("patient") && (
                     <th
                       onClick={() => handleSort("firstName")}
-                      className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 cursor-pointer hover:bg-gray-100"
+                      className="relative text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 cursor-pointer hover:bg-gray-100"
                     >
                       <div className="flex items-center gap-1">
                         Patient {getSortIcon("firstName")}
                       </div>
+                      <div onMouseDown={(e) => handleResizeStart("patient", e)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-sleep-400 active:bg-sleep-500" />
                     </th>
                   )}
                   {visibleCols.has("condition") && (
                     <th
                       onClick={() => handleSort("condition")}
-                      className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 cursor-pointer hover:bg-gray-100"
+                      className="relative text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 cursor-pointer hover:bg-gray-100"
                     >
                       <div className="flex items-center gap-1">
                         Condition {getSortIcon("condition")}
                       </div>
+                      <div onMouseDown={(e) => handleResizeStart("condition", e)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-sleep-400 active:bg-sleep-500" />
                     </th>
                   )}
                   {visibleCols.has("priority") && (
                     <th
                       onClick={() => handleSort("priority")}
-                      className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 cursor-pointer hover:bg-gray-100"
+                      className="relative text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 cursor-pointer hover:bg-gray-100"
                     >
                       <div className="flex items-center gap-1">
                         Priority {getSortIcon("priority")}
                       </div>
+                      <div onMouseDown={(e) => handleResizeStart("priority", e)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-sleep-400 active:bg-sleep-500" />
                     </th>
                   )}
                   {visibleCols.has("status") && (
                     <th
                       onClick={() => handleSort("status")}
-                      className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 cursor-pointer hover:bg-gray-100"
+                      className="relative text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 cursor-pointer hover:bg-gray-100"
                     >
                       <div className="flex items-center gap-1">
                         Status {getSortIcon("status")}
                       </div>
+                      <div onMouseDown={(e) => handleResizeStart("status", e)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-sleep-400 active:bg-sleep-500" />
                     </th>
                   )}
                   {visibleCols.has("scheduledFor") && (
-                    <th className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3">
+                    <th className="relative text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3">
                       Scheduled For
+                      <div onMouseDown={(e) => handleResizeStart("scheduledFor", e)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-sleep-400 active:bg-sleep-500" />
                     </th>
                   )}
                   {visibleCols.has("submitted") && (
                     <th
                       onClick={() => handleSort("submittedAt")}
-                      className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 cursor-pointer hover:bg-gray-100"
+                      className="relative text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 cursor-pointer hover:bg-gray-100"
                     >
                       <div className="flex items-center gap-1">
                         Submitted {getSortIcon("submittedAt")}
                       </div>
+                      <div onMouseDown={(e) => handleResizeStart("submitted", e)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-sleep-400 active:bg-sleep-500" />
                     </th>
                   )}
                   {visibleCols.has("lastActivity") && (
                     <th
                       onClick={() => handleSort("lastUpdatedAt")}
-                      className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 cursor-pointer hover:bg-gray-100"
+                      className="relative text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 cursor-pointer hover:bg-gray-100"
                     >
                       <div className="flex items-center gap-1">
                         Last Activity {getSortIcon("lastUpdatedAt")}
                       </div>
+                      <div onMouseDown={(e) => handleResizeStart("lastActivity", e)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-sleep-400 active:bg-sleep-500" />
                     </th>
                   )}
                   {visibleCols.has("preferred") && (
-                    <th className="text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3">
+                    <th className="relative text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider px-4 py-3">
                       Preferred
+                      <div onMouseDown={(e) => handleResizeStart("preferred", e)} className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-sleep-400 active:bg-sleep-500" />
                     </th>
                   )}
                   {visibleCols.has("actions") && (
@@ -1714,15 +1765,13 @@ export default function CoordinatorPage({
                       </td>
                     )}
                     {visibleCols.has("condition") && (
-                      <td className="px-4 py-3">
-                        <div className="max-w-[200px]">
-                          <span
-                            className="text-sm text-gray-600 capitalize block overflow-hidden text-ellipsis whitespace-nowrap"
-                            title={conditionLabel(lead)}
-                          >
-                            {conditionLabel(lead)}
-                          </span>
-                        </div>
+                      <td className="px-4 py-3 overflow-hidden">
+                        <span
+                          className="text-sm text-gray-600 capitalize block overflow-hidden text-ellipsis whitespace-nowrap"
+                          title={conditionLabel(lead)}
+                        >
+                          {conditionLabel(lead)}
+                        </span>
                       </td>
                     )}
                     {visibleCols.has("priority") && (
