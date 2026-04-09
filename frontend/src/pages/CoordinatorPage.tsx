@@ -1406,8 +1406,8 @@ export default function CoordinatorPage({
   const PageIcon = pageMeta.icon;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 lg:gap-4 overflow-hidden overscroll-none animate-fade-in">
-      <div className="sticky top-0 z-30 -mx-2 shrink-0 space-y-3 lg:space-y-4 bg-gray-50/95 px-2 pb-2 lg:pb-3 pt-1 backdrop-blur">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden overscroll-none animate-fade-in">
+      <div className="shrink-0 space-y-2 lg:space-y-3 px-0 pb-2 pt-1">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -1430,22 +1430,22 @@ export default function CoordinatorPage({
           </div>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 gap-2 lg:gap-3 xl:grid-cols-4">
+        {/* KPI Cards — always single row, 4 cols */}
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-2 lg:gap-3">
           {kpis.map((card) => (
             <div
               key={card.label}
-              className={`relative overflow-hidden rounded-xl lg:rounded-2xl p-3 lg:p-5 bg-gradient-to-br ${card.gradient} text-white shadow-md`}
+              className={`relative overflow-hidden rounded-lg lg:rounded-2xl p-2 sm:p-3 lg:p-4 bg-gradient-to-br ${card.gradient} text-white shadow-md`}
             >
-              <div className="absolute top-0 right-0 h-20 w-20 translate-x-5 -translate-y-5 rounded-full bg-white/10" />
+              <div className="absolute top-0 right-0 h-16 w-16 translate-x-4 -translate-y-4 rounded-full bg-white/10 hidden lg:block" />
               <div className="relative z-10">
-                <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
-                  <card.icon className="h-4.5 w-4.5 text-white" />
+                <div className="mb-1 lg:mb-2 flex h-7 w-7 lg:h-9 lg:w-9 items-center justify-center rounded-lg bg-white/15">
+                  <card.icon className="h-3.5 w-3.5 lg:h-4.5 lg:w-4.5 text-white" />
                 </div>
-                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-white/70">
+                <p className="mb-0.5 text-[9px] sm:text-[10px] lg:text-xs font-medium uppercase tracking-wider text-white/70 truncate">
                   {card.label}
                 </p>
-                <p className="text-2xl font-bold">{card.value}</p>
+                <p className="text-base sm:text-lg lg:text-2xl font-bold">{card.value}</p>
               </div>
             </div>
           ))}
