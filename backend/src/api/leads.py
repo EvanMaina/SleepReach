@@ -1177,15 +1177,15 @@ async def list_leads(
             has_previous=page > 1,
         )
     
+    except HTTPException:
+        raise  # Re-raise 400s and other intentional HTTP errors as-is
     except LookupError as e:
-        # Enum mismatch error - log and return 500 with helpful message
         logger.error(f"Enum mismatch error in list_leads: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database contains invalid enum values. Please contact support."
         )
     except Exception as e:
-        # Generic error handler - log without exposing internals
         logger.error(f"Error in list_leads: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
