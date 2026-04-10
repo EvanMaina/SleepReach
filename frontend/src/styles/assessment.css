@@ -309,10 +309,6 @@ body {
     gap: 8px;
 }
 
-.assess-choice-icon {
-    display: inline-flex;
-    color: #4a5568;
-}
 
 .assess-choice-label {
     display: block;

@@ -194,7 +194,7 @@ class Lead(Base):
     
     # Location
     zip_code = Column(String(10), nullable=False)
-    in_service_area = Column(Boolean, nullable=False, default=False)
+    in_service_area = Column(Boolean, nullable=False, default=False, index=True)
     
     # Urgency & Consent
     urgency = Column(
@@ -214,6 +214,7 @@ class Lead(Base):
         SQLEnum(PriorityType, name="priority_type", create_type=False),
         nullable=False,
         default=PriorityType.LOW,
+        index=True,
     )
     
     # Score Breakdown Fields
@@ -231,6 +232,7 @@ class Lead(Base):
         SQLEnum(LeadStatus, name="lead_status", create_type=False),
         nullable=False,
         default=LeadStatus.NEW,
+        index=True,
     )
     assigned_to = Column(PGUUID(as_uuid=True), nullable=True)
     notes = Column(Text, nullable=True)

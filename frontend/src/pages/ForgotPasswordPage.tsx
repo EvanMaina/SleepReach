@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react'
-import { ArrowLeft, CheckCircle2, Lock, Mail, Server, Shield } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Lock, Server, Shield } from 'lucide-react'
 import { authAPI } from '../lib/api'
 
 function BackToLogin() {

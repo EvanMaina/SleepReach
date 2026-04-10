@@ -94,6 +94,7 @@ services:
     volumes:
       - ./backend/src:/app/src:ro
       - ./backend/static:/app/static
+      - ./frontend/dist-widget:/app/frontend/dist-widget:ro
       - ./backend/scripts:/app/scripts:ro
     depends_on:
       db:

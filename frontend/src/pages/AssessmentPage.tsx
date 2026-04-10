@@ -1,25 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
-    Activity,
-    Brain,
-    Building2,
-    Calendar,
     Check,
-    CheckCircle2,
     ChevronLeft,
     ChevronRight,
-    ClipboardList,
-    Clock,
-    HelpCircle,
     Lock,
-    Mail,
-    MessageSquare,
-    Moon,
-    Pill,
-    Phone,
     Shield,
-    Wind,
-    XCircle,
 } from 'lucide-react'
 
 type ConditionType = 'INSOMNIA' | 'SLEEP_APNEA' | 'RESTLESS_LEG' | 'NARCOLEPSY' | 'OTHER'
@@ -115,49 +100,49 @@ const INITIAL_FORM: AssessmentFormData = {
     zipCode: '',
 }
 
-const CONDITION_OPTIONS: Array<{ value: ConditionType; label: string; description: string; icon: React.ReactNode }> = [
-    { value: 'INSOMNIA', label: 'Insomnia', description: 'Trouble falling asleep, staying asleep, or waking too early.', icon: <Moon size={16} /> },
-    { value: 'SLEEP_APNEA', label: 'Sleep Apnea', description: 'Snoring, gasping, breathing pauses, or non-restorative sleep.', icon: <Wind size={16} /> },
-    { value: 'RESTLESS_LEG', label: 'Restless Legs', description: 'An urge to move your legs that disrupts evening rest.', icon: <Activity size={16} /> },
-    { value: 'NARCOLEPSY', label: 'Narcolepsy', description: 'Excessive daytime sleepiness or sudden sleep attacks.', icon: <Clock size={16} /> },
-    { value: 'OTHER', label: 'Other Sleep Concern', description: 'Another sleep issue you would like to discuss with the clinic.', icon: <HelpCircle size={16} /> },
+const CONDITION_OPTIONS: Array<{ value: ConditionType; label: string; description: string }> = [
+    { value: 'INSOMNIA', label: 'Insomnia', description: 'Trouble falling asleep, staying asleep, or waking too early.' },
+    { value: 'SLEEP_APNEA', label: 'Sleep Apnea', description: 'Snoring, gasping, breathing pauses, or non-restorative sleep.' },
+    { value: 'RESTLESS_LEG', label: 'Restless Legs', description: 'An urge to move your legs that disrupts evening rest.' },
+    { value: 'NARCOLEPSY', label: 'Narcolepsy', description: 'Excessive daytime sleepiness or sudden sleep attacks.' },
+    { value: 'OTHER', label: 'Other Sleep Concern', description: 'Another sleep issue you would like to discuss with the clinic.' },
 ]
 
-const INTEREST_OPTIONS: Array<{ value: SleepTreatmentInterest; label: string; description: string; icon: React.ReactNode }> = [
-    { value: 'cpap_bipap', label: 'CPAP or BiPAP', description: 'Support with PAP therapy for sleep apnea or breathing-related sleep issues.', icon: <Wind size={16} /> },
-    { value: 'inspire', label: 'Inspire Therapy', description: 'Learn whether Inspire may be a fit for your sleep apnea treatment plan.', icon: <Activity size={16} /> },
-    { value: 'therapy_cbt', label: 'CBT-I Therapy', description: 'A non-medication approach for chronic insomnia and sleep habits.', icon: <Brain size={16} /> },
-    { value: 'sleep_study', label: 'Sleep Study', description: 'Diagnostic testing to understand what is affecting your sleep.', icon: <ClipboardList size={16} /> },
-    { value: 'medication', label: 'Medication Review', description: 'Discuss sleep-supporting medication options with a specialist.', icon: <Pill size={16} /> },
-    { value: 'not_sure', label: 'Not Sure Yet', description: 'You want guidance on the best next step for your sleep concerns.', icon: <HelpCircle size={16} /> },
+const INTEREST_OPTIONS: Array<{ value: SleepTreatmentInterest; label: string; description: string }> = [
+    { value: 'cpap_bipap', label: 'CPAP or BiPAP', description: 'Support with PAP therapy for sleep apnea or breathing-related sleep issues.' },
+    { value: 'inspire', label: 'Inspire Therapy', description: 'Learn whether Inspire may be a fit for your sleep apnea treatment plan.' },
+    { value: 'therapy_cbt', label: 'CBT-I Therapy', description: 'A non-medication approach for chronic insomnia and sleep habits.' },
+    { value: 'sleep_study', label: 'Sleep Study', description: 'Diagnostic testing to understand what is affecting your sleep.' },
+    { value: 'medication', label: 'Medication Review', description: 'Discuss sleep-supporting medication options with a specialist.' },
+    { value: 'not_sure', label: 'Not Sure Yet', description: 'You want guidance on the best next step for your sleep concerns.' },
 ]
 
-const DURATION_OPTIONS: Array<{ value: DurationType; label: string; description: string; icon: React.ReactNode }> = [
-    { value: 'LESS_THAN_6_MONTHS', label: 'Less than 6 months', description: 'This sleep issue started relatively recently.', icon: <Clock size={16} /> },
-    { value: 'SIX_TO_TWELVE_MONTHS', label: '6 to 12 months', description: 'Symptoms have been affecting your routine for several months.', icon: <Calendar size={16} /> },
-    { value: 'MORE_THAN_12_MONTHS', label: 'More than 12 months', description: 'This has been an ongoing issue for at least a year.', icon: <ClipboardList size={16} /> },
+const DURATION_OPTIONS: Array<{ value: DurationType; label: string; description: string }> = [
+    { value: 'LESS_THAN_6_MONTHS', label: 'Less than 6 months', description: 'This sleep issue started relatively recently.' },
+    { value: 'SIX_TO_TWELVE_MONTHS', label: '6 to 12 months', description: 'Symptoms have been affecting your routine for several months.' },
+    { value: 'MORE_THAN_12_MONTHS', label: 'More than 12 months', description: 'This has been an ongoing issue for at least a year.' },
 ]
 
-const TREATMENT_OPTIONS: Array<{ value: TreatmentType; label: string; description: string; icon: React.ReactNode }> = [
-    { value: 'CPAP_BIPAP', label: 'CPAP or BiPAP', description: 'You have used PAP therapy before.', icon: <Wind size={16} /> },
-    { value: 'MEDICATION', label: 'Medication', description: 'You have tried prescription or over-the-counter sleep medication.', icon: <Pill size={16} /> },
-    { value: 'SLEEP_STUDY', label: 'Sleep Study', description: 'You have completed a sleep study before.', icon: <ClipboardList size={16} /> },
-    { value: 'THERAPY_CBT', label: 'Therapy or CBT-I', description: 'You have tried therapy, coaching, or CBT-I support.', icon: <Brain size={16} /> },
-    { value: 'NONE', label: 'No prior treatment', description: 'You are just getting started.', icon: <CheckCircle2 size={16} /> },
-    { value: 'OTHER', label: 'Other', description: 'You have tried another sleep-related intervention.', icon: <HelpCircle size={16} /> },
+const TREATMENT_OPTIONS: Array<{ value: TreatmentType; label: string; description: string }> = [
+    { value: 'CPAP_BIPAP', label: 'CPAP or BiPAP', description: 'You have used PAP therapy before.' },
+    { value: 'MEDICATION', label: 'Medication', description: 'You have tried prescription or over-the-counter sleep medication.' },
+    { value: 'SLEEP_STUDY', label: 'Sleep Study', description: 'You have completed a sleep study before.' },
+    { value: 'THERAPY_CBT', label: 'Therapy or CBT-I', description: 'You have tried therapy, coaching, or CBT-I support.' },
+    { value: 'NONE', label: 'No prior treatment', description: 'You are just getting started.' },
+    { value: 'OTHER', label: 'Other', description: 'You have tried another sleep-related intervention.' },
 ]
 
-const URGENCY_OPTIONS: Array<{ value: UrgencyType; label: string; description: string; icon: React.ReactNode }> = [
-    { value: 'ASAP', label: 'As soon as possible', description: 'Sleep symptoms are impacting your health or daily functioning now.', icon: <Clock size={16} /> },
-    { value: 'WITHIN_30_DAYS', label: 'Within 30 days', description: 'You would like to speak with the clinic soon.', icon: <Calendar size={16} /> },
-    { value: 'EXPLORING', label: 'Just exploring', description: 'You are still learning about options and timing.', icon: <HelpCircle size={16} /> },
+const URGENCY_OPTIONS: Array<{ value: UrgencyType; label: string; description: string }> = [
+    { value: 'ASAP', label: 'As soon as possible', description: 'Sleep symptoms are impacting your health or daily functioning now.' },
+    { value: 'WITHIN_30_DAYS', label: 'Within 30 days', description: 'You would like to speak with the clinic soon.' },
+    { value: 'EXPLORING', label: 'Just exploring', description: 'You are still learning about options and timing.' },
 ]
 
-const CONTACT_METHOD_OPTIONS: Array<{ value: PreferredContactMethod; label: string; icon: React.ReactNode }> = [
-    { value: 'phone_call', label: 'Phone', icon: <Phone size={16} /> },
-    { value: 'text', label: 'Text', icon: <MessageSquare size={16} /> },
-    { value: 'email', label: 'Email', icon: <Mail size={16} /> },
-    { value: 'any', label: 'Any', icon: <Check size={16} /> },
+const CONTACT_METHOD_OPTIONS: Array<{ value: PreferredContactMethod; label: string }> = [
+    { value: 'phone_call', label: 'Phone' },
+    { value: 'text', label: 'Text' },
+    { value: 'email', label: 'Email' },
+    { value: 'any', label: 'Any' },
 ]
 
 function generateSubmissionId(): string {
@@ -272,7 +257,6 @@ function SelectionCard({
     description,
     type = 'radio',
     name,
-    icon,
 }: {
     selected: boolean
     onChange: () => void
@@ -280,7 +264,6 @@ function SelectionCard({
     description?: string
     type?: 'checkbox' | 'radio'
     name?: string
-    icon?: React.ReactNode
 }) {
     return (
         <label className={`assess-choice-card ${selected ? 'is-selected' : ''}`}>
@@ -543,7 +526,7 @@ export const AssessmentPage: React.FC<AssessmentPageProps> = ({ apiUrl }) => {
                                     onChange={() => toggleCondition(option.value)}
                                     label={option.label}
                                     description={option.description}
-                                    icon={option.icon}
+
                                     type="checkbox"
                                 />
                             ))}
@@ -583,7 +566,7 @@ export const AssessmentPage: React.FC<AssessmentPageProps> = ({ apiUrl }) => {
                                     onChange={() => updateField('sleepTreatmentInterest', option.value)}
                                     label={option.label}
                                     description={option.description}
-                                    icon={option.icon}
+
                                     type="radio"
                                     name="sleep-interest"
                                 />
@@ -607,7 +590,7 @@ export const AssessmentPage: React.FC<AssessmentPageProps> = ({ apiUrl }) => {
                                     onChange={() => updateField('symptomDuration', option.value)}
                                     label={option.label}
                                     description={option.description}
-                                    icon={option.icon}
+
                                     type="radio"
                                     name="duration"
                                 />
@@ -631,7 +614,7 @@ export const AssessmentPage: React.FC<AssessmentPageProps> = ({ apiUrl }) => {
                                     onChange={() => toggleTreatment(option.value)}
                                     label={option.label}
                                     description={option.description}
-                                    icon={option.icon}
+
                                     type="checkbox"
                                 />
                             ))}
@@ -654,7 +637,7 @@ export const AssessmentPage: React.FC<AssessmentPageProps> = ({ apiUrl }) => {
                                     onChange={() => updateField('urgency', option.value)}
                                     label={option.label}
                                     description={option.description}
-                                    icon={option.icon}
+
                                     type="radio"
                                     name="urgency"
                                 />
@@ -676,7 +659,6 @@ export const AssessmentPage: React.FC<AssessmentPageProps> = ({ apiUrl }) => {
                                 onChange={() => updateField('isReferral', true)}
                                 label="Yes"
                                 description="A provider referred me to the clinic."
-                                icon={<Building2 size={16} />}
                                 type="radio"
                                 name="referral"
                             />
@@ -685,7 +667,6 @@ export const AssessmentPage: React.FC<AssessmentPageProps> = ({ apiUrl }) => {
                                 onChange={() => updateField('isReferral', false)}
                                 label="No"
                                 description="I was not referred by a provider."
-                                icon={<XCircle size={16} />}
                                 type="radio"
                                 name="referral"
                             />
@@ -830,7 +811,7 @@ export const AssessmentPage: React.FC<AssessmentPageProps> = ({ apiUrl }) => {
                                         description={`Preferred ${option.label.toLowerCase()} follow-up`}
                                         type="radio"
                                         name="preferred-contact"
-                                        icon={option.icon}
+    
                                     />
                                 )
                             })}
@@ -853,7 +834,6 @@ export const AssessmentPage: React.FC<AssessmentPageProps> = ({ apiUrl }) => {
                                     onChange={() => updateField('hasInsurance', true)}
                                     label="Yes, I have insurance"
                                     description="I want the clinic to review my coverage."
-                                    icon={<Shield size={16} />}
                                     type="radio"
                                     name="insurance"
                                 />
@@ -862,7 +842,6 @@ export const AssessmentPage: React.FC<AssessmentPageProps> = ({ apiUrl }) => {
                                     onChange={() => updateField('hasInsurance', false)}
                                     label="No insurance"
                                     description="I do not have insurance for this evaluation."
-                                    icon={<XCircle size={16} />}
                                     type="radio"
                                     name="insurance"
                                 />

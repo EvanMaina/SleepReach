@@ -342,24 +342,19 @@ function UsersTab() {
         }
     }
 
+    const [deactivateConfirmUserId, setDeactivateConfirmUserId] = useState<string | null>(null)
+
     const handleDeactivate = async (userId: string) => {
-        const confirmed = await new Promise<boolean>((resolve) => {
-            toast((t) => (
-                <div className="flex flex-col gap-2">
-                    <p className="font-medium">Deactivate this user?</p>
-                    <p className="text-sm opacity-80">They will no longer be able to log in.</p>
-                    <div className="flex gap-2 mt-1">
-                        <button onClick={() => { toast.dismiss(t.id); resolve(false) }} className="px-3 py-1.5 text-sm rounded-lg bg-white/10 hover:bg-white/20">Cancel</button>
-                        <button onClick={() => { toast.dismiss(t.id); resolve(true) }} className="px-3 py-1.5 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600">Deactivate</button>
-                    </div>
-                </div>
-            ), { duration: 10000 })
-        })
-        if (!confirmed) return
-        setDeactivatingId(userId)
+        setDeactivateConfirmUserId(userId)
+    }
+
+    const confirmDeactivate = async () => {
+        if (!deactivateConfirmUserId) return
+        setDeactivateConfirmUserId(null)
+        setDeactivatingId(deactivateConfirmUserId)
         setPageError(null)
         try {
-            await usersAPI.delete(userId)
+            await usersAPI.delete(deactivateConfirmUserId)
             toast.success('User deactivated successfully')
             await fetchUsers()
         } catch (err) {
@@ -512,6 +507,41 @@ function UsersTab() {
                 onClose={() => setEditUser(null)}
                 onSubmit={handleUpdate}
             />
+
+            {/* Deactivation Confirmation Modal */}
+            {deactivateConfirmUserId && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 bg-black/40" onClick={() => setDeactivateConfirmUserId(null)} />
+                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+                                <Trash2 className="w-5 h-5 text-red-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-gray-900">Deactivate User</h3>
+                                <p className="text-sm text-gray-500">This action cannot be undone.</p>
+                            </div>
+                        </div>
+                        <p className="text-sm text-gray-600">
+                            This user will no longer be able to log in. Are you sure you want to continue?
+                        </p>
+                        <div className="flex gap-3 pt-1">
+                            <button
+                                onClick={() => setDeactivateConfirmUserId(null)}
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDeactivate}
+                                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors"
+                            >
+                                Deactivate
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     )
 }

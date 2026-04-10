@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import {
     BarChart3, Shield, TrendingUp, Users, Flame, CalendarCheck,
     Trophy, ArrowUpRight, ArrowDownRight, Globe, FileText, UserPlus,
-    RefreshCw, Zap
+    RefreshCw, Zap, Calendar, ChevronDown, Check
 } from 'lucide-react'
 import api from '../lib/api'
 
@@ -44,23 +44,69 @@ const platformColors: Record<string, { bg: string; text: string; border: string;
     referral: { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', gradient: 'from-[#26a9b5] to-[#41c5cf]', bar: 'bg-teal-500' },
 }
 
-const daysOptions = [7, 14, 30, 60, 90]
+function getDaysForPreset(key: string): number {
+    const now = new Date()
+    switch (key) {
+        case 'today': return 1
+        case '7d': return 7
+        case '14d': return 14
+        case '30d': return 30
+        case 'this_month': return now.getDate()
+        case 'last_month': {
+            const prev = new Date(now.getFullYear(), now.getMonth(), 0) // last day of prev month
+            return now.getDate() + prev.getDate()
+        }
+        case '90d': return 90
+        case 'this_quarter': {
+            const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
+            return Math.ceil((now.getTime() - qStart.getTime()) / 86400000) + 1
+        }
+        case 'ytd': {
+            const jan1 = new Date(now.getFullYear(), 0, 1)
+            return Math.ceil((now.getTime() - jan1.getTime()) / 86400000) + 1
+        }
+        case '365d': return 365
+        default: return 30
+    }
+}
+
+const DATE_PRESETS: Array<{ key: string; label: string; group: string }> = [
+    { key: 'today', label: 'Today', group: 'Quick' },
+    { key: '7d', label: 'Last 7 Days', group: 'Quick' },
+    { key: '14d', label: 'Last 14 Days', group: 'Quick' },
+    { key: '30d', label: 'Last 30 Days', group: 'Quick' },
+    { key: '90d', label: 'Last 90 Days', group: 'Quick' },
+    { key: 'this_month', label: 'This Month', group: 'Calendar' },
+    { key: 'last_month', label: 'Last Month', group: 'Calendar' },
+    { key: 'this_quarter', label: 'This Quarter', group: 'Calendar' },
+    { key: 'ytd', label: 'Year to Date', group: 'Calendar' },
+    { key: '365d', label: 'Last 12 Months', group: 'Calendar' },
+]
 
 export default function AnalyticsPage() {
     const [data, setData] = useState<SourceOverview | null>(null)
-    const [hotLeads, setHotLeads] = useState<any>(null)
+    const [datePreset, setDatePreset] = useState('30d')
     const [daysBack, setDaysBack] = useState(30)
     const [isLoading, setIsLoading] = useState(true)
+    const [showDatePicker, setShowDatePicker] = useState(false)
+    const datePickerRef = useRef<HTMLDivElement>(null)
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (datePickerRef.current && !datePickerRef.current.contains(e.target as Node)) {
+                setShowDatePicker(false)
+            }
+        }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [])
 
     useEffect(() => {
         setIsLoading(true)
-        Promise.all([
-            api.get('/analytics/sources/overview', { params: { days_back: daysBack } }),
-            api.get('/analytics/sources/hot-leads', { params: { days_back: daysBack } }),
-        ])
-            .then(([overviewRes, hotRes]) => {
-                setData(overviewRes.data)
-                setHotLeads(hotRes.data)
+        api.get('/analytics/sources/overview', { params: { days_back: daysBack } })
+            .then((res) => {
+                setData(res.data)
             })
             .catch(() => { })
             .finally(() => setIsLoading(false))
@@ -95,17 +141,41 @@ export default function AnalyticsPage() {
                     <p className="text-gray-500 mt-1 text-[15px]">Lead performance by intake source — Widget, Jotform, and Referral</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {/* Days selector */}
-                    <div className="flex items-center gap-1 p-1 rounded-lg bg-gray-100">
-                        {daysOptions.map(d => (
-                            <button
-                                key={d}
-                                onClick={() => setDaysBack(d)}
-                                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${daysBack === d ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                            >
-                                {d}d
-                            </button>
-                        ))}
+                    {/* Premium date range selector */}
+                    <div className="relative" ref={datePickerRef}>
+                        <button
+                            onClick={() => setShowDatePicker(v => !v)}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm"
+                        >
+                            <Calendar className="w-4 h-4 text-sleep-500" />
+                            <span>{DATE_PRESETS.find(p => p.key === datePreset)?.label || 'Last 30 Days'}</span>
+                            <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${showDatePicker ? 'rotate-180' : ''}`} />
+                        </button>
+                        {showDatePicker && (
+                            <div className="absolute right-0 top-11 z-50 w-56 bg-white border border-gray-200 rounded-2xl shadow-2xl py-1.5 animate-fade-in">
+                                {['Quick', 'Calendar'].map(group => (
+                                    <div key={group}>
+                                        <div className="px-3 pt-2 pb-1">
+                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{group}</span>
+                                        </div>
+                                        {DATE_PRESETS.filter(p => p.group === group).map(preset => (
+                                            <button
+                                                key={preset.key}
+                                                onClick={() => {
+                                                    setDatePreset(preset.key)
+                                                    setDaysBack(getDaysForPreset(preset.key))
+                                                    setShowDatePicker(false)
+                                                }}
+                                                className={`w-full flex items-center justify-between px-3 py-2 text-sm transition-colors ${datePreset === preset.key ? 'bg-sleep-50 text-sleep-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}
+                                            >
+                                                <span>{preset.label}</span>
+                                                {datePreset === preset.key && <Check className="w-4 h-4 text-sleep-600" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-medium">
                         <Shield className="w-3.5 h-3.5" /> HIPAA Protected
@@ -275,7 +345,7 @@ export default function AnalyticsPage() {
 
                     {/* Footer */}
                     <div className="flex items-center justify-between text-xs text-gray-400 pt-2">
-                        <span>Showing data for the last {daysBack} days</span>
+                        <span>Showing data for: {DATE_PRESETS.find(p => p.key === datePreset)?.label || `Last ${daysBack} days`}</span>
                         <span className="flex items-center gap-1.5"><Shield className="w-3 h-3" /> HIPAA-compliant analytics</span>
                     </div>
                 </>

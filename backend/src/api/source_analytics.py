@@ -396,15 +396,15 @@ async def get_source_analytics(
         # Calculate totals
         totals = {
             "total_leads": total_leads,
-            "total_hot": sum(p.hot_leads for p in platforms),
-            "total_medium": sum(p.medium_leads for p in platforms),
-            "total_low": sum(p.low_leads for p in platforms),
-            "total_converted": sum(p.converted_leads for p in platforms),
+            "hot_leads": sum(p.hot_leads for p in platforms),
+            "medium_leads": sum(p.medium_leads for p in platforms),
+            "low_leads": sum(p.low_leads for p in platforms),
+            "converted_leads": sum(p.converted_leads for p in platforms),
             "overall_conversion_rate": round(
                 (sum(p.converted_leads for p in platforms) / total_leads * 100) if total_leads > 0 else 0, 2
             ),
-            "total_scheduled": sum(p.scheduled_leads for p in platforms),
-            "platform_count": len([p for p in platforms if p.has_data]),  # Only count platforms with data
+            "scheduled_leads": sum(p.scheduled_leads for p in platforms),
+            "platform_count": len([p for p in platforms if p.has_data]),
         }
         
         result = {

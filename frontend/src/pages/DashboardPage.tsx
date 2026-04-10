@@ -179,7 +179,6 @@ export default function DashboardPage() {
                 const bestCohortData = nonEmptyCohorts
                     .filter((c: any) => c.percentages?.length > 1)
                     .sort((a: any, b: any) => (b.percentages[1] || 0) - (a.percentages[1] || 0))[0]
-                const windowLabel = yearParam ? `Year ${yearParam}` : `${monthsParam}-month window`
                 setCohortKpis({
                     avgRetention: `${avgRetention}%`,
                     bestCohort: bestCohortData ? `${bestCohortData.cohort}` : 'N/A',
@@ -209,94 +208,82 @@ export default function DashboardPage() {
             try {
                 const { default: api } = await import('../lib/api')
 
+                // Fire ALL requests in parallel for maximum speed
+                const [summaryRes, dailyRes, monthlyRes, condRes, treatRes] = await Promise.allSettled([
+                    api.get('/analytics/dashboard-summary'),
+                    api.get('/analytics/leads-trend', { params: { period: 30 } }),
+                    api.get('/analytics/leads-trend', { params: { period: 90 } }),
+                    api.get('/analytics/conditions-distribution'),
+                    api.get('/analytics/sleep-treatment-distribution'),
+                ])
+
                 // 1. Dashboard Summary (KPIs)
-                try {
-                    const res = await api.get('/analytics/dashboard-summary')
-                    if (res.data) {
-                        setStats({
-                            total_leads: res.data.total_leads || 0,
-                            converted_leads: res.data.converted_leads || 0,
-                            conversion_rate: res.data.conversion_rate || 0,
-                            scheduled_appointments: res.data.scheduled_appointments || 0,
-                            total_leads_change: res.data.trends?.total_leads ?? 0,
-                            converted_change: res.data.trends?.converted_leads ?? 0,
-                            conversion_change: res.data.trends?.conversion_rate ?? 0,
-                            scheduled_change: res.data.trends?.scheduled_appointments ?? 0,
-                        })
-                    }
-                } catch { /* use defaults */ }
+                if (summaryRes.status === 'fulfilled' && summaryRes.value.data) {
+                    const d = summaryRes.value.data
+                    setStats({
+                        total_leads: d.total_leads || 0,
+                        converted_leads: d.converted_leads || 0,
+                        conversion_rate: d.conversion_rate || 0,
+                        scheduled_appointments: d.scheduled_appointments || 0,
+                        total_leads_change: d.trends?.total_leads ?? 0,
+                        converted_change: d.trends?.converted_leads ?? 0,
+                        conversion_change: d.trends?.conversion_rate ?? 0,
+                        scheduled_change: d.trends?.scheduled_appointments ?? 0,
+                    })
+                }
 
                 // 2. Leads Trend (daily - 30 days)
-                try {
-                    const trendRes = await api.get('/analytics/leads-trend', { params: { period: 30 } })
-                    if (trendRes.data?.data) {
-                        setDailyTrend(trendRes.data.data.map((d: any) => ({
-                            date: d.label,
-                            leads: d.new_leads || 0,
-                            converted: d.converted_leads || 0,
-                        })))
-                    }
-                } catch { /* use empty */ }
+                if (dailyRes.status === 'fulfilled' && dailyRes.value.data?.data) {
+                    setDailyTrend(dailyRes.value.data.data.map((d: any) => ({
+                        date: d.label,
+                        leads: d.new_leads || 0,
+                        converted: d.converted_leads || 0,
+                    })))
+                }
 
                 // 3. Leads Trend (monthly - 90 days)
-                try {
-                    const monthRes = await api.get('/analytics/leads-trend', { params: { period: 90 } })
-                    if (monthRes.data?.data) {
-                        // Aggregate by month
-                        const byMonth: Record<string, { leads: number, converted: number }> = {}
-                        monthRes.data.data.forEach((d: any) => {
-                            const monthKey = d.date?.substring(0, 7) || d.label
-                            if (!byMonth[monthKey]) byMonth[monthKey] = { leads: 0, converted: 0 }
-                            byMonth[monthKey].leads += d.new_leads || 0
-                            byMonth[monthKey].converted += d.converted_leads || 0
-                        })
-                        setMonthlyTrend(Object.entries(byMonth).map(([key, val]) => {
-                            const dt = new Date(key + '-01')
-                            return {
-                                date: dt.toLocaleDateString('en-US', { month: 'short' }),
-                                leads: val.leads,
-                                converted: val.converted,
-                            }
-                        }))
-                    }
-                } catch { /* use empty */ }
+                if (monthlyRes.status === 'fulfilled' && monthlyRes.value.data?.data) {
+                    const byMonth: Record<string, { leads: number, converted: number }> = {}
+                    monthlyRes.value.data.data.forEach((d: any) => {
+                        const monthKey = d.date?.substring(0, 7) || d.label
+                        if (!byMonth[monthKey]) byMonth[monthKey] = { leads: 0, converted: 0 }
+                        byMonth[monthKey].leads += d.new_leads || 0
+                        byMonth[monthKey].converted += d.converted_leads || 0
+                    })
+                    setMonthlyTrend(Object.entries(byMonth).map(([key, val]) => {
+                        const dt = new Date(key + '-01')
+                        return {
+                            date: dt.toLocaleDateString('en-US', { month: 'short' }),
+                            leads: val.leads,
+                            converted: val.converted,
+                        }
+                    }))
+                }
 
-                // 4. Conditions Distribution — Always show ALL 6 conditions (like NeuroReach)
-                try {
-                    const condRes = await api.get('/analytics/conditions-distribution')
+                // 4. Conditions Distribution
+                if (condRes.status === 'fulfilled') {
                     const apiConditions: Record<string, { count: number, percentage: number }> = {}
-                    if (condRes.data?.conditions?.length) {
-                        condRes.data.conditions.forEach((c: any) => {
+                    if (condRes.value.data?.conditions?.length) {
+                        condRes.value.data.conditions.forEach((c: any) => {
                             apiConditions[c.condition] = { count: c.count || 0, percentage: c.percentage || 0 }
                         })
                     }
-                    // Always show ALL conditions — even those with 0 leads
                     setConditions(ALL_CONDITIONS.map(key => ({
                         name: CONDITION_LABELS[key] || key.replace(/_/g, ' '),
                         count: apiConditions[key]?.count || 0,
                         percentage: apiConditions[key]?.percentage || 0,
                         color: CONDITION_COLORS[key] || '#8eb1d4',
                     })))
-                } catch {
-                    // Fallback: show all conditions with 0
-                    setConditions(ALL_CONDITIONS.map(key => ({
-                        name: CONDITION_LABELS[key] || key.replace(/_/g, ' '),
-                        count: 0,
-                        percentage: 0,
-                        color: CONDITION_COLORS[key] || '#8eb1d4',
-                    })))
                 }
 
-                // 5. Treatment Interest Distribution — Always show ALL 5 treatment types (like NeuroReach)
-                try {
-                    const treatRes = await api.get('/analytics/sleep-treatment-distribution')
+                // 5. Treatment Interest Distribution
+                if (treatRes.status === 'fulfilled') {
                     const apiTreatments: Record<string, { count: number, percentage: number, trend: number }> = {}
-                    if (treatRes.data?.interests?.length) {
-                        treatRes.data.interests.forEach((t: any) => {
+                    if (treatRes.value.data?.interests?.length) {
+                        treatRes.value.data.interests.forEach((t: any) => {
                             apiTreatments[t.interest_type] = { count: t.count || 0, percentage: t.percentage || 0, trend: t.trend || 0 }
                         })
                     }
-                    // Always show ALL treatment types — even those with 0 leads
                     setTreatments(ALL_TREATMENTS.map(key => {
                         const data = apiTreatments[key]
                         return {
@@ -306,17 +293,9 @@ export default function DashboardPage() {
                             count: data?.count || 0,
                         }
                     }))
-                } catch {
-                    // Fallback: show all treatments with 0
-                    setTreatments(ALL_TREATMENTS.map(key => ({
-                        name: TREATMENT_LABELS[key] || key.replace(/_/g, ' '),
-                        interest: 0,
-                        icon: TREATMENT_ICONS[key] || HelpCircle,
-                        count: 0,
-                    })))
                 }
 
-                // 6. Cohort Retention — fetch with current filter
+                // 6. Cohort Retention (depends on api import, runs after parallel batch)
                 await fetchCohortData(api, 6)
             } catch {
                 // API might not be ready

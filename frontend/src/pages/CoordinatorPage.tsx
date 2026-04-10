@@ -1407,52 +1407,57 @@ export default function CoordinatorPage({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden overscroll-none animate-fade-in">
-      <div className="shrink-0 space-y-2 lg:space-y-3 px-0 pb-2 pt-1">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-gray-900">
-              <PageIcon className="h-6 w-6 text-sleep-500" />
-              {pageMeta.title}
-            </h1>
-            <p className="mt-1 text-[15px] text-gray-500">
-              {pageMeta.subtitle}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setSoundEnabled((v) => !v)}
-              className={`p-2 rounded-lg transition-colors ${soundEnabled ? "text-sleep-600 hover:bg-sleep-50" : "text-gray-400 hover:bg-gray-100"}`}
-              title={soundEnabled ? "Mute new lead notifications" : "Unmute new lead notifications"}
-            >
-              {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
-            </button>
-          </div>
-        </div>
-
-        {/* KPI Cards — always single row, 4 cols */}
-        <div className="grid grid-cols-4 gap-1.5 sm:gap-2 lg:gap-3">
-          {kpis.map((card) => (
-            <div
-              key={card.label}
-              className={`relative overflow-hidden rounded-lg lg:rounded-2xl p-2 sm:p-3 lg:p-4 bg-gradient-to-br ${card.gradient} text-white shadow-md`}
-            >
-              <div className="absolute top-0 right-0 h-16 w-16 translate-x-4 -translate-y-4 rounded-full bg-white/10 hidden lg:block" />
-              <div className="relative z-10">
-                <div className="mb-1 lg:mb-2 flex h-7 w-7 lg:h-9 lg:w-9 items-center justify-center rounded-lg bg-white/15">
-                  <card.icon className="h-3.5 w-3.5 lg:h-4.5 lg:w-4.5 text-white" />
-                </div>
-                <p className="mb-0.5 text-[9px] sm:text-[10px] lg:text-xs font-medium uppercase tracking-wider text-white/70 truncate">
-                  {card.label}
-                </p>
-                <p className="text-base sm:text-lg lg:text-2xl font-bold">{card.value}</p>
-              </div>
+      {/* Single scroll container — header/KPIs scroll away, toolbar sticks */}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {/* Header + KPIs — these scroll away */}
+        <div className="space-y-2 lg:space-y-3 pb-2 pt-1">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-gray-900">
+                <PageIcon className="h-6 w-6 text-sleep-500" />
+                {pageMeta.title}
+              </h1>
+              <p className="mt-1 text-[15px] text-gray-500">
+                {pageMeta.subtitle}
+              </p>
             </div>
-          ))}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSoundEnabled((v) => !v)}
+                className={`p-2 rounded-lg transition-colors ${soundEnabled ? "text-sleep-600 hover:bg-sleep-50" : "text-gray-400 hover:bg-gray-100"}`}
+                title={soundEnabled ? "Mute new lead notifications" : "Unmute new lead notifications"}
+              >
+                {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+              </button>
+            </div>
+          </div>
+
+          {/* KPI Cards — always single row, 4 cols */}
+          <div className="grid grid-cols-4 gap-1.5 sm:gap-2 lg:gap-3">
+            {kpis.map((card) => (
+              <div
+                key={card.label}
+                className={`relative overflow-hidden rounded-lg lg:rounded-2xl p-2 sm:p-3 lg:p-4 bg-gradient-to-br ${card.gradient} text-white shadow-md`}
+              >
+                <div className="absolute top-0 right-0 h-16 w-16 translate-x-4 -translate-y-4 rounded-full bg-white/10 hidden lg:block" />
+                <div className="relative z-10">
+                  <div className="mb-1 lg:mb-2 flex h-7 w-7 lg:h-9 lg:w-9 items-center justify-center rounded-lg bg-white/15">
+                    <card.icon className="h-3.5 w-3.5 lg:h-4.5 lg:w-4.5 text-white" />
+                  </div>
+                  <p className="mb-0.5 text-[9px] sm:text-[10px] lg:text-xs font-medium uppercase tracking-wider text-white/70 truncate">
+                    {card.label}
+                  </p>
+                  <p className="text-base sm:text-lg lg:text-2xl font-bold">{card.value}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Toolbar */}
-        <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
+        {/* Toolbar — STICKY: stays pinned while scrolling */}
+        <div className="sticky top-0 z-30 bg-gray-50 pt-0.5 pb-2">
+          <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
           <div className="px-4 py-3">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
@@ -1605,38 +1610,38 @@ export default function CoordinatorPage({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-        {/* Table */}
-        {isLoading ? (
-          <div className="text-center py-16">
-            <RefreshCw className="w-6 h-6 text-sleep-400 animate-spin mx-auto mb-3" />
-            <p className="text-sm text-gray-400">Loading leads...</p>
-          </div>
-        ) : filteredLeads.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="w-14 h-14 rounded-2xl bg-sleep-50 border border-sleep-100 flex items-center justify-center mx-auto mb-4">
-              <Inbox className="w-7 h-7 text-sleep-400" />
+        {/* Table card — inside the scroll container, flows naturally */}
+        <div className="rounded-2xl border border-gray-100 bg-white shadow-sm">
+          {/* Table */}
+          {isLoading ? (
+            <div className="text-center py-16">
+              <RefreshCw className="w-6 h-6 text-sleep-400 animate-spin mx-auto mb-3" />
+              <p className="text-sm text-gray-400">Loading leads...</p>
             </div>
-            <h3 className="text-base font-semibold text-gray-900 mb-1">
-              No leads in this queue
-            </h3>
-            <p className="text-sm text-gray-400">
-              When new leads come in they will appear here.
-            </p>
-          </div>
-        ) : (
-          <div
-            className="min-h-0 flex-1 overflow-auto overscroll-contain"
-            style={{ scrollbarGutter: "stable both-edges" }}
-          >
-            <table className="w-full" style={{ minWidth: "1100px", tableLayout: "fixed" }}>
-              {/* Column widths via <colgroup> — resizable */}
-              <colgroup>
-                {COLUMN_KEYS.filter((c) => visibleCols.has(c)).map((col) => (
-                  <col key={col} style={{ width: colWidths[col] || 120 }} />
-                ))}
-              </colgroup>
-              <thead className="sticky top-0 z-10">
+          ) : filteredLeads.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="w-14 h-14 rounded-2xl bg-sleep-50 border border-sleep-100 flex items-center justify-center mx-auto mb-4">
+                <Inbox className="w-7 h-7 text-sleep-400" />
+              </div>
+              <h3 className="text-base font-semibold text-gray-900 mb-1">
+                No leads in this queue
+              </h3>
+              <p className="text-sm text-gray-400">
+                When new leads come in they will appear here.
+              </p>
+            </div>
+          ) : (
+            <div
+              className="overflow-x-auto"
+            >
+              <table className="w-full" style={{ minWidth: "1100px", tableLayout: "fixed" }}>
+                {/* Column widths via <colgroup> — resizable */}
+                <colgroup>
+                  {COLUMN_KEYS.filter((c) => visibleCols.has(c)).map((col) => (
+                    <col key={col} style={{ width: colWidths[col] || 120 }} />
+                  ))}
+                </colgroup>
+                <thead className="bg-gray-50">
                 <tr className="border-b border-gray-200 bg-gray-50">
                   {visibleCols.has("leadId") && (
                     <th
@@ -2160,7 +2165,8 @@ export default function CoordinatorPage({
             )}
           </div>
         )}
-      </div>
+        </div>
+      </div>{/* end scroll container */}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* QUICK ACTION PANEL (Task C — for non-scheduled leads)          */}
@@ -2902,7 +2908,7 @@ function QuickActionPanel({
   onClose,
   onViewDetails,
   showToast,
-  onLeadUpdated,
+  onLeadUpdated: _onLeadUpdated,
   onOutcomeRecorded,
 }: {
   lead: Lead;
@@ -3549,7 +3555,7 @@ function ConsultationPanel({
   onClose,
   onViewDetails,
   showToast,
-  onLeadUpdated,
+  onLeadUpdated: _onLeadUpdated,
   onOutcomeRecorded,
 }: {
   lead: Lead;

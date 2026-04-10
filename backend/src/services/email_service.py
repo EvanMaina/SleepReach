@@ -306,7 +306,7 @@ EMAIL_BODY_TEMPLATES = {
                     <!-- Log In CTA Button -->
                     <tr>
                         <td align="center" style="padding: 10px 30px 0 30px;">
-                            <a href="{{{{ login_url }}}}" style="display: inline-block; padding: 16px 40px; background-color: {HEADER_BG_COLOR}; color: #ffffff; text-decoration: none; border-radius: 8px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: bold;">Log In to Your Account</a>
+                            <a href="{{{{ login_url }}}}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 16px 40px; background-color: {HEADER_BG_COLOR}; color: #ffffff; text-decoration: none; border-radius: 8px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: bold;">Log In to Your Account</a>
                         </td>
                     </tr>
 
@@ -363,7 +363,7 @@ EMAIL_BODY_TEMPLATES = {
                     <!-- Reset Password CTA Button -->
                     <tr>
                         <td align="center" style="padding: 10px 30px 0 30px;">
-                            <a href="{{{{ reset_url }}}}" style="display: inline-block; padding: 16px 40px; background-color: {HEADER_BG_COLOR}; color: #ffffff; text-decoration: none; border-radius: 8px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: bold;">Reset Your Password</a>
+                            <a href="{{{{ reset_url }}}}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 16px 40px; background-color: {HEADER_BG_COLOR}; color: #ffffff; text-decoration: none; border-radius: 8px; font-family: Arial, Helvetica, sans-serif; font-size: 16px; font-weight: bold;">Reset Your Password</a>
                         </td>
                     </tr>
 
