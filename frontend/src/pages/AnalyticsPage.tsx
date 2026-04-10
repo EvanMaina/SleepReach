@@ -102,7 +102,7 @@ export default function AnalyticsPage() {
         return () => document.removeEventListener('mousedown', handler)
     }, [])
 
-    useEffect(() => {
+    const fetchAnalytics = () => {
         setIsLoading(true)
         api.get('/analytics/sources/overview', { params: { days_back: daysBack } })
             .then((res) => {
@@ -110,6 +110,10 @@ export default function AnalyticsPage() {
             })
             .catch(() => { })
             .finally(() => setIsLoading(false))
+    }
+
+    useEffect(() => {
+        fetchAnalytics()
     }, [daysBack])
 
     const platforms = data?.platforms?.filter(p =>
@@ -177,6 +181,14 @@ export default function AnalyticsPage() {
                             </div>
                         )}
                     </div>
+                    <button
+                        onClick={fetchAnalytics}
+                        disabled={isLoading}
+                        className="p-2 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors disabled:opacity-50"
+                        title="Refresh analytics"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                    </button>
                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-medium">
                         <Shield className="w-3.5 h-3.5" /> HIPAA Protected
                     </div>
