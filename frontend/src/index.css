@@ -16,114 +16,6 @@
         -moz-osx-font-smoothing: grayscale;
     }
 
-    /* ═══════════════════════════════════════════════════════════
-       Dark Mode — Premium SaaS Theme
-       Uses precise selectors to avoid breaking gradient cards,
-       opacity overlays (bg-white/10), and decorative elements.
-       ═══════════════════════════════════════════════════════════ */
-
-    html.dark body {
-        background-color: #0f1419;
-        color: #e2e8f0;
-    }
-
-    /* ── Page backgrounds ── */
-    html.dark .bg-gray-50\/80,
-    html.dark .bg-gray-50 { background-color: #0f1419 !important; }
-
-    /* ── Solid white surfaces ── */
-    html.dark .bg-white {
-        background-color: #1a2332 !important;
-    }
-
-    /* ── Cards, panels, modals ── */
-    html.dark .card-premium,
-    html.dark .chart-card {
-        background-color: #1a2332 !important;
-        border-color: #2d3a4a !important;
-    }
-
-    /* ── KPI gradient cards — CLEAN dark mode ──
-       Remove all artifacts: shadows, backdrop-blur, white patches */
-    html.dark .bg-gradient-to-br {
-        box-shadow: none !important;
-    }
-    html.dark .bg-gradient-to-br [class*="bg-white"] {
-        background-color: transparent !important;
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-    }
-    html.dark .bg-gradient-to-br .text-white,
-    html.dark .bg-gradient-to-br .text-white\/70 {
-        color: rgba(255, 255, 255, 0.9) !important;
-    }
-
-    /* ── Light-bg badges (emerald, red, blue, amber, green, sleep) ── */
-    html.dark .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.12) !important; }
-    html.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.12) !important; }
-    html.dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.12) !important; }
-    html.dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.12) !important; }
-    html.dark .bg-green-50 { background-color: rgba(34, 197, 94, 0.12) !important; }
-    html.dark .bg-purple-50 { background-color: rgba(147, 51, 234, 0.12) !important; }
-    html.dark .bg-teal-50 { background-color: rgba(20, 184, 166, 0.12) !important; }
-    html.dark .bg-sleep-50 { background-color: rgba(74, 111, 165, 0.12) !important; }
-    html.dark .bg-gray-100 { background-color: #1e2d3d !important; }
-    html.dark .bg-gray-50\/80 { background-color: #0f1419 !important; }
-
-    /* ── Text colors ── */
-    html.dark .text-gray-900 { color: #f1f5f9 !important; }
-    html.dark .text-gray-800 { color: #e2e8f0 !important; }
-    html.dark .text-gray-700 { color: #cbd5e1 !important; }
-    html.dark .text-gray-600 { color: #94a3b8 !important; }
-    html.dark .text-gray-500 { color: #64748b !important; }
-    html.dark .text-gray-400 { color: #475569 !important; }
-
-    /* ── Borders ── */
-    html.dark .border-gray-100,
-    html.dark .border-gray-200,
-    html.dark .border-gray-100\/80,
-    html.dark .border-gray-100\/60 { border-color: #2d3a4a !important; }
-    html.dark .border-t { border-color: #2d3a4a !important; }
-
-    /* ── Inputs ── */
-    html.dark .input-premium,
-    html.dark input[type="text"],
-    html.dark input[type="email"],
-    html.dark input[type="password"],
-    html.dark input[type="search"],
-    html.dark input[type="tel"],
-    html.dark textarea,
-    html.dark select {
-        background-color: #131c28 !important;
-        border-color: #2d3a4a !important;
-        color: #e2e8f0 !important;
-    }
-
-    /* ── Tables ── */
-    html.dark thead,
-    html.dark th { background-color: #131c28 !important; }
-    html.dark tr:hover { background-color: rgba(74, 111, 165, 0.08) !important; }
-    html.dark td { border-color: #1e2d3d !important; }
-
-    /* ── Sidebar ── */
-    html.dark aside { background-color: #0c1220 !important; border-color: #1e2d3d !important; }
-    html.dark aside .hover\:bg-gray-50:hover { background-color: #1a2332 !important; }
-
-    /* ── Rounded card containers (toolbar, table wrappers) ── */
-    html.dark .rounded-2xl.border { border-color: #2d3a4a !important; }
-    html.dark .shadow-sm { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important; }
-
-    /* ── Dropdowns, popovers, modals ── */
-    html.dark [class*="shadow-2xl"] { background-color: #1a2332 !important; border-color: #2d3a4a !important; }
-
-    /* ── Filter pills / toggle buttons ── */
-    html.dark .bg-white.text-gray-600 { background-color: #1e2d3d !important; }
-    html.dark .hover\:bg-gray-50:hover { background-color: #1e2d3d !important; }
-
-    /* ── Scrollbar ── */
-    html.dark ::-webkit-scrollbar-thumb { background-color: #334155; }
-    html.dark ::-webkit-scrollbar-thumb:hover { background-color: #475569; }
-
     /* Premium scrollbar */
     ::-webkit-scrollbar {
         width: 6px;
@@ -272,3 +164,103 @@
         background-image: linear-gradient(135deg, #4A6FA5, #6593be);
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   DARK MODE — OUTSIDE @layer so it overrides ALL Tailwind utilities.
+   This is the ONLY correct way to ensure dark mode wins over
+   Tailwind's @layer utilities which have higher cascade priority
+   than @layer base.
+   ═══════════════════════════════════════════════════════════════════ */
+
+html.dark body {
+    background-color: #0f1419;
+    color: #e2e8f0;
+}
+
+/* Page backgrounds */
+html.dark .bg-gray-50\/80,
+html.dark .bg-gray-50 { background-color: #0f1419 !important; }
+
+/* Solid white surfaces */
+html.dark .bg-white { background-color: #1a2332 !important; }
+
+/* Cards, panels */
+html.dark .card-premium,
+html.dark .chart-card {
+    background-color: #1a2332 !important;
+    border-color: #2d3a4a !important;
+}
+
+/* ── KPI GRADIENT CARDS — completely clean ── */
+html.dark .bg-gradient-to-br {
+    --tw-shadow: 0 0 #0000 !important;
+    box-shadow: none !important;
+}
+html.dark .bg-gradient-to-br [class*="bg-white"] {
+    background-color: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+/* Light-bg badges */
+html.dark .bg-emerald-50 { background-color: rgba(16, 185, 129, 0.12) !important; }
+html.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.12) !important; }
+html.dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.12) !important; }
+html.dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.12) !important; }
+html.dark .bg-green-50 { background-color: rgba(34, 197, 94, 0.12) !important; }
+html.dark .bg-purple-50 { background-color: rgba(147, 51, 234, 0.12) !important; }
+html.dark .bg-teal-50 { background-color: rgba(20, 184, 166, 0.12) !important; }
+html.dark .bg-sleep-50 { background-color: rgba(74, 111, 165, 0.12) !important; }
+html.dark .bg-gray-100 { background-color: #1e2d3d !important; }
+
+/* Text */
+html.dark .text-gray-900 { color: #f1f5f9 !important; }
+html.dark .text-gray-800 { color: #e2e8f0 !important; }
+html.dark .text-gray-700 { color: #cbd5e1 !important; }
+html.dark .text-gray-600 { color: #94a3b8 !important; }
+html.dark .text-gray-500 { color: #64748b !important; }
+html.dark .text-gray-400 { color: #475569 !important; }
+
+/* Borders */
+html.dark .border-gray-100,
+html.dark .border-gray-200,
+html.dark .border-gray-100\/80,
+html.dark .border-gray-100\/60 { border-color: #2d3a4a !important; }
+html.dark .border-t { border-color: #2d3a4a !important; }
+
+/* Inputs */
+html.dark .input-premium,
+html.dark input[type="text"],
+html.dark input[type="email"],
+html.dark input[type="password"],
+html.dark input[type="search"],
+html.dark input[type="tel"],
+html.dark textarea,
+html.dark select {
+    background-color: #131c28 !important;
+    border-color: #2d3a4a !important;
+    color: #e2e8f0 !important;
+}
+
+/* Tables */
+html.dark thead,
+html.dark th { background-color: #131c28 !important; }
+html.dark tr:hover { background-color: rgba(74, 111, 165, 0.08) !important; }
+html.dark td { border-color: #1e2d3d !important; }
+
+/* Sidebar */
+html.dark aside { background-color: #0c1220 !important; border-color: #1e2d3d !important; }
+
+/* Shadows */
+html.dark .shadow-sm { --tw-shadow: 0 0 #0000 !important; box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important; }
+html.dark .shadow-md { --tw-shadow: 0 0 #0000 !important; box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important; }
+
+/* Dropdowns, modals */
+html.dark [class*="shadow-2xl"] { background-color: #1a2332 !important; border-color: #2d3a4a !important; }
+
+/* Filter pills */
+html.dark .hover\:bg-gray-50:hover { background-color: #1e2d3d !important; }
+
+/* Scrollbar */
+html.dark ::-webkit-scrollbar-thumb { background-color: #334155; }
+html.dark ::-webkit-scrollbar-thumb:hover { background-color: #475569; }
