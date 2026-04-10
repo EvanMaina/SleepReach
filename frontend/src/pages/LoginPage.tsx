@@ -5,14 +5,16 @@ import { authAPI } from '../lib/api'
 import toast from 'react-hot-toast'
 
 export default function LoginPage() {
+    const { user, login, refreshUser } = useAuth()
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+    // Show password change form if: user already authenticated with must_change flag, OR login just returned must_change
     const [mustChangePassword, setMustChangePassword] = useState(false)
+    const showPasswordChange = mustChangePassword || user?.must_change_password
     const [newPassword, setNewPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
-    const { login, refreshUser } = useAuth()
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -161,7 +163,7 @@ export default function LoginPage() {
                         </div>
                     </div>
 
-                    {mustChangePassword ? (
+                    {showPasswordChange ? (
                         /* ─── Inline Set New Password Form ─── */
                         <>
                             <div className="mb-8">

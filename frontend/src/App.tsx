@@ -72,9 +72,9 @@ function AuthGate() {
         return <LoginPage />
     }
 
-    // If user must change password, show that page
+    // If user must change password, show LoginPage (inline password form)
     if (user?.must_change_password) {
-        return <ChangePasswordPage />
+        return <LoginPage />
     }
 
     // Authenticated — render the full app with routing
