@@ -43,20 +43,19 @@
         border-color: #2d3a4a !important;
     }
 
-    /* ── KPI gradient cards — FULL PROTECTION ──
-       Everything inside a gradient card keeps its original look.
-       No dark mode override touches anything inside these cards. */
+    /* ── KPI gradient cards — CLEAN dark mode ──
+       Remove all artifacts: shadows, backdrop-blur, white patches */
     html.dark .bg-gradient-to-br {
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25) !important;
+        box-shadow: none !important;
     }
-    html.dark [class*="bg-gradient"] [class*="bg-white"] {
-        background-color: rgba(255, 255, 255, 0.08) !important;
+    html.dark .bg-gradient-to-br [class*="bg-white"] {
+        background-color: transparent !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
     }
-    html.dark [class*="bg-gradient"] .text-white\/70 {
-        color: rgba(255, 255, 255, 0.7) !important;
-    }
-    html.dark [class*="bg-gradient"] .text-white {
-        color: #ffffff !important;
+    html.dark .bg-gradient-to-br .text-white,
+    html.dark .bg-gradient-to-br .text-white\/70 {
+        color: rgba(255, 255, 255, 0.9) !important;
     }
 
     /* ── Light-bg badges (emerald, red, blue, amber, green, sleep) ── */
