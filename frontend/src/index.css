@@ -31,8 +31,8 @@
     html.dark .bg-gray-50\/80,
     html.dark .bg-gray-50 { background-color: #0f1419 !important; }
 
-    /* ── Solid white surfaces ONLY (not bg-white/10, bg-white/15 etc.) ── */
-    html.dark .bg-white:not([class*="bg-white/"]):not([class*="bg-white\/"]) {
+    /* ── Solid white surfaces ── */
+    html.dark .bg-white {
         background-color: #1a2332 !important;
     }
 
@@ -43,21 +43,20 @@
         border-color: #2d3a4a !important;
     }
 
-    /* ── KPI gradient cards — keep gradients, just enhance overlays ── */
+    /* ── KPI gradient cards — FULL PROTECTION ──
+       Everything inside a gradient card keeps its original look.
+       No dark mode override touches anything inside these cards. */
     html.dark .bg-gradient-to-br {
-        /* Gradient cards keep their colors — no override needed */
-        border-color: transparent !important;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3) !important;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25) !important;
     }
-    /* Decorative circle inside gradient cards — boost visibility */
-    html.dark .bg-gradient-to-br .bg-white\/10 {
-        background-color: rgba(255, 255, 255, 0.12) !important;
+    html.dark [class*="bg-gradient"] [class*="bg-white"] {
+        background-color: rgba(255, 255, 255, 0.08) !important;
     }
-    html.dark .bg-gradient-to-br .bg-white\/15 {
-        background-color: rgba(255, 255, 255, 0.18) !important;
+    html.dark [class*="bg-gradient"] .text-white\/70 {
+        color: rgba(255, 255, 255, 0.7) !important;
     }
-    html.dark .bg-gradient-to-br .bg-white\/20 {
-        background-color: rgba(255, 255, 255, 0.22) !important;
+    html.dark [class*="bg-gradient"] .text-white {
+        color: #ffffff !important;
     }
 
     /* ── Light-bg badges (emerald, red, blue, amber, green, sleep) ── */
