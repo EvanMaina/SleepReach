@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Eye, EyeOff, Lock, Shield, Server, ChevronRight } from 'lucide-react'
+import { Eye, EyeOff, Lock, Shield, Server, ChevronRight, ArrowRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { authAPI } from '../lib/api'
 import toast from 'react-hot-toast'
 
 export default function LoginPage() {
@@ -8,7 +9,10 @@ export default function LoginPage() {
     const [password, setPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
-    const { login } = useAuth()
+    const [mustChangePassword, setMustChangePassword] = useState(false)
+    const [newPassword, setNewPassword] = useState('')
+    const [confirmPassword, setConfirmPassword] = useState('')
+    const { login, refreshUser } = useAuth()
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -23,11 +27,37 @@ export default function LoginPage() {
 
         setIsLoading(true)
         try {
-            await login(email, password)
-            toast.success('Welcome back!')
+            const result = await login(email, password)
+            if (result?.must_change_password) {
+                setMustChangePassword(true)
+            } else {
+                toast.success('Welcome back!')
+            }
         } catch (err: any) {
             const msg = err.response?.data?.detail || 'Invalid credentials'
             toast.error(msg)
+        } finally {
+            setIsLoading(false)
+        }
+    }
+
+    const handlePasswordChange = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (newPassword !== confirmPassword) {
+            toast.error('Passwords do not match')
+            return
+        }
+        if (newPassword.length < 8) {
+            toast.error('Password must be at least 8 characters')
+            return
+        }
+        setIsLoading(true)
+        try {
+            await authAPI.changePassword(null, newPassword)
+            toast.success('Password updated — welcome!')
+            await refreshUser()
+        } catch (err: any) {
+            toast.error(err.response?.data?.detail || 'Failed to change password')
         } finally {
             setIsLoading(false)
         }
@@ -131,101 +161,147 @@ export default function LoginPage() {
                         </div>
                     </div>
 
-                    {/* Form header */}
-                    <div className="mb-8">
-                        <h2 className="text-[1.75rem] font-bold text-gray-900 mb-2 tracking-tight">Welcome back</h2>
-                        <p className="text-gray-500 text-[15px]">Sign in to your clinic dashboard</p>
-                    </div>
+                    {mustChangePassword ? (
+                        /* ─── Inline Set New Password Form ─── */
+                        <>
+                            <div className="mb-8">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center">
+                                        <Lock className="w-5 h-5 text-amber-600" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-gray-900 tracking-tight">Set New Password</h2>
+                                        <p className="text-gray-500 text-sm">You must change your password before continuing.</p>
+                                    </div>
+                                </div>
+                            </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        {/* Email */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Email address
-                            </label>
-                            <input
-                                type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="input-premium"
-                                placeholder="you@clinic.com"
-                                autoComplete="email"
-                                required
-                            />
-                        </div>
+                            <form onSubmit={handlePasswordChange} className="space-y-5">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+                                    <input
+                                        type="password"
+                                        value={newPassword}
+                                        onChange={(e) => setNewPassword(e.target.value)}
+                                        className="input-premium"
+                                        placeholder="Min 8 characters, upper + lower + number + symbol"
+                                        required
+                                        minLength={8}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
+                                    <input
+                                        type="password"
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        className="input-premium"
+                                        placeholder="Re-enter your new password"
+                                        required
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={isLoading || !newPassword || !confirmPassword}
+                                    className="w-full h-12 rounded-xl font-semibold text-[15px] text-white transition-all duration-200 ease-out shadow-md hover:shadow-lg hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2.5"
+                                    style={{ background: 'linear-gradient(135deg, #243448 0%, #2C3E5A 50%, #3B5068 100%)' }}
+                                >
+                                    {isLoading ? (
+                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <>
+                                            Update Password
+                                            <ArrowRight className="w-4 h-4" />
+                                        </>
+                                    )}
+                                </button>
+                            </form>
+                        </>
+                    ) : (
+                        /* ─── Standard Login Form ─── */
+                        <>
+                            <div className="mb-8">
+                                <h2 className="text-[1.75rem] font-bold text-gray-900 mb-2 tracking-tight">Welcome back</h2>
+                                <p className="text-gray-500 text-[15px]">Sign in to your clinic dashboard</p>
+                            </div>
 
-                        {/* Password */}
-                        <div>
-                            <div className="flex items-center justify-between mb-2">
-                                <label className="block text-sm font-medium text-gray-700">
-                                    Password
-                                </label>
+                            <form onSubmit={handleSubmit} className="space-y-5">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Email address</label>
+                                    <input
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="input-premium"
+                                        placeholder="you@clinic.com"
+                                        autoComplete="email"
+                                        required
+                                    />
+                                </div>
+
+                                <div>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="block text-sm font-medium text-gray-700">Password</label>
+                                        <button
+                                            type="button"
+                                            onClick={() => { window.location.hash = 'forgot-password' }}
+                                            className="text-xs font-medium transition-colors"
+                                            style={{ color: '#2C3E5A' }}
+                                        >
+                                            Forgot password?
+                                        </button>
+                                    </div>
+                                    <div className="relative">
+                                        <input
+                                            type={showPassword ? 'text' : 'password'}
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            className="input-premium pr-12"
+                                            placeholder="Enter your password"
+                                            autoComplete="current-password"
+                                            required
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-0.5"
+                                        >
+                                            {showPassword ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    className="w-full h-12 rounded-xl font-semibold text-[15px] text-white transition-all duration-200 ease-out shadow-md hover:shadow-lg hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2.5"
+                                    style={{ background: 'linear-gradient(135deg, #243448 0%, #2C3E5A 50%, #3B5068 100%)' }}
+                                >
+                                    {isLoading ? (
+                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <>
+                                            <Lock className="w-4 h-4" />
+                                            Sign In Securely
+                                            <ChevronRight className="w-4 h-4 ml-0.5" />
+                                        </>
+                                    )}
+                                </button>
+                            </form>
+
+                            <p className="mt-8 text-center text-sm text-gray-400">
+                                Need access?{' '}
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        window.location.hash = 'forgot-password'
-                                    }}
-                                    className="text-xs font-medium transition-colors"
+                                    onClick={() => { window.location.hash = 'request-invitation' }}
+                                    className="font-semibold transition-colors"
                                     style={{ color: '#2C3E5A' }}
                                 >
-                                    Forgot password?
+                                    Request an invitation
                                 </button>
-                            </div>
-                            <div className="relative">
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="input-premium pr-12"
-                                    placeholder="Enter your password"
-                                    autoComplete="current-password"
-                                    required
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-0.5"
-                                >
-                                    {showPassword ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Submit — slate-blue matching left panel */}
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full h-12 rounded-xl font-semibold text-[15px] text-white transition-all duration-200 ease-out shadow-md hover:shadow-lg hover:brightness-110 active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2.5"
-                            style={{
-                                background: 'linear-gradient(135deg, #243448 0%, #2C3E5A 50%, #3B5068 100%)',
-                            }}
-                        >
-                            {isLoading ? (
-                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            ) : (
-                                <>
-                                    <Lock className="w-4 h-4" />
-                                    Sign In Securely
-                                    <ChevronRight className="w-4 h-4 ml-0.5" />
-                                </>
-                            )}
-                        </button>
-                    </form>
-
-                    {/* Footer */}
-                    <p className="mt-8 text-center text-sm text-gray-400">
-                        Need access?{' '}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                window.location.hash = 'request-invitation'
-                            }}
-                            className="font-semibold transition-colors"
-                            style={{ color: '#2C3E5A' }}
-                        >
-                            Request an invitation
-                        </button>
-                    </p>
+                            </p>
+                        </>
+                    )}
 
                     {/* Trust indicators */}
                     <div className="mt-10 pt-6 border-t border-gray-200/60">

@@ -17,8 +17,8 @@ import {
   UserPlus,
   TrendingUp,
   Phone,
-  Volume2,
-  VolumeX,
+  Bell,
+  BellOff,
   MessageSquare,
   Mail,
   Search,
@@ -1428,7 +1428,7 @@ export default function CoordinatorPage({
                 className={`p-2 rounded-lg transition-colors ${soundEnabled ? "text-sleep-600 hover:bg-sleep-50" : "text-gray-400 hover:bg-gray-100"}`}
                 title={soundEnabled ? "Mute new lead notifications" : "Unmute new lead notifications"}
               >
-                {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                {soundEnabled ? <Bell size={18} /> : <BellOff size={18} />}
               </button>
             </div>
           </div>
@@ -1496,6 +1496,13 @@ export default function CoordinatorPage({
                 <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
                   {filteredLeads.length} of {leads.length} leads
                 </span>
+                <button
+                  onClick={() => fetchLeads()}
+                  className="p-2 rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+                  title="Refresh leads"
+                >
+                  <RefreshCw size={15} className={isLoading ? "animate-spin" : ""} />
+                </button>
                 <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg">
                   <Shield size={14} className="text-emerald-600" />
                   <span className="text-xs font-semibold text-emerald-700">

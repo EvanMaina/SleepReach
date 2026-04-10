@@ -122,7 +122,7 @@ async def list_providers(
     specialty_filter: Optional[str] = None,  # Free text specialty filter
     specialty: Optional[str] = None,  # Alias for specialty_filter (frontend compatibility)
     search: Optional[str] = None,
-    sort_by: str = "total_referrals",
+    sort_by: str = "created_at",
     sort_order: str = "desc",
 ) -> PaginatedResponse:
     """

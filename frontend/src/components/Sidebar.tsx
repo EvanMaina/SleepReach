@@ -3,11 +3,12 @@ import {
     LayoutDashboard, Headphones, Users, Trash2,
     Stethoscope, BarChart3, Settings, LogOut, ChevronLeft,
     ChevronDown, Inbox, Phone, Clock, PhoneOff, Calendar,
-    CheckCircle2, XCircle, Flame, Diamond, CircleDot, Sparkles
+    CheckCircle2, XCircle, Flame, Diamond, CircleDot, Sparkles,
+    Moon, Sun, Camera
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import clsx from 'clsx'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 /* ─── Queue definitions for Coordinator sub-items ─── */
 const coordinatorQueues = [
@@ -41,6 +42,26 @@ export default function Sidebar() {
     const location = useLocation()
     const [collapsed, setCollapsed] = useState(() => window.innerWidth < 1280)
     const [coordinatorExpanded, setCoordinatorExpanded] = useState(false)
+    const [darkMode, setDarkMode] = useState(() => localStorage.getItem('sleepreach_theme') === 'dark')
+    const [profilePic, setProfilePic] = useState<string | null>(() => localStorage.getItem('sleepreach_avatar'))
+    const avatarInputRef = useRef<HTMLInputElement>(null)
+
+    const toggleTheme = () => {
+        const next = !darkMode
+        setDarkMode(next)
+        localStorage.setItem('sleepreach_theme', next ? 'dark' : 'light')
+        if (next) {
+            document.documentElement.classList.add('dark')
+        } else {
+            document.documentElement.classList.remove('dark')
+        }
+    }
+
+    // Apply saved theme on mount
+    useEffect(() => {
+        if (darkMode) document.documentElement.classList.add('dark')
+        else document.documentElement.classList.remove('dark')
+    }, [])
 
     // Auto-collapse sidebar on screens smaller than xl (1280px)
     useEffect(() => {
@@ -186,8 +207,10 @@ export default function Sidebar() {
                     )}
                 </div>
 
-                {/* Remaining nav items */}
-                {navigation.slice(1).map((item) => (
+                {/* Remaining nav items — Settings visible only to admins */}
+                {navigation.slice(1).filter((item) =>
+                    item.name !== 'Settings' || ['primary_admin', 'admin'].includes(user?.role || '')
+                ).map((item) => (
                     <NavLink
                         key={item.name}
                         to={item.href}
@@ -207,14 +230,45 @@ export default function Sidebar() {
             </nav>
 
             {/* User section */}
-            <div className="border-t border-gray-100 px-3 py-3 space-y-2">
+            <div className="border-t border-gray-100 px-3 py-3 space-y-1.5">
                 {user && !collapsed && (
                     <div className="flex items-center gap-3 px-3 py-2.5">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-sleep-500 to-sleep-700 flex items-center justify-center text-white text-[11px] font-bold shrink-0 shadow-sm">
-                            {user.first_name[0]}{user.last_name[0]}
+                        <div className="relative group shrink-0">
+                            {profilePic ? (
+                                <img src={profilePic} alt="" className="w-9 h-9 rounded-full object-cover shadow-sm" />
+                            ) : (
+                                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-sleep-500 to-sleep-700 flex items-center justify-center text-white text-[11px] font-bold shadow-sm">
+                                    {user.first_name[0]}{user.last_name[0]}
+                                </div>
+                            )}
+                            <button
+                                onClick={() => avatarInputRef.current?.click()}
+                                className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                                title="Upload profile photo"
+                            >
+                                <Camera className="w-3.5 h-3.5 text-white" />
+                            </button>
+                            <input
+                                ref={avatarInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0]
+                                    if (file) {
+                                        const reader = new FileReader()
+                                        reader.onload = () => {
+                                            const dataUrl = reader.result as string
+                                            setProfilePic(dataUrl)
+                                            localStorage.setItem('sleepreach_avatar', dataUrl)
+                                        }
+                                        reader.readAsDataURL(file)
+                                    }
+                                }}
+                            />
                         </div>
                         <div className="min-w-0">
-                            <p className="text-[13px] font-semibold text-gray-900 truncate leading-tight">
+                            <p className="text-[13px] font-semibold text-gray-900 dark:text-gray-100 truncate leading-tight">
                                 {user.first_name} {user.last_name}
                             </p>
                             <p className="text-[11px] text-gray-400 truncate capitalize leading-tight mt-0.5">
@@ -223,10 +277,22 @@ export default function Sidebar() {
                         </div>
                     </div>
                 )}
+
+                {/* Theme toggle */}
+                {!collapsed && (
+                    <button
+                        onClick={toggleTheme}
+                        className="flex items-center gap-3 w-full px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-150 text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                    >
+                        {darkMode ? <Sun className="w-[17px] h-[17px] shrink-0 text-amber-500" /> : <Moon className="w-[17px] h-[17px] shrink-0" />}
+                        <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+                    </button>
+                )}
+
                 <button
                     onClick={handleLogout}
                     className={clsx(
-                        'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-150',
+                        'flex items-center gap-3 w-full px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-150',
                         'text-gray-400 hover:text-red-600 hover:bg-red-50',
                         collapsed && 'justify-center'
                     )}
