@@ -3,7 +3,7 @@ import Sidebar from '../components/Sidebar'
 
 export default function DashboardLayout() {
     return (
-        <div className="h-screen overflow-hidden bg-gray-50/80 dark:bg-gray-900">
+        <div className="h-screen overflow-hidden bg-gray-50/80">
             <Sidebar />
             {/*
               Mobile (<md):  sidebar hidden via overlay, main takes full width

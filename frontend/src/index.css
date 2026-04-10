@@ -16,6 +16,69 @@
         -moz-osx-font-smoothing: grayscale;
     }
 
+    /* ─── Dark Mode — comprehensive surface overrides ─── */
+    html.dark body {
+        background-color: #0f1419;
+        color: #e2e8f0;
+    }
+    html.dark .bg-gray-50\/80,
+    html.dark .bg-gray-50 { background-color: #0f1419 !important; }
+    html.dark .bg-white { background-color: #1a2332 !important; }
+    html.dark .bg-gray-50\/80 { background-color: #0f1419 !important; }
+
+    /* Cards, panels, modals */
+    html.dark .card-premium,
+    html.dark .chart-card,
+    html.dark [class*="bg-white"] {
+        background-color: #1a2332 !important;
+        border-color: #2d3a4a !important;
+    }
+
+    /* Text colors */
+    html.dark .text-gray-900 { color: #f1f5f9 !important; }
+    html.dark .text-gray-800 { color: #e2e8f0 !important; }
+    html.dark .text-gray-700 { color: #cbd5e1 !important; }
+    html.dark .text-gray-600 { color: #94a3b8 !important; }
+    html.dark .text-gray-500 { color: #64748b !important; }
+    html.dark .text-gray-400 { color: #475569 !important; }
+
+    /* Borders */
+    html.dark .border-gray-100,
+    html.dark .border-gray-200 { border-color: #2d3a4a !important; }
+
+    /* Inputs */
+    html.dark .input-premium,
+    html.dark input[type="text"],
+    html.dark input[type="email"],
+    html.dark input[type="password"],
+    html.dark input[type="search"],
+    html.dark input[type="tel"],
+    html.dark textarea,
+    html.dark select {
+        background-color: #131c28 !important;
+        border-color: #2d3a4a !important;
+        color: #e2e8f0 !important;
+    }
+
+    /* Table headers */
+    html.dark thead,
+    html.dark .bg-gray-50 th,
+    html.dark th { background-color: #131c28 !important; }
+    html.dark tr:hover { background-color: rgba(74, 111, 165, 0.08) !important; }
+    html.dark td { border-color: #1e2d3d !important; }
+
+    /* Sidebar */
+    html.dark aside { background-color: #0c1220 !important; border-color: #1e2d3d !important; }
+    html.dark aside .text-gray-500 { color: #64748b !important; }
+    html.dark aside .hover\:bg-gray-50:hover { background-color: #1a2332 !important; }
+
+    /* Dropdowns, popovers */
+    html.dark [class*="shadow-2xl"] { background-color: #1a2332 !important; border-color: #2d3a4a !important; }
+
+    /* Scrollbar dark */
+    html.dark ::-webkit-scrollbar-thumb { background-color: #334155; }
+    html.dark ::-webkit-scrollbar-thumb:hover { background-color: #475569; }
+
     /* Premium scrollbar */
     ::-webkit-scrollbar {
         width: 6px;

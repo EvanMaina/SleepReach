@@ -7,6 +7,7 @@ import {
     Moon, Sun, Camera
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import toast from 'react-hot-toast'
 import clsx from 'clsx'
 import { useState, useEffect, useRef } from 'react'
 
@@ -251,19 +252,36 @@ export default function Sidebar() {
                             <input
                                 ref={avatarInputRef}
                                 type="file"
-                                accept="image/*"
+                                accept="image/png,image/jpeg,image/webp,image/gif"
                                 className="hidden"
                                 onChange={(e) => {
                                     const file = e.target.files?.[0]
-                                    if (file) {
-                                        const reader = new FileReader()
-                                        reader.onload = () => {
-                                            const dataUrl = reader.result as string
-                                            setProfilePic(dataUrl)
-                                            localStorage.setItem('sleepreach_avatar', dataUrl)
-                                        }
-                                        reader.readAsDataURL(file)
+                                    if (!file) return
+                                    // Validate file type
+                                    const validTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+                                    if (!validTypes.includes(file.type)) {
+                                        toast.error('Please upload a valid image (PNG, JPG, WebP, or GIF)')
+                                        e.target.value = ''
+                                        return
                                     }
+                                    // Validate file size (max 2MB)
+                                    if (file.size > 2 * 1024 * 1024) {
+                                        toast.error('Image must be under 2MB')
+                                        e.target.value = ''
+                                        return
+                                    }
+                                    const reader = new FileReader()
+                                    reader.onload = () => {
+                                        const dataUrl = reader.result as string
+                                        setProfilePic(dataUrl)
+                                        localStorage.setItem('sleepreach_avatar', dataUrl)
+                                        toast.success('Profile photo updated')
+                                    }
+                                    reader.onerror = () => {
+                                        toast.error('Failed to read image file')
+                                    }
+                                    reader.readAsDataURL(file)
+                                    e.target.value = ''
                                 }}
                             />
                         </div>
