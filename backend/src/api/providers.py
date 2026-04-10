@@ -313,8 +313,8 @@ async def get_provider(
             request_method="GET",
             user_agent=get_user_agent(request),
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("Audit log failed: %s", e)
     
     return provider_to_response(provider)
 
@@ -389,8 +389,8 @@ async def create_provider(
     try:
         cache = get_cache()
         cache.invalidate_pattern("providers:*")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("Audit log failed: %s", e)
     
     # Log audit
     try:
@@ -404,8 +404,8 @@ async def create_provider(
             user_agent=get_user_agent(request),
             new_values={"name": provider.name, "status": provider.status.value},
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("Audit log failed: %s", e)
     
     return provider_to_response(provider)
 
@@ -490,8 +490,8 @@ async def update_provider(
     try:
         cache = get_cache()
         cache.invalidate_pattern("providers:*")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("Audit log failed: %s", e)
     
     # Log audit
     try:
@@ -506,8 +506,8 @@ async def update_provider(
             old_values=old_values,
             new_values=update_data,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("Audit log failed: %s", e)
     
     return provider_to_response(provider)
 
@@ -546,8 +546,8 @@ async def archive_provider(
     try:
         cache = get_cache()
         cache.invalidate_pattern("providers:*")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("Audit log failed: %s", e)
     
     # Log audit
     try:
@@ -562,8 +562,8 @@ async def archive_provider(
             old_values={"status": provider.status.value},
             new_values={"status": ProviderStatus.ARCHIVED.value},
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("Audit log failed: %s", e)
 
 
 # =============================================================================
@@ -926,8 +926,8 @@ async def send_provider_email(
             old_values={},
             new_values={"action": "email_sent", "subject": email_request.subject},
         )
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error("Audit log failed: %s", e)
 
     return {
         "success": True,

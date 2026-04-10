@@ -88,6 +88,7 @@ export default function AnalyticsPage() {
     const [datePreset, setDatePreset] = useState('30d')
     const [daysBack, setDaysBack] = useState(30)
     const [isLoading, setIsLoading] = useState(true)
+    const [loadError, setLoadError] = useState<string | null>(null)
     const [showDatePicker, setShowDatePicker] = useState(false)
     const datePickerRef = useRef<HTMLDivElement>(null)
 
@@ -104,11 +105,14 @@ export default function AnalyticsPage() {
 
     const fetchAnalytics = () => {
         setIsLoading(true)
+        setLoadError(null)
         api.get('/analytics/sources/overview', { params: { days_back: daysBack } })
             .then((res) => {
                 setData(res.data)
             })
-            .catch(() => { })
+            .catch(() => {
+                setLoadError('Unable to load analytics. Please try again.')
+            })
             .finally(() => setIsLoading(false))
     }
 
@@ -194,6 +198,13 @@ export default function AnalyticsPage() {
                     </div>
                 </div>
             </div>
+
+            {loadError && !isLoading && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+                    <span className="font-medium">Error:</span> {loadError}
+                    <button onClick={fetchAnalytics} className="ml-auto text-xs font-semibold text-red-600 hover:text-red-800 underline">Retry</button>
+                </div>
+            )}
 
             {isLoading ? (
                 <div className="flex items-center justify-center py-24">

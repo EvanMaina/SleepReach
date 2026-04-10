@@ -648,7 +648,7 @@ export default function CoordinatorPage({
     // Premium notification chime (short, professional)
     notifAudioRef.current = new Audio("data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2teleRgAYJrl0I9cDACBnOPReXgAAIar5OiSdBQAgrHu9oRaAAB4jN/qql4AAHqX6/N+WgAAe5jn76BoJgB0luf0gGAEAHqT5fKGWxIAf5rn9IpeBgCFme/uhFkRAIia6PKNWQsAhJju8I5TBQCKmO3vkVcHAI2Z7PKPUQQAjJfs8pFUBgCOmOvykVACAJKZ6vKTUQIAkpjq8ZRQAQCUmOnxlE8AAJaY6fGWTwAAlpfp8ZZNAACYl+nxlkwAAJqX6PGXSwAAmZbo8ZhLAACbl+jxmEoAAJyW6PKZSgAAnJbm8ppJAACelubymiYRAJ6W5vKbJwkAoJbm8pwlCACglubyKw8AAJmV5fMsDwAAnJXl8y0NAACaleTzLg0AAJuV5fMvCgAAnJXk8zALAACcleT0MQgAAJ2V5PQyBwAAn5Xk9DQGAQD//w==");
     notifAudioRef.current.volume = 0.4;
-    return () => { notifAudioRef.current = null; };
+    return () => { notifAudioRef.current?.pause(); notifAudioRef.current = null; };
   }, []);
 
   useEffect(() => { soundEnabledRef.current = soundEnabled; }, [soundEnabled]);

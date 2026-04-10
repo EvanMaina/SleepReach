@@ -148,6 +148,7 @@ export default function DashboardPage() {
     const [cohortTimeFilter, setCohortTimeFilter] = useState<string>('6')
     const [cohortAvailableYears, setCohortAvailableYears] = useState<number[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [loadError, setLoadError] = useState<string | null>(null)
 
     /* ─── Cohort data fetcher (reusable for filter changes) ─── */
     const fetchCohortData = async (api: any, monthsParam: number, yearParam?: number) => {
@@ -297,8 +298,9 @@ export default function DashboardPage() {
 
                 // 6. Cohort Retention (depends on api import, runs after parallel batch)
                 await fetchCohortData(api, 6)
-            } catch {
-                // API might not be ready
+            } catch (err) {
+                console.error('Dashboard load failed:', err)
+                setLoadError('Unable to load dashboard data. Please refresh the page.')
             } finally {
                 setIsLoading(false)
             }
@@ -374,6 +376,13 @@ export default function DashboardPage() {
                     <span>Last updated: just now</span>
                 </div>
             </div>
+
+            {loadError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+                    <span className="font-medium">Error:</span> {loadError}
+                    <button onClick={() => window.location.reload()} className="ml-auto text-xs font-semibold text-red-600 hover:text-red-800 underline">Refresh</button>
+                </div>
+            )}
 
             {/* ═══════════════════ 1. KPI Cards Row ═══════════════════ */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">

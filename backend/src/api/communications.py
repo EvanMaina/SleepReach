@@ -169,13 +169,13 @@ async def send_email_to_lead(
             task_id=None,
         )
 
-    # Fetch lead
-    lead = db.query(Lead).filter(Lead.id == email_data.lead_id).first()
+    # Fetch lead (exclude soft-deleted)
+    lead = db.query(Lead).filter(Lead.id == email_data.lead_id, Lead.deleted_at.is_(None)).first()
 
     if not lead:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Lead not found",
+            detail="Lead not found or has been deleted",
         )
 
     # Decrypt PHI to get email
@@ -320,14 +320,14 @@ async def send_sms_to_lead(
         phone = sms_data.to_phone
         # If lead_id also provided, fetch lead info for audit
         if sms_data.lead_id:
-            lead = db.query(Lead).filter(Lead.id == sms_data.lead_id).first()
+            lead = db.query(Lead).filter(Lead.id == sms_data.lead_id, Lead.deleted_at.is_(None)).first()
             if lead:
                 decrypted = EncryptionService.decrypt_lead_phi(lead)
                 first_name = decrypted.get("first_name", "Contact")
                 lead_id_str = str(lead.id)
     elif sms_data.lead_id:
-        # Lead-based SMS - fetch lead and get phone
-        lead = db.query(Lead).filter(Lead.id == sms_data.lead_id).first()
+        # Lead-based SMS - fetch lead and get phone (exclude soft-deleted)
+        lead = db.query(Lead).filter(Lead.id == sms_data.lead_id, Lead.deleted_at.is_(None)).first()
 
         if not lead:
             raise HTTPException(
