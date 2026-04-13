@@ -464,8 +464,10 @@ class AIInsightsService:
             "provider_commentary, trend_commentary, forecast_summary, "
             "geographic_commentary, coordinator_commentary, "
             "act_now_overrides, communication_templates, provider_recommendations. "
-            "geographic_commentary should analyze which zip codes/areas produce the most leads and best conversions — "
-            "suggest where the clinic should focus marketing or consider expansion. "
+            "geographic_commentary should analyze the geographic data (zip codes and coordinator-recorded locations) to identify "
+            "which cities, areas, or regions produce the most leads and best conversion rates. Identify the zip codes by their "
+            "actual city/area name if possible (US or international). Suggest where the clinic should focus marketing, "
+            "which areas show expansion potential, and any geographic patterns worth noting. "
             "coordinator_commentary should assess team performance — who is converting best, "
             "who may need support, and concrete coaching recommendations. "
             "act_now_overrides should be an array of up to 5 objects with lead_id, recommended_action, reason, script. "
@@ -1031,18 +1033,29 @@ class AIInsightsService:
     }
 
     def _build_geographic_analysis(self, leads: list[Lead]) -> dict[str, Any]:
-        """Analyze lead distribution by resolved city name and recorded location."""
+        """Analyze lead distribution by resolved city/area and recorded location.
+
+        Works globally — AZ zips get resolved to city names; all other zips
+        are grouped by their raw code. Claude AI analyzes the raw data and
+        can identify any geography worldwide.
+        """
         from collections import Counter
         city_counts: Counter[str] = Counter()
         city_conversion: defaultdict[str, dict[str, int]] = defaultdict(lambda: {"total": 0, "converted": 0})
         location_counts: Counter[str] = Counter()
+        raw_zip_list: list[str] = []  # Raw zips for Claude to analyze
 
         for lead in leads:
             zc = (lead.zip_code or "").strip()
-            if zc:
-                city = self.AZ_ZIP_CITY.get(zc, f"Zip {zc}")
+            if zc and zc != "00000":
+                # Try AZ mapping first; fall back to "Zip XXXXX" for any other area
+                city = self.AZ_ZIP_CITY.get(zc)
+                if not city:
+                    # For non-AZ zips, show the zip code so Claude and users can identify
+                    city = f"Zip {zc}"
                 city_counts[city] += 1
                 city_conversion[city]["total"] += 1
+                raw_zip_list.append(zc)
                 if lead.status in SCHEDULED_OR_BETTER:
                     city_conversion[city]["converted"] += 1
             loc = getattr(lead, "lead_location", None)
@@ -1059,6 +1072,7 @@ class AIInsightsService:
         return {
             "top_cities": top_cities,
             "top_locations": top_locations,
+            "raw_zip_codes": list(set(raw_zip_list)),  # Unique zips for Claude to analyze
             "total_unique_cities": len(city_counts),
             "total_with_location": sum(location_counts.values()),
         }
