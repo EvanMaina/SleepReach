@@ -2362,6 +2362,18 @@ async def update_contact_outcome(
     # =========================================================================
     clear_lead_transition_fields(lead)
 
+    # Auto-assign to current coordinator if lead is unassigned
+    if not lead.assigned_to:
+        try:
+            from ..core.auth import decode_token
+            auth_header = request.headers.get("authorization", "")
+            if auth_header.startswith("Bearer "):
+                payload = decode_token(auth_header[7:])
+                if payload and payload.get("sub"):
+                    lead.assigned_to = payload["sub"]
+        except Exception:
+            pass  # Non-critical — don't block outcome recording
+
     # Update contact outcome on clean slate
     lead.contact_outcome = outcome_data.contact_outcome
     lead.last_contact_attempt = datetime.now(timezone.utc)
@@ -2535,6 +2547,18 @@ async def update_consultation_outcome(
     notes = body.get("notes")
     scheduled_callback_at_str = body.get("scheduled_callback_at")
     contact_method_str = body.get("contact_method")
+
+    # Auto-assign to current coordinator if lead is unassigned
+    if not lead.assigned_to:
+        try:
+            from ..core.auth import decode_token
+            auth_header = request.headers.get("authorization", "")
+            if auth_header.startswith("Bearer "):
+                payload = decode_token(auth_header[7:])
+                if payload and payload.get("sub"):
+                    lead.assigned_to = payload["sub"]
+        except Exception:
+            pass
 
     old_status = lead.status.value if lead.status else None
     now = datetime.now(timezone.utc)
