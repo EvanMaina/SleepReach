@@ -1,13 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
     Activity,
     ArrowDownRight,
-    ArrowRight,
     ArrowUpRight,
     BarChart3,
     Brain,
-    Building2,
     Calendar,
     ChevronRight,
     Clock,
@@ -17,7 +15,6 @@ import {
     MessageSquare,
     PhoneCall,
     RefreshCw,
-    ShieldCheck,
     Sparkles,
     Target,
     TrendingUp,
@@ -213,7 +210,7 @@ function MetricCard({ label, value, sub, icon: Icon, accent = 'sleep' }: {
 }
 
 /* ─────────── Main Component ─────────── */
-export default function AIInsightsPage() {
+function AIInsightsPage() {
     const navigate = useNavigate()
     const [data, setData] = useState<AIInsightsResponse | null>(null)
     const [isLoading, setIsLoading] = useState(true)
@@ -602,7 +599,6 @@ export default function AIInsightsPage() {
                         )}
                         <div className="space-y-3">
                             {data.operational!.team_performance.slice(0, 6).map((u: any, i: number) => {
-                                const maxAssigned = data.operational!.team_performance[0]?.assigned || 1
                                 return (
                                     <div key={u.name} className="rounded-xl border border-gray-100 p-4">
                                         <div className="flex items-center gap-4 mb-3">
@@ -784,3 +780,44 @@ export default function AIInsightsPage() {
         </div>
     )
 }
+
+/* ─── Error Boundary — prevents white screen crash ─── */
+class AIInsightsErrorBoundary extends React.Component<
+    { children: React.ReactNode },
+    { hasError: boolean }
+> {
+    state = { hasError: false }
+    static getDerivedStateFromError() { return { hasError: true } }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="flex items-center justify-center py-32">
+                    <div className="max-w-md text-center">
+                        <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-2xl bg-red-50 border border-red-100 mb-4">
+                            <Brain className="h-7 w-7 text-red-400" />
+                        </div>
+                        <h2 className="text-lg font-bold text-gray-900">Something went wrong</h2>
+                        <p className="mt-2 text-sm text-gray-500">The AI Insights page encountered an error.</p>
+                        <button
+                            onClick={() => { this.setState({ hasError: false }); window.location.reload() }}
+                            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-sleep-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sleep-700"
+                        >
+                            <RefreshCw className="h-4 w-4" /> Reload Page
+                        </button>
+                    </div>
+                </div>
+            )
+        }
+        return this.props.children
+    }
+}
+
+function AIInsightsPageWrapped() {
+    return (
+        <AIInsightsErrorBoundary>
+            <AIInsightsPage />
+        </AIInsightsErrorBoundary>
+    )
+}
+
+export { AIInsightsPageWrapped as default }
