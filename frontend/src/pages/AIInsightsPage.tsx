@@ -134,9 +134,9 @@ interface AIInsightsResponse {
         commentary?: string
     }
     geographic?: {
-        top_zip_codes: { zip: string; count: number; converted: number; rate: number }[]
+        top_cities: { city: string; count: number; converted: number; rate: number }[]
         top_locations: { location: string; count: number }[]
-        total_unique_zips: number
+        total_unique_cities: number
         total_with_location: number
         commentary?: string
     }
@@ -521,78 +521,7 @@ export default function AIInsightsPage() {
             </Section>
 
             {/* ═══════════════════════════════════════════════════════════ */}
-            {/* SECTION 4 — CONDITION PERFORMANCE                         */}
-            {/* ═══════════════════════════════════════════════════════════ */}
-            <div className="grid gap-6 lg:grid-cols-3">
-                {/* Condition Performance */}
-                <Section icon={BarChart3} title="Condition Performance" subtitle="Conversion rates and volume by sleep condition.">
-                    {data.pipeline.conversion_drivers.condition.length > 0 ? (
-                        <div className="space-y-4">
-                            {data.pipeline.conversion_drivers.condition.slice(0, 6).map((row) => (
-                                <div key={row.label}>
-                                    <div className="flex items-center justify-between text-sm mb-1">
-                                        <span className="font-medium text-gray-800">{row.label}</span>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-xs text-gray-500">{row.count} leads</span>
-                                            <span className="font-semibold text-gray-900">{row.conversion_rate}%</span>
-                                        </div>
-                                    </div>
-                                    <div className="h-2.5 rounded-full bg-gray-100">
-                                        <div className="h-2.5 rounded-full bg-sleep-500 transition-all duration-500" style={{ width: `${Math.min(row.conversion_rate || 0, 100)}%` }} />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : <p className="text-sm text-gray-500">Not enough data to rank conditions yet.</p>}
-                </Section>
-
-                {/* Source Performance */}
-                <Section icon={TrendingUp} title="Source Performance" subtitle="Which lead sources convert best.">
-                    {data.pipeline.conversion_drivers.source.length > 0 ? (
-                        <div className="space-y-4">
-                            {data.pipeline.conversion_drivers.source.slice(0, 6).map((row) => (
-                                <div key={row.label}>
-                                    <div className="flex items-center justify-between text-sm mb-1">
-                                        <span className="font-medium text-gray-800">{row.label}</span>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-xs text-gray-500">{row.count} leads</span>
-                                            <span className="font-semibold text-gray-900">{row.conversion_rate}%</span>
-                                        </div>
-                                    </div>
-                                    <div className="h-2.5 rounded-full bg-gray-100">
-                                        <div className="h-2.5 rounded-full bg-indigo-500 transition-all duration-500" style={{ width: `${Math.min(row.conversion_rate || 0, 100)}%` }} />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : <p className="text-sm text-gray-500">Not enough data to rank sources yet.</p>}
-                </Section>
-
-                {/* Insurance Performance */}
-                <Section icon={ShieldCheck} title="Insurance Performance" subtitle="Conversion rates by insurance status.">
-                    {data.pipeline.conversion_drivers.insurance.length > 0 ? (
-                        <div className="space-y-4">
-                            {data.pipeline.conversion_drivers.insurance.slice(0, 6).map((row) => (
-                                <div key={row.label}>
-                                    <div className="flex items-center justify-between text-sm mb-1">
-                                        <span className="font-medium text-gray-800">{row.label}</span>
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-xs text-gray-500">{row.count} leads</span>
-                                            <span className="font-semibold text-gray-900">{row.conversion_rate}%</span>
-                                        </div>
-                                    </div>
-                                    <div className="h-2.5 rounded-full bg-gray-100">
-                                        <div className="h-2.5 rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${Math.min(row.conversion_rate || 0, 100)}%` }} />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : <p className="text-sm text-gray-500">Not enough data to rank by insurance yet.</p>}
-                </Section>
-            </div>
-
-            {/* ═══════════════════════════════════════════════════════════ */}
-            {/* SECTION 5 — COMMUNICATION INSIGHTS                        */}
+            {/* SECTION 4 — COMMUNICATION INSIGHTS                        */}
             {/* ═══════════════════════════════════════════════════════════ */}
             <Section icon={MessageSquare} title="Communication Insights" subtitle={data.communication.commentary}>
                 <div className="grid gap-4 md:grid-cols-2 mb-6">
@@ -661,101 +590,89 @@ export default function AIInsightsPage() {
             </Section>
 
             {/* ═══════════════════════════════════════════════════════════ */}
-            {/* SECTION 6 — PROVIDER INTELLIGENCE                         */}
+            {/* SECTION 6 — COORDINATOR PERFORMANCE                       */}
             {/* ═══════════════════════════════════════════════════════════ */}
-            <Section icon={Building2} title="Provider Intelligence" subtitle={data.provider_intelligence.commentary}>
-                {data.provider_intelligence.providers.length > 0 ? (
-                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                        {data.provider_intelligence.providers.slice(0, 6).map((provider, i) => (
-                            <div key={provider.id} className="flex items-center gap-4 rounded-xl border border-gray-200 p-3.5">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sleep-50 text-sm font-bold text-sleep-700 flex-shrink-0">
-                                    #{i + 1}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-gray-900 truncate">{provider.name}</p>
-                                    <p className="text-xs text-gray-500">{provider.practice_name || provider.specialty}</p>
-                                </div>
-                                <div className="text-right flex-shrink-0">
-                                    <p className="text-lg font-bold text-gray-900">{provider.conversion_rate}%</p>
-                                    <p className="text-xs text-gray-500">{provider.referrals} referrals</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="rounded-xl border border-dashed border-sleep-200 bg-sleep-50/50 p-4 text-sm text-sleep-800">
-                        Provider intelligence will appear once referral partners have leads in the pipeline.
-                    </div>
-                )}
-                {data.provider_intelligence.recommendations.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                        {data.provider_intelligence.recommendations.map((rec, i) => (
-                            <div key={i} className="flex items-start gap-2.5 rounded-lg bg-gray-50 px-4 py-3">
-                                <ArrowRight className="h-4 w-4 text-sleep-500 mt-0.5 flex-shrink-0" />
-                                <p className="text-sm text-gray-700">{rec}</p>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </Section>
-
-            {/* ═══════════════════════════════════════════════════════════ */}
-            {/* SECTION 7 — COORDINATOR PERFORMANCE (STANDALONE)          */}
-            {/* ═══════════════════════════════════════════════════════════ */}
-            <Section icon={Users} title="Coordinator Performance" subtitle="Conversion tracking by team member — who is moving leads to completion.">
+            <Section icon={Users} title="Coordinator Performance" subtitle="Who is converting leads — ranked by completion rate.">
                 {(data.operational?.team_performance?.length ?? 0) > 0 ? (
                     <div>
                         {data.operational?.commentary && (
-                            <p className="text-sm text-gray-500 leading-relaxed mb-4">{data.operational.commentary}</p>
+                            <div className="rounded-xl bg-sleep-50 border border-sleep-200 p-4 mb-4">
+                                <p className="text-sm text-sleep-800 leading-relaxed"><Brain className="inline h-4 w-4 mr-1.5 text-sleep-600" />{data.operational.commentary}</p>
+                            </div>
                         )}
-                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                            {data.operational!.team_performance.slice(0, 6).map((u: any, i: number) => (
-                                <div key={u.name} className="flex items-center gap-3 p-4 rounded-xl border border-gray-100 hover:border-gray-200 transition-colors">
-                                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold text-white shrink-0 ${i === 0 ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' : i === 1 ? 'bg-gradient-to-br from-sleep-500 to-sleep-600' : i === 2 ? 'bg-gradient-to-br from-amber-500 to-amber-600' : 'bg-gray-400'}`}>
-                                        #{i + 1}
+                        <div className="space-y-3">
+                            {data.operational!.team_performance.slice(0, 6).map((u: any, i: number) => {
+                                const maxAssigned = data.operational!.team_performance[0]?.assigned || 1
+                                return (
+                                    <div key={u.name} className="rounded-xl border border-gray-100 p-4">
+                                        <div className="flex items-center gap-4 mb-3">
+                                            <div className={`flex h-11 w-11 items-center justify-center rounded-xl text-sm font-bold text-white shrink-0 ${i === 0 ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-lg shadow-emerald-200' : i === 1 ? 'bg-gradient-to-br from-sleep-500 to-sleep-600' : i === 2 ? 'bg-gradient-to-br from-amber-500 to-amber-600' : 'bg-gray-400'}`}>
+                                                #{i + 1}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-gray-900">{u.name}</p>
+                                                <p className="text-xs text-gray-400">{u.assigned} leads assigned</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-2xl font-bold text-emerald-600">{u.completion_rate || 0}%</p>
+                                                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Conversion</p>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div className="rounded-lg bg-gray-50 p-2 text-center">
+                                                <p className="text-lg font-bold text-gray-900">{u.assigned}</p>
+                                                <p className="text-[10px] text-gray-400">Assigned</p>
+                                            </div>
+                                            <div className="rounded-lg bg-blue-50 p-2 text-center">
+                                                <p className="text-lg font-bold text-blue-600">{u.scheduled || 0}</p>
+                                                <p className="text-[10px] text-gray-400">Scheduled</p>
+                                            </div>
+                                            <div className="rounded-lg bg-emerald-50 p-2 text-center">
+                                                <p className="text-lg font-bold text-emerald-600">{u.completed || 0}</p>
+                                                <p className="text-[10px] text-gray-400">Completed</p>
+                                            </div>
+                                        </div>
+                                        <div className="mt-2 h-2 rounded-full bg-gray-100 overflow-hidden">
+                                            <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all" style={{ width: `${Math.max(u.completion_rate || 0, 2)}%` }} />
+                                        </div>
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-semibold text-gray-900 truncate">{u.name}</p>
-                                        <p className="text-xs text-gray-400">{u.assigned} leads assigned</p>
-                                    </div>
-                                    <div className="text-right shrink-0">
-                                        <p className="text-lg font-bold text-emerald-600">{u.completion_rate || 0}%</p>
-                                        <p className="text-[10px] text-gray-400">{u.completed || 0} converted · {u.scheduled || 0} sched</p>
-                                    </div>
-                                </div>
-                            ))}
+                                )
+                            })}
                         </div>
                     </div>
                 ) : (
-                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
-                        <Users className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                        <p className="text-sm text-gray-500">Coordinator metrics will appear once leads are assigned to team members.</p>
+                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center">
+                        <Users className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                        <p className="text-sm font-medium text-gray-500">Coordinator metrics will appear once leads are assigned to team members.</p>
+                        <p className="text-xs text-gray-400 mt-1">Assign leads in the coordinator dashboard to start tracking performance.</p>
                     </div>
                 )}
             </Section>
 
             {/* ═══════════════════════════════════════════════════════════ */}
-            {/* SECTION 8 — GEOGRAPHIC: ZIP CODE ANALYSIS (STANDALONE)    */}
+            {/* SECTION 7 — GEOGRAPHIC INSIGHTS (CITY NAMES)              */}
             {/* ═══════════════════════════════════════════════════════════ */}
-            <Section icon={BarChart3} title="Geographic Insights — Zip Codes" subtitle="Where your leads are coming from based on submitted zip codes. Use this to identify high-density areas for marketing.">
-                {(data.geographic?.top_zip_codes?.length ?? 0) > 0 ? (
+            <Section icon={BarChart3} title="Geographic Insights" subtitle="Where your leads are coming from — resolved to city names. Use this for targeted marketing.">
+                {(data.geographic?.top_cities?.length ?? 0) > 0 ? (
                     <div>
                         {data.geographic?.commentary && (
-                            <p className="text-sm text-gray-500 leading-relaxed mb-4">{data.geographic.commentary}</p>
+                            <div className="rounded-xl bg-sleep-50 border border-sleep-200 p-4 mb-4">
+                                <p className="text-sm text-sleep-800 leading-relaxed"><Brain className="inline h-4 w-4 mr-1.5 text-sleep-600" />{data.geographic.commentary}</p>
+                            </div>
                         )}
                         <div className="space-y-2.5">
-                            {data.geographic!.top_zip_codes.slice(0, 10).map((z: any) => {
-                                const maxCount = data.geographic!.top_zip_codes[0]?.count || 1
+                            {data.geographic!.top_cities.slice(0, 10).map((z: any) => {
+                                const maxCount = data.geographic!.top_cities[0]?.count || 1
                                 return (
-                                    <div key={z.zip} className="flex items-center gap-3">
-                                        <span className="w-16 font-mono text-sm font-bold text-gray-800 shrink-0">{z.zip}</span>
-                                        <div className="flex-1 h-7 bg-gray-100 rounded-lg overflow-hidden">
-                                            <div className="h-full bg-gradient-to-r from-amber-400 to-orange-400 rounded-lg transition-all flex items-center px-2" style={{ width: `${Math.max((z.count / maxCount) * 100, 8)}%` }}>
-                                                <span className="text-[10px] font-bold text-white whitespace-nowrap">{z.count} leads</span>
+                                    <div key={z.city} className="flex items-center gap-3">
+                                        <span className="w-28 text-sm font-semibold text-gray-800 shrink-0 truncate">{z.city}</span>
+                                        <div className="flex-1 h-8 bg-gray-100 rounded-lg overflow-hidden">
+                                            <div className="h-full bg-gradient-to-r from-sleep-400 to-sleep-500 rounded-lg transition-all flex items-center px-3" style={{ width: `${Math.max((z.count / maxCount) * 100, 12)}%` }}>
+                                                <span className="text-xs font-bold text-white whitespace-nowrap">{z.count} leads</span>
                                             </div>
                                         </div>
                                         <div className="text-right shrink-0 w-20">
-                                            <span className="text-sm font-semibold text-emerald-600">{z.rate}%</span>
+                                            <span className="text-sm font-bold text-emerald-600">{z.rate}%</span>
                                             <span className="text-[10px] text-gray-400 block">conversion</span>
                                         </div>
                                     </div>
@@ -764,47 +681,48 @@ export default function AIInsightsPage() {
                         </div>
                     </div>
                 ) : (
-                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
-                        <BarChart3 className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                        <p className="text-sm text-gray-500">Zip code data will appear as leads enter the pipeline via the widget, Jotform, or referrals.</p>
+                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center">
+                        <BarChart3 className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                        <p className="text-sm font-medium text-gray-500">Geographic data will appear as leads with zip codes enter the pipeline.</p>
                     </div>
                 )}
             </Section>
 
             {/* ═══════════════════════════════════════════════════════════ */}
-            {/* SECTION 9 — EXPANSION OPPORTUNITIES (STANDALONE)          */}
+            {/* SECTION 8 — EXPANSION OPPORTUNITIES                       */}
             {/* ═══════════════════════════════════════════════════════════ */}
-            <Section icon={Target} title="Expansion Opportunities — Coordinator-Recorded Locations" subtitle="Cities and areas recorded by your coordinators during calls. Use this to identify where to scale your clinic next.">
+            <Section icon={Target} title="Expansion Opportunities" subtitle="Specific locations recorded by coordinators during calls — identify where to scale next.">
                 {data.geographic?.top_locations?.length ? (
                     <div>
-                        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             {data.geographic!.top_locations.slice(0, 12).map((l: any, i: number) => (
-                                <div key={l.location} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-amber-200 transition-colors">
-                                    <div className={`flex h-9 w-9 items-center justify-center rounded-lg text-sm font-bold text-white shrink-0 ${i === 0 ? 'bg-gradient-to-br from-amber-500 to-orange-500' : i < 3 ? 'bg-amber-400' : 'bg-gray-300'}`}>
+                                <div key={l.location} className="flex items-center gap-3 p-4 rounded-xl border border-gray-100 hover:border-amber-200 hover:shadow-sm transition-all">
+                                    <div className={`flex h-11 w-11 items-center justify-center rounded-xl text-lg font-bold text-white shrink-0 ${i === 0 ? 'bg-gradient-to-br from-amber-500 to-orange-500 shadow-lg shadow-amber-200' : i < 3 ? 'bg-gradient-to-br from-amber-400 to-amber-500' : 'bg-gray-400'}`}>
                                         {l.count}
                                     </div>
                                     <div className="min-w-0">
-                                        <p className="text-sm font-semibold text-gray-900 truncate">{l.location}</p>
-                                        <p className="text-[10px] text-gray-400">{l.count === 1 ? '1 lead' : `${l.count} leads`} from this area</p>
+                                        <p className="text-sm font-bold text-gray-900 truncate">{l.location}</p>
+                                        <p className="text-xs text-gray-400">{l.count === 1 ? '1 lead' : `${l.count} leads`} recorded from this area</p>
                                     </div>
                                 </div>
                             ))}
                         </div>
                         <div className="mt-4 rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
                             <Target className="inline h-4 w-4 mr-1.5 text-amber-600" />
-                            Encourage coordinators to record lead locations during calls. The more data collected, the better the AI can identify expansion opportunities.
+                            Encourage coordinators to record lead locations during calls. More data means better expansion insights.
                         </div>
                     </div>
                 ) : (
-                    <div className="rounded-xl border border-dashed border-amber-200 bg-amber-50/50 p-6 text-center">
-                        <Target className="h-8 w-8 text-amber-300 mx-auto mb-2" />
-                        <p className="text-sm text-amber-700">No locations recorded yet. When coordinators record lead locations during calls, expansion insights will appear here.</p>
+                    <div className="rounded-xl border border-dashed border-amber-200 bg-amber-50/50 p-8 text-center">
+                        <Target className="h-10 w-10 text-amber-300 mx-auto mb-3" />
+                        <p className="text-sm font-medium text-amber-700">No locations recorded yet.</p>
+                        <p className="text-xs text-amber-600 mt-1">When coordinators record lead locations during calls, AI will identify expansion opportunities.</p>
                     </div>
                 )}
             </Section>
 
             {/* ═══════════════════════════════════════════════════════════ */}
-            {/* SECTION 10 — TRENDS & FORECASTING                         */}
+            {/* SECTION 9 — TRENDS & FORECASTING                          */}
             {/* ═══════════════════════════════════════════════════════════ */}
                 <Section icon={LineChartIcon} title="Trends & Forecasting" subtitle={data.trends.commentary}>
                     {(data.trends.weekly.length > 0 || data.trends.monthly.length > 0) ? (

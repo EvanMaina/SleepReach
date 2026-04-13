@@ -988,35 +988,78 @@ class AIInsightsService:
         rows.sort(key=lambda item: (-item["completion_rate"], -item["scheduled_rate"], -item["assigned"]))
         return rows[:8]
 
+    # Arizona zip code → city mapping for geographic resolution
+    AZ_ZIP_CITY: dict[str, str] = {
+        "85001": "Phoenix", "85002": "Phoenix", "85003": "Phoenix", "85004": "Phoenix",
+        "85006": "Phoenix", "85007": "Phoenix", "85008": "Phoenix", "85009": "Phoenix",
+        "85011": "Phoenix", "85012": "Phoenix", "85013": "Phoenix", "85014": "Phoenix",
+        "85015": "Phoenix", "85016": "Phoenix", "85017": "Phoenix", "85018": "Phoenix",
+        "85019": "Phoenix", "85020": "Phoenix", "85021": "Phoenix", "85022": "Phoenix",
+        "85023": "Phoenix", "85024": "Phoenix", "85027": "Phoenix", "85028": "Phoenix",
+        "85029": "Phoenix", "85031": "Phoenix", "85032": "Phoenix", "85033": "Phoenix",
+        "85034": "Phoenix", "85035": "Phoenix", "85037": "Phoenix", "85040": "Phoenix",
+        "85041": "Phoenix", "85042": "Phoenix", "85043": "Phoenix", "85044": "Phoenix",
+        "85045": "Phoenix", "85048": "Phoenix", "85050": "Phoenix", "85051": "Phoenix",
+        "85053": "Phoenix", "85054": "Phoenix",
+        "85201": "Mesa", "85202": "Mesa", "85203": "Mesa", "85204": "Mesa",
+        "85205": "Mesa", "85206": "Mesa", "85207": "Mesa", "85208": "Mesa",
+        "85209": "Mesa", "85210": "Mesa", "85212": "Mesa", "85213": "Mesa",
+        "85215": "Mesa", "85233": "Gilbert", "85234": "Gilbert", "85295": "Gilbert",
+        "85296": "Gilbert", "85297": "Gilbert", "85298": "Gilbert",
+        "85225": "Chandler", "85224": "Chandler", "85226": "Chandler",
+        "85248": "Chandler", "85249": "Chandler", "85286": "Chandler",
+        "85250": "Scottsdale", "85251": "Scottsdale", "85252": "Scottsdale",
+        "85253": "Scottsdale", "85254": "Scottsdale", "85255": "Scottsdale",
+        "85256": "Scottsdale", "85257": "Scottsdale", "85258": "Scottsdale",
+        "85259": "Scottsdale", "85260": "Scottsdale", "85262": "Scottsdale",
+        "85266": "Scottsdale", "85267": "Scottsdale",
+        "85281": "Tempe", "85282": "Tempe", "85283": "Tempe", "85284": "Tempe",
+        "85301": "Glendale", "85302": "Glendale", "85303": "Glendale",
+        "85304": "Glendale", "85305": "Glendale", "85306": "Glendale",
+        "85307": "Goodyear", "85338": "Goodyear", "85340": "Litchfield Park",
+        "85308": "Glendale", "85310": "Glendale",
+        "85345": "Peoria", "85381": "Peoria", "85382": "Peoria", "85383": "Peoria",
+        "85374": "Surprise", "85375": "Surprise", "85378": "Surprise",
+        "85142": "Queen Creek", "85143": "San Tan Valley",
+        "85118": "Gold Canyon", "85120": "Apache Junction",
+        "85122": "Casa Grande", "85128": "Coolidge",
+        "85268": "Fountain Hills", "85331": "Cave Creek", "85377": "Carefree",
+        "86301": "Prescott", "86303": "Prescott", "86305": "Prescott Valley",
+        "86401": "Kingman", "85701": "Tucson", "85710": "Tucson", "85718": "Tucson",
+        "85392": "Avondale", "85323": "Buckeye", "85326": "Buckeye",
+        "86001": "Flagstaff", "86004": "Flagstaff",
+    }
+
     def _build_geographic_analysis(self, leads: list[Lead]) -> dict[str, Any]:
-        """Analyze lead distribution by zip code and recorded location."""
+        """Analyze lead distribution by resolved city name and recorded location."""
         from collections import Counter
-        zip_counts: Counter[str] = Counter()
+        city_counts: Counter[str] = Counter()
+        city_conversion: defaultdict[str, dict[str, int]] = defaultdict(lambda: {"total": 0, "converted": 0})
         location_counts: Counter[str] = Counter()
-        zip_conversion: defaultdict[str, dict[str, int]] = defaultdict(lambda: {"total": 0, "converted": 0})
 
         for lead in leads:
             zc = (lead.zip_code or "").strip()
             if zc:
-                zip_counts[zc] += 1
-                zip_conversion[zc]["total"] += 1
+                city = self.AZ_ZIP_CITY.get(zc, f"Zip {zc}")
+                city_counts[city] += 1
+                city_conversion[city]["total"] += 1
                 if lead.status in SCHEDULED_OR_BETTER:
-                    zip_conversion[zc]["converted"] += 1
+                    city_conversion[city]["converted"] += 1
             loc = getattr(lead, "lead_location", None)
             if loc and loc.strip():
                 location_counts[loc.strip()] += 1
 
-        top_zips = [
-            {"zip": z, "count": c, "converted": zip_conversion[z]["converted"],
-             "rate": round((zip_conversion[z]["converted"] / zip_conversion[z]["total"]) * 100, 1)}
-            for z, c in zip_counts.most_common(10)
+        top_cities = [
+            {"city": c, "count": n, "converted": city_conversion[c]["converted"],
+             "rate": round((city_conversion[c]["converted"] / city_conversion[c]["total"]) * 100, 1)}
+            for c, n in city_counts.most_common(10)
         ]
         top_locations = [{"location": loc, "count": c} for loc, c in location_counts.most_common(10)]
 
         return {
-            "top_zip_codes": top_zips,
+            "top_cities": top_cities,
             "top_locations": top_locations,
-            "total_unique_zips": len(zip_counts),
+            "total_unique_cities": len(city_counts),
             "total_with_location": sum(location_counts.values()),
         }
 
