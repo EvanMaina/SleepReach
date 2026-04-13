@@ -144,10 +144,68 @@ Warmly,
 The Insomnia and Sleep Institute of Arizona""",
     ),
     _email_template(
+        "day3_educational",
+        "Day 3 — Educational",
+        "Educational email about sleep health, sent ~3 days after inquiry.",
+        "Understanding your sleep — what to expect from a consultation",
+        """Hi {{first_name}},
+
+Many of our patients tell us they waited years before seeking help for their sleep concerns — and wish they'd done it sooner.
+
+Here's what a consultation at our clinic typically looks like:
+• A brief review of your sleep history and symptoms
+• Discussion of diagnostic options like a sleep study, if appropriate
+• A clear outline of treatment paths, including CPAP therapy, Inspire therapy, CBT-I, and other options tailored to your situation
+
+There's no obligation, and our goal is simply to help you understand what's affecting your sleep and what your options are.
+
+If you'd like to schedule a consultation, reply to this email or call us at {{clinic_phone}}.
+
+Wishing you restful nights,
+The Insomnia and Sleep Institute of Arizona""",
+    ),
+    _email_template(
+        "day7_value",
+        "Day 7 — Why Patients Choose Us",
+        "Social proof and value email, sent ~7 days after inquiry.",
+        "Why patients trust The Insomnia and Sleep Institute of Arizona",
+        """Hi {{first_name}},
+
+We wanted to share a bit about why patients choose our clinic for their sleep health:
+
+• Led by Dr. Patel, a board-certified sleep medicine specialist
+• Comprehensive approach — from diagnosis through treatment and follow-up
+• Experience with a wide range of conditions, including insomnia, sleep apnea, restless legs, and narcolepsy
+• Multiple treatment options so you're never locked into a single path
+
+If sleep is affecting your energy, focus, or overall health, we're here to help you take the next step — at your pace.
+
+Call us at {{clinic_phone}} or reply to this email to schedule your consultation.
+
+Warmly,
+The Insomnia and Sleep Institute of Arizona""",
+    ),
+    _email_template(
+        "day14_reengage",
+        "Day 14 — Re-engagement",
+        "Gentle re-engagement for leads who haven't responded in ~2 weeks.",
+        "Still thinking about your sleep health?",
+        """Hi {{first_name}},
+
+We know that deciding to address sleep concerns is a personal decision, and there's no rush.
+
+We just wanted to let you know that our team is still here if you have questions or would like to explore your options. Whether it's a quick phone call or scheduling a consultation, we're happy to help in whatever way feels right for you.
+
+If now isn't the right time, that's completely okay. You can always reach us at {{clinic_phone}} when you're ready.
+
+Take care,
+The Insomnia and Sleep Institute of Arizona""",
+    ),
+    _email_template(
         "final_outreach",
         "Final Outreach",
-        "Last gentle re-engagement attempt.",
-        "Checking in one last time about your sleep consultation inquiry",
+        "Last gentle re-engagement attempt (~30+ days).",
+        "One last note about your sleep consultation inquiry",
         """Hi {{first_name}},
 
 I wanted to send one final note in case you still wanted to speak with our team about your sleep concerns.
@@ -208,6 +266,30 @@ DEFAULT_SMS_TEMPLATES = [
         "Missed Call SMS",
         "Follow-up after a missed call attempt.",
         "Hi {{first_name}}, we tried reaching you from The Insomnia and Sleep Institute of Arizona about your sleep inquiry. Call {{clinic_phone}} or reply here when you're available.",
+    ),
+    _sms_template(
+        "day3_educational",
+        "Day 3 Educational SMS",
+        "Educational follow-up about the consultation process.",
+        "Hi {{first_name}}, just a quick note from The Insomnia and Sleep Institute. A sleep consultation is a simple first step — no obligation. We're here when you're ready. Call {{clinic_phone}}.",
+    ),
+    _sms_template(
+        "day7_value",
+        "Day 7 Value SMS",
+        "Social proof follow-up.",
+        "Hi {{first_name}}, many patients tell us they wish they'd addressed their sleep concerns sooner. If you'd like to chat with our team, call {{clinic_phone}} or reply here.",
+    ),
+    _sms_template(
+        "day14_reengage",
+        "Day 14 Re-engagement SMS",
+        "Gentle check-in for unresponsive leads.",
+        "Hi {{first_name}}, we haven't heard from you and want you to know our team is still here for you. No rush. Call {{clinic_phone}} whenever you're ready.",
+    ),
+    _sms_template(
+        "not_interested_follow_up",
+        "Not Interested Re-engagement SMS",
+        "Softer outreach for leads who declined.",
+        "Hi {{first_name}}, just checking in from The Insomnia and Sleep Institute. If your sleep situation changes, we're here to help. No pressure. Call {{clinic_phone}} anytime.",
     ),
     _sms_template(
         "custom",

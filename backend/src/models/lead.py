@@ -195,6 +195,7 @@ class Lead(Base):
     # Location
     zip_code = Column(String(10), nullable=False)
     in_service_area = Column(Boolean, nullable=False, default=False, index=True)
+    lead_location = Column(String(200), nullable=True)  # City/area recorded by coordinator (e.g., "Gilbert, AZ")
     
     # Urgency & Consent
     urgency = Column(

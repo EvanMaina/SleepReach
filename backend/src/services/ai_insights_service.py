@@ -147,6 +147,12 @@ class AIInsightsService:
         if provider_recommendations:
             snapshot["provider_intelligence"]["recommendations"] = provider_recommendations
 
+        # Geographic and coordinator commentary from Claude
+        if narrative.get("geographic_commentary"):
+            snapshot["geographic"]["commentary"] = narrative["geographic_commentary"]
+        if narrative.get("coordinator_commentary"):
+            snapshot["operational"]["commentary"] = narrative["coordinator_commentary"]
+
         snapshot["llm_enabled"] = bool(settings.anthropic_api_key)
         return snapshot
 
@@ -223,6 +229,7 @@ class AIInsightsService:
         conversion_by_insurance = self._build_conversion_rows(leads, "insurance")
         provider_rankings = self._build_provider_rankings(providers)
         coordinator_performance = self._build_coordinator_performance(leads, users)
+        geographic_analysis = self._build_geographic_analysis(leads)
 
         avg_first_contact_hours = round(sum(first_contact_hours) / len(first_contact_hours), 1) if first_contact_hours else None
         avg_schedule_days = round(sum(schedule_lags) / len(schedule_lags), 1) if schedule_lags else None
@@ -352,6 +359,7 @@ class AIInsightsService:
                     "completed": stage_counts.get("completed", 0),
                 },
             },
+            "geographic": geographic_analysis,
         }
         return snapshot
 
@@ -435,6 +443,8 @@ class AIInsightsService:
                 }
                 for item in snapshot["act_now"][:10]
             ],
+            "geographic": snapshot.get("geographic", {}),
+            "operational": snapshot.get("operational", {}),
         }
 
         system_prompt = (
@@ -443,6 +453,8 @@ class AIInsightsService:
             "Common treatments include CPAP therapy, Inspire therapy, CBT-I, and sleep studies. "
             "The lead lifecycle is NEW -> CONTACTED -> SCHEDULED -> COMPLETED, where completed means the consultation occurred. "
             "Insurance, urgency, referral source strength, and response speed all matter. "
+            "You also analyze geographic lead patterns (which zip codes and areas generate the most leads and best conversion), "
+            "and coordinator performance (which coordinators have the highest completion/conversion rates). "
             "Return JSON only. Be specific, operationally useful, and grounded in the provided metrics. "
             "Do not invent data, do not mention revenue, and make every recommendation concrete enough for clinic leadership and coordinators to act on today."
         )
@@ -450,7 +462,12 @@ class AIInsightsService:
             "Analyze this de-identified clinic pipeline snapshot and produce JSON with keys: "
             "headline_summary, summary_detail, pipeline_commentary, communication_commentary, "
             "provider_commentary, trend_commentary, forecast_summary, "
+            "geographic_commentary, coordinator_commentary, "
             "act_now_overrides, communication_templates, provider_recommendations. "
+            "geographic_commentary should analyze which zip codes/areas produce the most leads and best conversions — "
+            "suggest where the clinic should focus marketing or consider expansion. "
+            "coordinator_commentary should assess team performance — who is converting best, "
+            "who may need support, and concrete coaching recommendations. "
             "act_now_overrides should be an array of up to 5 objects with lead_id, recommended_action, reason, script. "
             "Each act_now override must mention the lead's actual condition or contact state from the data. "
             "communication_templates should be an array of 4 objects with id, title, body for sleep-medicine outreach that a coordinator would genuinely use. "
@@ -965,10 +982,43 @@ class AIInsightsService:
                     "scheduled": metrics["scheduled"],
                     "completed": metrics["completed"],
                     "scheduled_rate": round((metrics["scheduled"] / assigned) * 100, 1) if assigned else 0.0,
+                    "completion_rate": round((metrics["completed"] / assigned) * 100, 1) if assigned else 0.0,
                 }
             )
-        rows.sort(key=lambda item: (-item["scheduled_rate"], -item["assigned"], item["name"]))
+        rows.sort(key=lambda item: (-item["completion_rate"], -item["scheduled_rate"], -item["assigned"]))
         return rows[:8]
+
+    def _build_geographic_analysis(self, leads: list[Lead]) -> dict[str, Any]:
+        """Analyze lead distribution by zip code and recorded location."""
+        from collections import Counter
+        zip_counts: Counter[str] = Counter()
+        location_counts: Counter[str] = Counter()
+        zip_conversion: defaultdict[str, dict[str, int]] = defaultdict(lambda: {"total": 0, "converted": 0})
+
+        for lead in leads:
+            zc = (lead.zip_code or "").strip()
+            if zc:
+                zip_counts[zc] += 1
+                zip_conversion[zc]["total"] += 1
+                if lead.status in SCHEDULED_OR_BETTER:
+                    zip_conversion[zc]["converted"] += 1
+            loc = getattr(lead, "lead_location", None)
+            if loc and loc.strip():
+                location_counts[loc.strip()] += 1
+
+        top_zips = [
+            {"zip": z, "count": c, "converted": zip_conversion[z]["converted"],
+             "rate": round((zip_conversion[z]["converted"] / zip_conversion[z]["total"]) * 100, 1)}
+            for z, c in zip_counts.most_common(10)
+        ]
+        top_locations = [{"location": loc, "count": c} for loc, c in location_counts.most_common(10)]
+
+        return {
+            "top_zip_codes": top_zips,
+            "top_locations": top_locations,
+            "total_unique_zips": len(zip_counts),
+            "total_with_location": sum(location_counts.values()),
+        }
 
     def _build_weekly_series(self, leads: list[Lead], now: datetime) -> list[dict[str, Any]]:
         rows = []

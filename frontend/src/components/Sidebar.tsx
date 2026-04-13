@@ -44,8 +44,16 @@ export default function Sidebar() {
     const [collapsed, setCollapsed] = useState(() => window.innerWidth < 1280)
     const [coordinatorExpanded, setCoordinatorExpanded] = useState(false)
     const [darkMode, setDarkMode] = useState(() => localStorage.getItem('sleepreach_theme') === 'dark')
-    const [profilePic, setProfilePic] = useState<string | null>(() => localStorage.getItem('sleepreach_avatar'))
+    const avatarKey = `sleepreach_avatar_${user?.id || 'anon'}`
+    const [profilePic, setProfilePic] = useState<string | null>(() => localStorage.getItem(`sleepreach_avatar_${user?.id || 'anon'}`))
     const avatarInputRef = useRef<HTMLInputElement>(null)
+
+    // Sync avatar when user changes (different login)
+    useEffect(() => {
+        if (user?.id) {
+            setProfilePic(localStorage.getItem(`sleepreach_avatar_${user.id}`))
+        }
+    }, [user?.id])
 
     const toggleTheme = () => {
         const next = !darkMode
@@ -274,7 +282,7 @@ export default function Sidebar() {
                                     reader.onload = () => {
                                         const dataUrl = reader.result as string
                                         setProfilePic(dataUrl)
-                                        localStorage.setItem('sleepreach_avatar', dataUrl)
+                                        localStorage.setItem(avatarKey, dataUrl)
                                         toast.success('Profile photo updated')
                                     }
                                     reader.onerror = () => {
@@ -292,6 +300,14 @@ export default function Sidebar() {
                             <p className="text-[11px] text-gray-400 truncate capitalize leading-tight mt-0.5">
                                 {user.role.replace(/_/g, ' ')}
                             </p>
+                            {profilePic && (
+                                <button
+                                    onClick={() => { setProfilePic(null); localStorage.removeItem(avatarKey); toast.success('Photo removed') }}
+                                    className="text-[10px] text-red-400 hover:text-red-500 mt-0.5 transition-colors"
+                                >
+                                    Remove photo
+                                </button>
+                            )}
                         </div>
                     </div>
                 )}

@@ -199,6 +199,7 @@ class LeadUpdate(BaseModel):
     urgency: Optional[UrgencyType] = None
     sleep_treatment_interest: Optional[str] = Field(default=None, max_length=100)
     notes: Optional[str] = Field(default=None, max_length=5000)
+    lead_location: Optional[str] = Field(default=None, max_length=200)
     status: Optional[LeadStatus] = None
     priority: Optional[PriorityType] = None
     expected_updated_at: Optional[datetime] = None
@@ -243,6 +244,7 @@ class LeadResponse(BaseModel):
     insurance_provider: Optional[str] = None
     zip_code: str
     in_service_area: bool
+    lead_location: Optional[str] = None
     urgency: UrgencyType
     hipaa_consent: bool
     hipaa_consent_timestamp: Optional[datetime] = None

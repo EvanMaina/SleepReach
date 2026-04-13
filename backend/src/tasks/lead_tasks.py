@@ -839,12 +839,27 @@ def send_automated_follow_ups(self) -> Dict[str, Any]:
                 email = decrypted.get("email", "")
                 phone = decrypted.get("phone", "")
 
+                # Determine drip stage based on lead age
+                lead_created = lead.created_at.replace(tzinfo=timezone.utc) if lead.created_at.tzinfo is None else lead.created_at
+                days_since_creation = (now - lead_created).days
+                if days_since_creation < 2:
+                    template_id = "follow_up"
+                elif days_since_creation < 5:
+                    template_id = "day3_educational"
+                elif days_since_creation < 10:
+                    template_id = "day7_value"
+                elif days_since_creation < 21:
+                    template_id = "day14_reengage"
+                else:
+                    template_id = "final_outreach"
+
                 # Send follow-up email
                 if email:
                     email_result = send_follow_up_email({
                         "first_name": first_name,
                         "email": email,
                         "lead_id": lead_id,
+                        "template_id": template_id,
                     })
                     if email_result.get("success"):
                         sent_email += 1
@@ -857,9 +872,10 @@ def send_automated_follow_ups(self) -> Dict[str, Any]:
 
                 # Send follow-up SMS
                 if phone:
-                    sms_content = sms_service.render_template("follow_up", {
+                    sms_content = sms_service.render_template(template_id, {
                         "first_name": first_name,
                     })
+                    sms_content = sms_content or sms_service.render_template("follow_up", {"first_name": first_name})
                     sms_result = sms_service.send_sms(
                         to_number=phone,
                         message=sms_content,

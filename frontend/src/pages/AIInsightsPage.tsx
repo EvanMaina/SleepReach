@@ -130,7 +130,15 @@ interface AIInsightsResponse {
         commentary: string
     }
     operational: {
-        team_performance: { name: string; assigned: number; scheduled: number; completed: number; scheduled_rate: number }[]
+        team_performance: { name: string; assigned: number; scheduled: number; completed: number; scheduled_rate: number; completion_rate?: number }[]
+        commentary?: string
+    }
+    geographic?: {
+        top_zip_codes: { zip: string; count: number; converted: number; rate: number }[]
+        top_locations: { location: string; count: number }[]
+        total_unique_zips: number
+        total_with_location: number
+        commentary?: string
     }
 }
 
@@ -736,19 +744,64 @@ export default function AIInsightsPage() {
                         </div>
                         <p className="text-sm font-medium leading-relaxed">{data.trends.forecast.summary}</p>
                     </div>
-                    {data.operational.team_performance?.length > 0 && (
+                    {/* Coordinator Performance */}
+                    {data.operational?.team_performance?.length > 0 && (
                         <div className="mt-4 rounded-xl border border-gray-200 p-4">
-                            <div className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                <Users className="h-4 w-4 text-sleep-600" /> Team Performance
+                            <div className="text-sm font-bold text-gray-900 mb-1 flex items-center gap-2">
+                                <Users className="h-4 w-4 text-sleep-600" /> Coordinator Performance
                             </div>
+                            {data.operational?.commentary && (
+                                <p className="text-xs text-gray-500 mb-3">{data.operational.commentary}</p>
+                            )}
                             <div className="space-y-2.5">
-                                {data.operational.team_performance.slice(0, 5).map((u) => (
+                                {data.operational.team_performance.slice(0, 6).map((u: any) => (
                                     <div key={u.name} className="flex items-center justify-between text-sm">
                                         <span className="font-medium text-gray-800">{u.name}</span>
-                                        <span className="text-gray-500">{u.scheduled_rate}% scheduled · {u.assigned} assigned</span>
+                                        <div className="flex items-center gap-3 text-xs">
+                                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold">{u.completion_rate || 0}% converted</span>
+                                            <span className="text-gray-400">{u.scheduled || 0} scheduled · {u.assigned} assigned</span>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
+                        </div>
+                    )}
+
+                    {/* Geographic Insights */}
+                    {(data.geographic?.top_zip_codes?.length ?? 0) > 0 && (
+                        <div className="mt-4 rounded-xl border border-gray-200 p-4">
+                            <div className="text-sm font-bold text-gray-900 mb-1 flex items-center gap-2">
+                                <BarChart3 className="h-4 w-4 text-amber-600" /> Geographic Lead Distribution
+                            </div>
+                            {data.geographic?.commentary && (
+                                <p className="text-xs text-gray-500 mb-3">{data.geographic.commentary}</p>
+                            )}
+                            <div className="space-y-2">
+                                {data.geographic!.top_zip_codes.slice(0, 8).map((z: any) => {
+                                    const maxCount = data.geographic!.top_zip_codes[0]?.count || 1
+                                    return (
+                                        <div key={z.zip} className="flex items-center gap-3 text-sm">
+                                            <span className="w-16 font-mono font-medium text-gray-700 shrink-0">{z.zip}</span>
+                                            <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
+                                                <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${(z.count / maxCount) * 100}%` }} />
+                                            </div>
+                                            <span className="text-xs font-semibold text-gray-600 w-20 text-right">{z.count} leads · {z.rate}%</span>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                            {data.geographic?.top_locations?.length ? (
+                                <div className="mt-3 pt-3 border-t border-gray-100">
+                                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Top Recorded Locations</div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {data.geographic!.top_locations.slice(0, 8).map((l: any) => (
+                                            <span key={l.location} className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 text-xs font-medium">
+                                                {l.location} ({l.count})
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : null}
                         </div>
                     )}
                 </Section>

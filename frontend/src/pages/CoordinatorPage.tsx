@@ -115,6 +115,7 @@ interface Lead {
   lead_score?: number;
   zip_code?: string;
   in_service_area?: boolean;
+  lead_location?: string;
   has_insurance?: boolean;
   insurance_provider?: string;
   symptom_duration?: string;
@@ -2934,6 +2935,7 @@ function QuickActionPanel({
   const [pendingOutcome, setPendingOutcome] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [noteText, setNoteText] = useState("");
+  const [leadLocation, setLeadLocation] = useState(lead.lead_location || "");
   const [schedDate, setSchedDate] = useState("");
   const [schedTime, setSchedTime] = useState("");
   const [schedError, setSchedError] = useState<string | null>(null);
@@ -3007,6 +3009,10 @@ function QuickActionPanel({
         contact_outcome: pendingOutcome,
         notes: noteText.trim() || undefined,
       });
+      // Save lead location if provided
+      if (leadLocation.trim()) {
+        await leadsAPI.update(lead.id, { lead_location: leadLocation.trim() }).catch(() => {});
+      }
       const name = `${lead.first_name} ${lead.last_name || ""}`.trim();
       const msgs: Record<string, string> = {
         ANSWERED: `✓ ${name} moved to Contacted`,
@@ -3210,6 +3216,19 @@ function QuickActionPanel({
                   placeholder="Add a note about this interaction..."
                   rows={2}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <div className="flex items-center gap-1.5 mt-3 mb-1.5">
+                  <MapPin size={13} className="text-gray-400" />
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Lead Location (city / area)
+                  </label>
+                </div>
+                <input
+                  type="text"
+                  value={leadLocation}
+                  onChange={(e) => setLeadLocation(e.target.value)}
+                  placeholder="e.g. Gilbert, AZ or Scottsdale"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div className="px-5 py-3">
