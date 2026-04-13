@@ -105,9 +105,12 @@ def get_db() -> Generator[Session, None, None]:
         try:
             db.close()
         except Exception:
-            # Connection may have been dropped (e.g., after DB restart).
-            # Invalidate it so the pool creates a fresh one next time.
-            db.invalidate()  # type: ignore[attr-defined]
+            # Connection dropped (e.g., after DB restart). Dispose the entire
+            # pool so all subsequent requests get fresh connections.
+            try:
+                engine.dispose()
+            except Exception:
+                pass
 
 
 # =============================================================================

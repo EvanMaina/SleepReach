@@ -220,13 +220,17 @@ export default function AIInsightsPage() {
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    const fetchInsights = async (force = false) => {
+    const fetchInsights = async (force = false, retryCount = 0) => {
         try {
             force ? setIsRefreshing(true) : setIsLoading(true)
             setError(null)
             const res = await aiInsightsAPI.get(force ? { force_refresh: true } : undefined)
             setData(res.data)
         } catch (err: any) {
+            // Auto-retry once on first failure (handles stale connections after restart)
+            if (retryCount < 1) {
+                return fetchInsights(force, retryCount + 1)
+            }
             setError(err?.response?.data?.message || 'Unable to load AI insights right now.')
         } finally {
             setIsLoading(false)

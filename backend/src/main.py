@@ -348,6 +348,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             ", ".join(_missing_services),
         )
 
+    # Clear stale DB connections from pool (prevents errors after container restart)
+    engine.dispose()
+    logger.info("Database connection pool reset")
+
     # Initialize cache service
     cache = get_cache()
     if cache.is_connected:
