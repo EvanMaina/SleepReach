@@ -659,125 +659,149 @@ export default function AIInsightsPage() {
             {/* ═══════════════════════════════════════════════════════════ */}
             {/* SECTION 6 — PROVIDER INTELLIGENCE                         */}
             {/* ═══════════════════════════════════════════════════════════ */}
-            <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-                <Section icon={Building2} title="Provider Intelligence" subtitle={data.provider_intelligence.commentary}>
-                    {data.provider_intelligence.providers.length > 0 ? (
-                        <div className="space-y-3">
-                            {data.provider_intelligence.providers.slice(0, 6).map((provider, i) => (
-                                <div key={provider.id} className="flex items-center gap-4 rounded-xl border border-gray-200 p-3.5">
-                                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sleep-50 text-sm font-bold text-sleep-700 flex-shrink-0">
+            <Section icon={Building2} title="Provider Intelligence" subtitle={data.provider_intelligence.commentary}>
+                {data.provider_intelligence.providers.length > 0 ? (
+                    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                        {data.provider_intelligence.providers.slice(0, 6).map((provider, i) => (
+                            <div key={provider.id} className="flex items-center gap-4 rounded-xl border border-gray-200 p-3.5">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sleep-50 text-sm font-bold text-sleep-700 flex-shrink-0">
+                                    #{i + 1}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold text-gray-900 truncate">{provider.name}</p>
+                                    <p className="text-xs text-gray-500">{provider.practice_name || provider.specialty}</p>
+                                </div>
+                                <div className="text-right flex-shrink-0">
+                                    <p className="text-lg font-bold text-gray-900">{provider.conversion_rate}%</p>
+                                    <p className="text-xs text-gray-500">{provider.referrals} referrals</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="rounded-xl border border-dashed border-sleep-200 bg-sleep-50/50 p-4 text-sm text-sleep-800">
+                        Provider intelligence will appear once referral partners have leads in the pipeline.
+                    </div>
+                )}
+                {data.provider_intelligence.recommendations.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                        {data.provider_intelligence.recommendations.map((rec, i) => (
+                            <div key={i} className="flex items-start gap-2.5 rounded-lg bg-gray-50 px-4 py-3">
+                                <ArrowRight className="h-4 w-4 text-sleep-500 mt-0.5 flex-shrink-0" />
+                                <p className="text-sm text-gray-700">{rec}</p>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </Section>
+
+            {/* ═══════════════════════════════════════════════════════════ */}
+            {/* SECTION 7 — COORDINATOR PERFORMANCE (STANDALONE)          */}
+            {/* ═══════════════════════════════════════════════════════════ */}
+            <Section icon={Users} title="Coordinator Performance" subtitle="Conversion tracking by team member — who is moving leads to completion.">
+                {(data.operational?.team_performance?.length ?? 0) > 0 ? (
+                    <div>
+                        {data.operational?.commentary && (
+                            <p className="text-sm text-gray-500 leading-relaxed mb-4">{data.operational.commentary}</p>
+                        )}
+                        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                            {data.operational!.team_performance.slice(0, 6).map((u: any, i: number) => (
+                                <div key={u.name} className="flex items-center gap-3 p-4 rounded-xl border border-gray-100 hover:border-gray-200 transition-colors">
+                                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl text-sm font-bold text-white shrink-0 ${i === 0 ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' : i === 1 ? 'bg-gradient-to-br from-sleep-500 to-sleep-600' : i === 2 ? 'bg-gradient-to-br from-amber-500 to-amber-600' : 'bg-gray-400'}`}>
                                         #{i + 1}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-semibold text-gray-900 truncate">{provider.name}</p>
-                                        <p className="text-xs text-gray-500">{provider.practice_name || provider.specialty}</p>
+                                        <p className="text-sm font-semibold text-gray-900 truncate">{u.name}</p>
+                                        <p className="text-xs text-gray-400">{u.assigned} leads assigned</p>
                                     </div>
-                                    <div className="text-right flex-shrink-0">
-                                        <p className="text-lg font-bold text-gray-900">{provider.conversion_rate}%</p>
-                                        <p className="text-xs text-gray-500">{provider.referrals} referrals</p>
+                                    <div className="text-right shrink-0">
+                                        <p className="text-lg font-bold text-emerald-600">{u.completion_rate || 0}%</p>
+                                        <p className="text-[10px] text-gray-400">{u.completed || 0} converted · {u.scheduled || 0} sched</p>
                                     </div>
                                 </div>
                             ))}
                         </div>
-                    ) : (
-                        <div className="rounded-xl border border-dashed border-sleep-200 bg-sleep-50/50 p-4 text-sm text-sleep-800">
-                            Provider intelligence will appear once referral partners have leads in the pipeline.
+                    </div>
+                ) : (
+                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
+                        <Users className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500">Coordinator metrics will appear once leads are assigned to team members.</p>
+                    </div>
+                )}
+            </Section>
+
+            {/* ═══════════════════════════════════════════════════════════ */}
+            {/* SECTION 8 — GEOGRAPHIC: ZIP CODE ANALYSIS (STANDALONE)    */}
+            {/* ═══════════════════════════════════════════════════════════ */}
+            <Section icon={BarChart3} title="Geographic Insights — Zip Codes" subtitle="Where your leads are coming from based on submitted zip codes. Use this to identify high-density areas for marketing.">
+                {(data.geographic?.top_zip_codes?.length ?? 0) > 0 ? (
+                    <div>
+                        {data.geographic?.commentary && (
+                            <p className="text-sm text-gray-500 leading-relaxed mb-4">{data.geographic.commentary}</p>
+                        )}
+                        <div className="space-y-2.5">
+                            {data.geographic!.top_zip_codes.slice(0, 10).map((z: any) => {
+                                const maxCount = data.geographic!.top_zip_codes[0]?.count || 1
+                                return (
+                                    <div key={z.zip} className="flex items-center gap-3">
+                                        <span className="w-16 font-mono text-sm font-bold text-gray-800 shrink-0">{z.zip}</span>
+                                        <div className="flex-1 h-7 bg-gray-100 rounded-lg overflow-hidden">
+                                            <div className="h-full bg-gradient-to-r from-amber-400 to-orange-400 rounded-lg transition-all flex items-center px-2" style={{ width: `${Math.max((z.count / maxCount) * 100, 8)}%` }}>
+                                                <span className="text-[10px] font-bold text-white whitespace-nowrap">{z.count} leads</span>
+                                            </div>
+                                        </div>
+                                        <div className="text-right shrink-0 w-20">
+                                            <span className="text-sm font-semibold text-emerald-600">{z.rate}%</span>
+                                            <span className="text-[10px] text-gray-400 block">conversion</span>
+                                        </div>
+                                    </div>
+                                )
+                            })}
                         </div>
-                    )}
-                    {data.provider_intelligence.recommendations.length > 0 && (
-                        <div className="mt-4 space-y-2">
-                            {data.provider_intelligence.recommendations.map((rec, i) => (
-                                <div key={i} className="flex items-start gap-2.5 rounded-lg bg-gray-50 px-4 py-3">
-                                    <ArrowRight className="h-4 w-4 text-sleep-500 mt-0.5 flex-shrink-0" />
-                                    <p className="text-sm text-gray-700">{rec}</p>
+                    </div>
+                ) : (
+                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
+                        <BarChart3 className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500">Zip code data will appear as leads enter the pipeline via the widget, Jotform, or referrals.</p>
+                    </div>
+                )}
+            </Section>
+
+            {/* ═══════════════════════════════════════════════════════════ */}
+            {/* SECTION 9 — EXPANSION OPPORTUNITIES (STANDALONE)          */}
+            {/* ═══════════════════════════════════════════════════════════ */}
+            <Section icon={Target} title="Expansion Opportunities — Coordinator-Recorded Locations" subtitle="Cities and areas recorded by your coordinators during calls. Use this to identify where to scale your clinic next.">
+                {data.geographic?.top_locations?.length ? (
+                    <div>
+                        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                            {data.geographic!.top_locations.slice(0, 12).map((l: any, i: number) => (
+                                <div key={l.location} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-amber-200 transition-colors">
+                                    <div className={`flex h-9 w-9 items-center justify-center rounded-lg text-sm font-bold text-white shrink-0 ${i === 0 ? 'bg-gradient-to-br from-amber-500 to-orange-500' : i < 3 ? 'bg-amber-400' : 'bg-gray-300'}`}>
+                                        {l.count}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-gray-900 truncate">{l.location}</p>
+                                        <p className="text-[10px] text-gray-400">{l.count === 1 ? '1 lead' : `${l.count} leads`} from this area</p>
+                                    </div>
                                 </div>
                             ))}
                         </div>
-                    )}
-                </Section>
+                        <div className="mt-4 rounded-xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800">
+                            <Target className="inline h-4 w-4 mr-1.5 text-amber-600" />
+                            Encourage coordinators to record lead locations during calls. The more data collected, the better the AI can identify expansion opportunities.
+                        </div>
+                    </div>
+                ) : (
+                    <div className="rounded-xl border border-dashed border-amber-200 bg-amber-50/50 p-6 text-center">
+                        <Target className="h-8 w-8 text-amber-300 mx-auto mb-2" />
+                        <p className="text-sm text-amber-700">No locations recorded yet. When coordinators record lead locations during calls, expansion insights will appear here.</p>
+                    </div>
+                )}
+            </Section>
 
-                {/* ═══════════════════════════════════════════════════════════ */}
-                {/* SECTION 7 — TEAM & GEOGRAPHIC INTELLIGENCE                */}
-                {/* ═══════════════════════════════════════════════════════════ */}
-                <div className="grid gap-6 lg:grid-cols-2">
-                    {/* Coordinator Performance */}
-                    <Section icon={Users} title="Coordinator Performance" subtitle="Conversion tracking by team member — who is moving leads to completion.">
-                        {(data.operational?.team_performance?.length ?? 0) > 0 ? (
-                            <div className="space-y-3">
-                                {data.operational?.commentary && (
-                                    <p className="text-sm text-gray-500 leading-relaxed">{data.operational.commentary}</p>
-                                )}
-                                {data.operational!.team_performance.slice(0, 6).map((u: any, i: number) => (
-                                    <div key={u.name} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-gray-200 transition-colors">
-                                        <div className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold text-white shrink-0 ${i === 0 ? 'bg-emerald-500' : i === 1 ? 'bg-sleep-500' : 'bg-gray-400'}`}>
-                                            #{i + 1}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-semibold text-gray-900 truncate">{u.name}</p>
-                                            <p className="text-xs text-gray-400">{u.assigned} leads assigned</p>
-                                        </div>
-                                        <div className="text-right shrink-0">
-                                            <p className="text-sm font-bold text-emerald-600">{u.completion_rate || 0}%</p>
-                                            <p className="text-[10px] text-gray-400">{u.completed || 0} converted · {u.scheduled || 0} scheduled</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
-                                <Users className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                                <p className="text-sm text-gray-500">Coordinator metrics will appear once leads are assigned to team members.</p>
-                            </div>
-                        )}
-                    </Section>
-
-                    {/* Geographic Intelligence */}
-                    <Section icon={BarChart3} title="Geographic Intelligence" subtitle="Lead distribution by zip code and coordinator-recorded locations.">
-                        {(data.geographic?.top_zip_codes?.length ?? 0) > 0 ? (
-                            <div className="space-y-3">
-                                {data.geographic?.commentary && (
-                                    <p className="text-sm text-gray-500 leading-relaxed">{data.geographic.commentary}</p>
-                                )}
-                                {data.geographic!.top_zip_codes.slice(0, 8).map((z: any) => {
-                                    const maxCount = data.geographic!.top_zip_codes[0]?.count || 1
-                                    return (
-                                        <div key={z.zip} className="flex items-center gap-3">
-                                            <span className="w-14 font-mono text-sm font-semibold text-gray-700 shrink-0">{z.zip}</span>
-                                            <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
-                                                <div className="h-full bg-gradient-to-r from-amber-400 to-orange-400 rounded-full transition-all" style={{ width: `${(z.count / maxCount) * 100}%` }} />
-                                            </div>
-                                            <div className="text-right shrink-0 w-24">
-                                                <span className="text-sm font-semibold text-gray-700">{z.count}</span>
-                                                <span className="text-xs text-gray-400 ml-1">· {z.rate}%</span>
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                                {data.geographic?.top_locations?.length ? (
-                                    <div className="pt-3 border-t border-gray-100">
-                                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Coordinator-Recorded Areas</div>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {data.geographic!.top_locations.slice(0, 10).map((l: any) => (
-                                                <span key={l.location} className="px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 text-amber-800 text-xs font-medium">
-                                                    {l.location} <span className="text-amber-500">({l.count})</span>
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ) : null}
-                            </div>
-                        ) : (
-                            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
-                                <BarChart3 className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                                <p className="text-sm text-gray-500">Geographic data will appear as leads with zip codes enter the pipeline.</p>
-                            </div>
-                        )}
-                    </Section>
-                </div>
-
-                {/* ═══════════════════════════════════════════════════════════ */}
-                {/* SECTION 8 — TRENDS                                        */}
-                {/* ═══════════════════════════════════════════════════════════ */}
+            {/* ═══════════════════════════════════════════════════════════ */}
+            {/* SECTION 10 — TRENDS & FORECASTING                         */}
+            {/* ═══════════════════════════════════════════════════════════ */}
                 <Section icon={LineChartIcon} title="Trends & Forecasting" subtitle={data.trends.commentary}>
                     {(data.trends.weekly.length > 0 || data.trends.monthly.length > 0) ? (
                         <div className="space-y-4">
@@ -829,7 +853,6 @@ export default function AIInsightsPage() {
                         <span>Powered by Claude AI · Real-time analysis refreshes on demand</span>
                     </div>
                 </Section>
-            </div>
 
             {data.insufficient_data && (
                 <div className="rounded-xl border border-dashed border-sleep-200 bg-sleep-50/50 p-5 text-sm text-sleep-800">
