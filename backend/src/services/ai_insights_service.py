@@ -475,7 +475,7 @@ class AIInsightsService:
             f"{json.dumps(sanitized, default=str)}"
         )
 
-        async with httpx.AsyncClient(timeout=45.0) as client:
+        async with httpx.AsyncClient(timeout=90.0) as client:
             response = await client.post(
                 "https://api.anthropic.com/v1/messages",
                 headers={

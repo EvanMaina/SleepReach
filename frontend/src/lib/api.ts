@@ -124,7 +124,7 @@ export const providersAPI = {
     sendEmail: (id: string, data: { subject: string; message: string }) => api.post(`/providers/${id}/email`, data),
 }
 
-// AI Insights API
+// AI Insights API (longer timeout — Claude generation can take 60-90s)
 export const aiInsightsAPI = {
-    get: (params?: { force_refresh?: boolean }) => api.get('/ai-insights', { params }),
+    get: (params?: { force_refresh?: boolean }) => api.get('/ai-insights', { params, timeout: 120000 }),
 }
