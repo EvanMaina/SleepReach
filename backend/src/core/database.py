@@ -42,7 +42,7 @@ engine = create_engine(
     max_overflow=settings.db_max_overflow,
     poolclass=QueuePool,
     pool_pre_ping=True,  # Enable connection health checks
-    pool_recycle=settings.db_pool_recycle,   # Use config value (default 1800s)
+    pool_recycle=300,     # Recycle connections every 5 min (survive container restarts)
     pool_timeout=settings.db_pool_timeout,   # Use config value (default 30s)
     echo=False,  # SQL echo disabled — use logging config for query debugging
 )
@@ -94,22 +94,20 @@ def ping_connection(dbapi_connection, connection_record, connection_proxy):
 def get_db() -> Generator[Session, None, None]:
     """
     FastAPI dependency for database session injection.
-    
+
     Creates a new session for each request and ensures proper cleanup.
-    
-    Yields:
-        SQLAlchemy Session instance
-        
-    Example:
-        @router.get("/leads")
-        def get_leads(db: Session = Depends(get_db)):
-            return db.query(Lead).all()
+    Handles stale connections gracefully after container restarts.
     """
     db = SessionLocal()
     try:
         yield db
     finally:
-        db.close()
+        try:
+            db.close()
+        except Exception:
+            # Connection may have been dropped (e.g., after DB restart).
+            # Invalidate it so the pool creates a fresh one next time.
+            db.invalidate()  # type: ignore[attr-defined]
 
 
 # =============================================================================
