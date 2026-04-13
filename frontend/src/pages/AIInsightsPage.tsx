@@ -697,7 +697,86 @@ export default function AIInsightsPage() {
                 </Section>
 
                 {/* ═══════════════════════════════════════════════════════════ */}
-                {/* SECTION 7 — TRENDS                                        */}
+                {/* SECTION 7 — TEAM & GEOGRAPHIC INTELLIGENCE                */}
+                {/* ═══════════════════════════════════════════════════════════ */}
+                <div className="grid gap-6 lg:grid-cols-2">
+                    {/* Coordinator Performance */}
+                    <Section icon={Users} title="Coordinator Performance" subtitle="Conversion tracking by team member — who is moving leads to completion.">
+                        {(data.operational?.team_performance?.length ?? 0) > 0 ? (
+                            <div className="space-y-3">
+                                {data.operational?.commentary && (
+                                    <p className="text-sm text-gray-500 leading-relaxed">{data.operational.commentary}</p>
+                                )}
+                                {data.operational!.team_performance.slice(0, 6).map((u: any, i: number) => (
+                                    <div key={u.name} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 hover:border-gray-200 transition-colors">
+                                        <div className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold text-white shrink-0 ${i === 0 ? 'bg-emerald-500' : i === 1 ? 'bg-sleep-500' : 'bg-gray-400'}`}>
+                                            #{i + 1}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-semibold text-gray-900 truncate">{u.name}</p>
+                                            <p className="text-xs text-gray-400">{u.assigned} leads assigned</p>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <p className="text-sm font-bold text-emerald-600">{u.completion_rate || 0}%</p>
+                                            <p className="text-[10px] text-gray-400">{u.completed || 0} converted · {u.scheduled || 0} scheduled</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
+                                <Users className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                                <p className="text-sm text-gray-500">Coordinator metrics will appear once leads are assigned to team members.</p>
+                            </div>
+                        )}
+                    </Section>
+
+                    {/* Geographic Intelligence */}
+                    <Section icon={BarChart3} title="Geographic Intelligence" subtitle="Lead distribution by zip code and coordinator-recorded locations.">
+                        {(data.geographic?.top_zip_codes?.length ?? 0) > 0 ? (
+                            <div className="space-y-3">
+                                {data.geographic?.commentary && (
+                                    <p className="text-sm text-gray-500 leading-relaxed">{data.geographic.commentary}</p>
+                                )}
+                                {data.geographic!.top_zip_codes.slice(0, 8).map((z: any) => {
+                                    const maxCount = data.geographic!.top_zip_codes[0]?.count || 1
+                                    return (
+                                        <div key={z.zip} className="flex items-center gap-3">
+                                            <span className="w-14 font-mono text-sm font-semibold text-gray-700 shrink-0">{z.zip}</span>
+                                            <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
+                                                <div className="h-full bg-gradient-to-r from-amber-400 to-orange-400 rounded-full transition-all" style={{ width: `${(z.count / maxCount) * 100}%` }} />
+                                            </div>
+                                            <div className="text-right shrink-0 w-24">
+                                                <span className="text-sm font-semibold text-gray-700">{z.count}</span>
+                                                <span className="text-xs text-gray-400 ml-1">· {z.rate}%</span>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                                {data.geographic?.top_locations?.length ? (
+                                    <div className="pt-3 border-t border-gray-100">
+                                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Coordinator-Recorded Areas</div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {data.geographic!.top_locations.slice(0, 10).map((l: any) => (
+                                                <span key={l.location} className="px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 text-amber-800 text-xs font-medium">
+                                                    {l.location} <span className="text-amber-500">({l.count})</span>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : null}
+                            </div>
+                        ) : (
+                            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center">
+                                <BarChart3 className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                                <p className="text-sm text-gray-500">Geographic data will appear as leads with zip codes enter the pipeline.</p>
+                            </div>
+                        )}
+                    </Section>
+                </div>
+
+                {/* ═══════════════════════════════════════════════════════════ */}
+                {/* SECTION 8 — TRENDS                                        */}
                 {/* ═══════════════════════════════════════════════════════════ */}
                 <Section icon={LineChartIcon} title="Trends & Forecasting" subtitle={data.trends.commentary}>
                     {(data.trends.weekly.length > 0 || data.trends.monthly.length > 0) ? (
@@ -744,66 +823,11 @@ export default function AIInsightsPage() {
                         </div>
                         <p className="text-sm font-medium leading-relaxed">{data.trends.forecast.summary}</p>
                     </div>
-                    {/* Coordinator Performance */}
-                    {data.operational?.team_performance?.length > 0 && (
-                        <div className="mt-4 rounded-xl border border-gray-200 p-4">
-                            <div className="text-sm font-bold text-gray-900 mb-1 flex items-center gap-2">
-                                <Users className="h-4 w-4 text-sleep-600" /> Coordinator Performance
-                            </div>
-                            {data.operational?.commentary && (
-                                <p className="text-xs text-gray-500 mb-3">{data.operational.commentary}</p>
-                            )}
-                            <div className="space-y-2.5">
-                                {data.operational.team_performance.slice(0, 6).map((u: any) => (
-                                    <div key={u.name} className="flex items-center justify-between text-sm">
-                                        <span className="font-medium text-gray-800">{u.name}</span>
-                                        <div className="flex items-center gap-3 text-xs">
-                                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold">{u.completion_rate || 0}% converted</span>
-                                            <span className="text-gray-400">{u.scheduled || 0} scheduled · {u.assigned} assigned</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Geographic Insights */}
-                    {(data.geographic?.top_zip_codes?.length ?? 0) > 0 && (
-                        <div className="mt-4 rounded-xl border border-gray-200 p-4">
-                            <div className="text-sm font-bold text-gray-900 mb-1 flex items-center gap-2">
-                                <BarChart3 className="h-4 w-4 text-amber-600" /> Geographic Lead Distribution
-                            </div>
-                            {data.geographic?.commentary && (
-                                <p className="text-xs text-gray-500 mb-3">{data.geographic.commentary}</p>
-                            )}
-                            <div className="space-y-2">
-                                {data.geographic!.top_zip_codes.slice(0, 8).map((z: any) => {
-                                    const maxCount = data.geographic!.top_zip_codes[0]?.count || 1
-                                    return (
-                                        <div key={z.zip} className="flex items-center gap-3 text-sm">
-                                            <span className="w-16 font-mono font-medium text-gray-700 shrink-0">{z.zip}</span>
-                                            <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
-                                                <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${(z.count / maxCount) * 100}%` }} />
-                                            </div>
-                                            <span className="text-xs font-semibold text-gray-600 w-20 text-right">{z.count} leads · {z.rate}%</span>
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                            {data.geographic?.top_locations?.length ? (
-                                <div className="mt-3 pt-3 border-t border-gray-100">
-                                    <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Top Recorded Locations</div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {data.geographic!.top_locations.slice(0, 8).map((l: any) => (
-                                            <span key={l.location} className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 text-xs font-medium">
-                                                {l.location} ({l.count})
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : null}
-                        </div>
-                    )}
+                    {/* Powered by Claude badge */}
+                    <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
+                        <Sparkles className="h-3.5 w-3.5" />
+                        <span>Powered by Claude AI · Real-time analysis refreshes on demand</span>
+                    </div>
                 </Section>
             </div>
 
