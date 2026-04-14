@@ -296,13 +296,14 @@ function AIInsightsPage() {
         )
     }
 
-    const tone = scoreTone(data.summary?.health_score ?? 0)
+    const summary = data.summary || { health_score: 0, health_state: 'unknown', trend_delta: 0, headline: '', detail: '', metrics: { active_leads: 0, insured_open_leads: 0, avg_first_contact_hours: null } } as any
+    const tone = scoreTone(summary.health_score ?? 0)
 
     /* ── Safe data access helpers ── */
     const stages = data.pipeline?.stages || []
     const actNow = data.act_now || []
-    const comm = data.communication || {} as any
-    const trends = data.trends || {} as any
+    const comm = data.communication || { templates: [], timing_rows: [], method_rows: [], best_time_of_day: '—', best_contact_method: '—', commentary: '' } as any
+    const trends = data.trends || { weekly: [], monthly: [], forecast: { summary: '', projected_monthly_leads: 0, projected_scheduled: 0 }, commentary: '' } as any
     const operational = data.operational || {} as any
     const geographic = data.geographic || {} as any
 
@@ -331,8 +332,8 @@ function AIInsightsPage() {
                                 <h1 className="text-2xl font-bold">AI Insights</h1>
                                 <span className={`rounded-full px-3 py-1 text-xs font-semibold ${tone.bg}/20 ${tone.text}`}>{tone.label}</span>
                             </div>
-                            <p className="mt-2 max-w-3xl text-sm text-white/70">{data.summary.headline}</p>
-                            <p className="mt-1 max-w-3xl text-sm text-white/50">{data.summary.detail}</p>
+                            <p className="mt-2 max-w-3xl text-sm text-white/70">{summary.headline}</p>
+                            <p className="mt-1 max-w-3xl text-sm text-white/50">{summary.detail}</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -352,33 +353,33 @@ function AIInsightsPage() {
                     <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
                         <div className="text-xs uppercase tracking-wide text-white/40">Health Score</div>
                         <div className="mt-2 flex items-baseline gap-2">
-                            <span className="text-5xl font-bold">{data.summary.health_score}</span>
+                            <span className="text-5xl font-bold">{summary.health_score}</span>
                             <span className="text-sm text-white/40">/100</span>
                         </div>
                         <div className="mt-2 flex items-center gap-1.5 text-sm">
-                            {data.summary.trend_delta >= 0
+                            {summary.trend_delta >= 0
                                 ? <ArrowUpRight className="h-4 w-4 text-emerald-400" />
                                 : <ArrowDownRight className="h-4 w-4 text-rose-400" />}
-                            <span className={data.summary.trend_delta >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                                {Math.abs(data.summary.trend_delta)}%
+                            <span className={summary.trend_delta >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
+                                {Math.abs(summary.trend_delta)}%
                             </span>
                             <span className="text-white/40">vs last period</span>
                         </div>
                     </div>
                     <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
                         <div className="text-xs uppercase tracking-wide text-white/40">Active Pipeline</div>
-                        <div className="mt-2 text-4xl font-bold">{data.summary.metrics.active_leads}</div>
+                        <div className="mt-2 text-4xl font-bold">{summary.metrics.active_leads}</div>
                         <div className="mt-1 text-sm text-white/40">Total open leads</div>
                     </div>
                     <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
                         <div className="text-xs uppercase tracking-wide text-white/40">Insured Open</div>
-                        <div className="mt-2 text-4xl font-bold">{data.summary.metrics.insured_open_leads}</div>
+                        <div className="mt-2 text-4xl font-bold">{summary.metrics.insured_open_leads}</div>
                         <div className="mt-1 text-sm text-white/40">High-value leads needing action</div>
                     </div>
                     <div className="rounded-2xl bg-white/5 border border-white/10 p-5">
                         <div className="text-xs uppercase tracking-wide text-white/40">Avg. First Contact</div>
                         <div className="mt-2 text-4xl font-bold">
-                            {data.summary.metrics.avg_first_contact_hours == null ? '—' : `${data.summary.metrics.avg_first_contact_hours}h`}
+                            {summary.metrics.avg_first_contact_hours == null ? '—' : `${summary.metrics.avg_first_contact_hours}h`}
                         </div>
                         <div className="mt-1 text-sm text-white/40">Time to first outreach</div>
                     </div>
@@ -410,7 +411,7 @@ function AIInsightsPage() {
                     <MetricCard
                         icon={Heart}
                         label="Insured Open"
-                        value={data.summary.metrics.insured_open_leads}
+                        value={summary.metrics.insured_open_leads}
                         sub="Money on the table"
                         accent="emerald"
                     />
