@@ -1332,7 +1332,8 @@ export default function CoordinatorPage({
     setSmsMessage(personalizeTemplate(template?.message || "", lead));
   };
 
-  const [aiEmailScript, setAiEmailScript] = useState<{ action: string; script: string } | null>(null);
+  const [aiEmailScript, setAiEmailScript] = useState<{ subject: string; body: string } | null>(null);
+  const [aiEmailLoading, setAiEmailLoading] = useState(false);
 
   const openEmailDialog = async (lead: Lead | null) => {
     const { email } = await ensureTemplatesLoaded();
@@ -1340,28 +1341,29 @@ export default function CoordinatorPage({
     setEmailDialogOpen(true);
     setAiEmailScript(null);
 
-    // Check if AI has a personalized script for this lead
-    if (lead) {
-      try {
-        const res = await api.get("/ai-insights");
-        const actNow = res.data?.act_now || [];
-        const match = actNow.find((item: any) => item.lead_id === lead.id);
-        if (match?.script && match?.recommended_action) {
-          setAiEmailScript({ action: match.recommended_action, script: match.script });
-          // Auto-apply the AI script
-          setSelectedEmailTemplate("ai_recommended");
-          setEmailSubject(`Following up on your sleep consultation inquiry`);
-          setEmailBody(match.script);
-          return;
-        }
-      } catch { /* fall through to default template */ }
-    }
-
+    // Start with a standard template immediately (no waiting)
     const templateId = lead ? "follow_up" : "custom";
     const template = email.find((item) => item.id === templateId);
     setSelectedEmailTemplate(templateId);
     setEmailSubject(personalizeTemplate(template?.subject || "", lead));
     setEmailBody(personalizeTemplate(template?.body || "", lead));
+
+    // Generate AI email in the background — will auto-apply when ready
+    if (lead) {
+      setAiEmailLoading(true);
+      api.get(`/ai-insights/email-draft/${lead.id}`)
+        .then((res) => {
+          if (res.data?.subject && res.data?.body) {
+            setAiEmailScript({ subject: res.data.subject, body: res.data.body });
+            // Auto-apply the AI draft
+            setSelectedEmailTemplate("ai_recommended");
+            setEmailSubject(res.data.subject);
+            setEmailBody(res.data.body);
+          }
+        })
+        .catch(() => { /* AI unavailable — standard template stays */ })
+        .finally(() => setAiEmailLoading(false));
+    }
   };
 
   const handleSendSMS = async () => {
@@ -2839,16 +2841,23 @@ export default function CoordinatorPage({
                 Templates
               </p>
               <div className="flex flex-wrap gap-2">
-                {aiEmailScript && (
+                {(aiEmailScript || aiEmailLoading) && (
                   <button
+                    disabled={aiEmailLoading}
                     onClick={() => {
-                      setSelectedEmailTemplate("ai_recommended");
-                      setEmailSubject("Following up on your sleep consultation inquiry");
-                      setEmailBody(aiEmailScript.script);
+                      if (aiEmailScript) {
+                        setSelectedEmailTemplate("ai_recommended");
+                        setEmailSubject(aiEmailScript.subject);
+                        setEmailBody(aiEmailScript.body);
+                      }
                     }}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors flex items-center gap-1 ${selectedEmailTemplate === "ai_recommended" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-white text-purple-600 border-purple-200 hover:border-purple-300 hover:bg-purple-50"}`}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors flex items-center gap-1 ${selectedEmailTemplate === "ai_recommended" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-white text-purple-600 border-purple-200 hover:border-purple-300 hover:bg-purple-50"} ${aiEmailLoading ? "opacity-60" : ""}`}
                   >
-                    <Sparkles size={12} /> AI Recommended
+                    {aiEmailLoading ? (
+                      <><Loader2 size={12} className="animate-spin" /> Generating AI Draft...</>
+                    ) : (
+                      <><Sparkles size={12} /> AI Recommended</>
+                    )}
                   </button>
                 )}
                 {emailTemplates
