@@ -381,3 +381,20 @@ html.dark .shadow-premium-lg { --tw-shadow: 0 0 #0000 !important; box-shadow: 0 
 /* Source Performance Ranking cards */
 html.dark .border-warm-300 { border-color: rgba(238, 154, 29, 0.4) !important; }
 html.dark .ring-warm-200 { --tw-ring-color: rgba(238, 154, 29, 0.2) !important; }
+
+/* ── Fix: Table row borders (remove red/pink lines in dark) ── */
+html.dark .border-gray-50 { border-color: #1e2d3d !important; }
+html.dark tr { border-color: #1e2d3d !important; }
+html.dark .border-t { border-color: #1e2d3d !important; }
+
+/* ── Fix: Active sidebar queue item visibility ── */
+html.dark .bg-sleep-50.text-sleep-800 { background-color: rgba(74, 111, 165, 0.25) !important; color: #bccfe6 !important; }
+html.dark .bg-sleep-100\/80 { background-color: rgba(74, 111, 165, 0.2) !important; }
+html.dark .text-sleep-800 { color: #bccfe6 !important; }
+
+/* ── Fix: Analytics warm/orange colors (Source Performance Ranking) ── */
+html.dark .bg-warm-50 { background-color: rgba(238, 154, 29, 0.12) !important; }
+html.dark .bg-warm-200 { background-color: rgba(238, 154, 29, 0.25) !important; }
+html.dark .text-warm-800 { color: #fbbf24 !important; }
+html.dark .text-warm-500 { color: #f59e0b !important; }
+html.dark .border-warm-200 { border-color: rgba(238, 154, 29, 0.3) !important; }
