@@ -181,8 +181,12 @@ html.dark body {
 html.dark .bg-gray-50\/80,
 html.dark .bg-gray-50 { background-color: #0f1419 !important; }
 
-/* Solid white surfaces */
-html.dark .bg-white { background-color: #1a2332 !important; }
+/* Solid white surfaces — NUCLEAR: attribute selector catches ALL bg-white elements */
+html.dark .bg-white,
+html.dark [class~="bg-white"] {
+    --tw-bg-opacity: 1 !important;
+    background-color: #1a2332 !important;
+}
 
 /* Cards, panels */
 html.dark .card-premium,
@@ -368,9 +372,13 @@ html.dark [class*="bg-gradient"] p { color: rgba(255,255,255,0.85) !important; }
 /* ── Placeholder text ── */
 html.dark .placeholder\:text-gray-400::placeholder { color: #475569 !important; }
 
-/* ── FINAL FIX: gradient-to-white backgrounds + opacity bg variants ── */
-html.dark .from-gray-50 { --tw-gradient-from: #131c28 !important; }
-html.dark .to-white { --tw-gradient-to: #1a2332 !important; }
+/* ── Gradient overrides — from-gray/to-white patterns ── */
+html.dark .from-gray-50 { --tw-gradient-from: #131c28 var(--tw-gradient-from-position) !important; }
+html.dark .to-white { --tw-gradient-to: #1a2332 var(--tw-gradient-to-position) !important; }
+html.dark [class*="from-gray-50"][class*="to-white"] {
+    background-image: none !important;
+    background-color: #1a2332 !important;
+}
 html.dark .bg-sleep-50\/50 { background-color: rgba(74, 111, 165, 0.08) !important; }
 html.dark .bg-emerald-50\/50 { background-color: rgba(16, 185, 129, 0.08) !important; }
 html.dark .bg-amber-50\/50 { background-color: rgba(245, 158, 11, 0.08) !important; }
