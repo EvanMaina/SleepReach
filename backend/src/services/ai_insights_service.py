@@ -103,19 +103,23 @@ class AIInsightsService:
         self.cache = get_cache()
 
     async def get_insights(self, force_refresh: bool = False) -> dict[str, Any]:
+        # Return cache if available and not forcing refresh
         cached = None if force_refresh else self.cache.get(CACHE_KEY)
         if cached:
             cached["cached"] = True
             return cached
 
-        insights = await self._build_insights()
-        self.cache.set(CACHE_KEY, insights, ttl=settings.ai_insights_cache_ttl)
-        insights["cached"] = False
-        return insights
-
-    async def _build_insights(self) -> dict[str, Any]:
+        # Build snapshot (fast — pure DB queries, <1 second)
         snapshot = self._build_snapshot()
-        narrative = await self._build_narrative(snapshot)
+
+        if force_refresh:
+            # User clicked "Refresh" — call Claude for full AI narrative
+            narrative = await self._build_narrative(snapshot)
+        else:
+            # First page load / cold cache — use instant fallback narrative
+            # so the page loads immediately, then user can click Refresh for Claude
+            narrative = self._fallback_narrative(snapshot)
+
         snapshot = self._merge_act_now(snapshot, narrative)
         snapshot = self._merge_provider_recommendations(snapshot, narrative)
 
@@ -129,9 +133,10 @@ class AIInsightsService:
         snapshot["communication"]["commentary"] = (
             narrative.get("communication_commentary") or snapshot["communication"]["commentary"]
         )
-        snapshot["provider_intelligence"]["commentary"] = (
-            narrative.get("provider_commentary") or snapshot["provider_intelligence"]["commentary"]
-        )
+        if "provider_intelligence" in snapshot:
+            snapshot["provider_intelligence"]["commentary"] = (
+                narrative.get("provider_commentary") or snapshot.get("provider_intelligence", {}).get("commentary", "")
+            )
         snapshot["trends"]["commentary"] = (
             narrative.get("trend_commentary") or snapshot["trends"]["commentary"]
         )
@@ -144,16 +149,19 @@ class AIInsightsService:
             snapshot["communication"]["templates"] = llm_templates
 
         provider_recommendations = narrative.get("provider_recommendations") or []
-        if provider_recommendations:
+        if provider_recommendations and "provider_intelligence" in snapshot:
             snapshot["provider_intelligence"]["recommendations"] = provider_recommendations
 
-        # Geographic and coordinator commentary from Claude
         if narrative.get("geographic_commentary"):
             snapshot["geographic"]["commentary"] = narrative["geographic_commentary"]
         if narrative.get("coordinator_commentary"):
             snapshot["operational"]["commentary"] = narrative["coordinator_commentary"]
 
         snapshot["llm_enabled"] = bool(settings.anthropic_api_key)
+        snapshot["cached"] = False
+
+        # Cache the result
+        self.cache.set(CACHE_KEY, snapshot, ttl=settings.ai_insights_cache_ttl)
         return snapshot
 
     def _build_snapshot(self) -> dict[str, Any]:
