@@ -181,11 +181,11 @@ html.dark body {
 html.dark .bg-gray-50\/80,
 html.dark .bg-gray-50 { background-color: #0f1419 !important; }
 
-/* Solid white surfaces — NUCLEAR: attribute selector catches ALL bg-white elements */
+/* Solid white surfaces — override Tailwind's rgb(255 255 255) directly */
 html.dark .bg-white,
 html.dark [class~="bg-white"] {
-    --tw-bg-opacity: 1 !important;
-    background-color: #1a2332 !important;
+    --tw-bg-opacity: 0 !important;
+    background: #1a2332 !important;
 }
 
 /* Cards, panels */
