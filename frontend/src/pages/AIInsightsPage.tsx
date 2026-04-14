@@ -296,11 +296,19 @@ function AIInsightsPage() {
         )
     }
 
-    const tone = scoreTone(data.summary.health_score)
+    const tone = scoreTone(data.summary?.health_score ?? 0)
+
+    /* ── Safe data access helpers ── */
+    const stages = data.pipeline?.stages || []
+    const actNow = data.act_now || []
+    const comm = data.communication || {} as any
+    const trends = data.trends || {} as any
+    const operational = data.operational || {} as any
+    const geographic = data.geographic || {} as any
 
     /* ── Funnel data ── */
-    const funnelTotal = data.pipeline.stages.reduce((s, r) => s + (r.count || 0), 0) || 1
-    const funnelStages = data.pipeline.stages.map((stage, i) => ({
+    const funnelTotal = stages.reduce((s: number, r: any) => s + (r.count || 0), 0) || 1
+    const funnelStages = stages.map((stage: any, i: number) => ({
         ...stage,
         pct: Math.round(((stage.count || 0) / funnelTotal) * 100),
         colors: ['bg-blue-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-teal-500'][i] || 'bg-gray-500',
@@ -385,7 +393,7 @@ function AIInsightsPage() {
                     <MetricCard
                         icon={Users}
                         label="New Leads"
-                        value={data.pipeline.stages.find(s => s.label === 'New')?.count || 0}
+                        value={stages.find(s => s.label === 'New')?.count || 0}
                         sub={(() => {
                             const stale = data.pipeline.alerts.find(a => a.label === 'Untouched New Leads')?.count || 0;
                             return stale > 0 ? `${stale} waiting 48h+ for first contact` : 'Awaiting first contact';
@@ -416,7 +424,7 @@ function AIInsightsPage() {
                     <MetricCard
                         icon={Calendar}
                         label="Scheduled"
-                        value={data.pipeline.stages.find(s => s.label === 'Scheduled')?.count || 0}
+                        value={stages.find(s => s.label === 'Scheduled')?.count || 0}
                         sub="Upcoming consultations"
                         accent="sleep"
                     />
@@ -426,7 +434,7 @@ function AIInsightsPage() {
             {/* ═══════════════════════════════════════════════════════════ */}
             {/* SECTION 2 — CONVERSION FUNNEL                             */}
             {/* ═══════════════════════════════════════════════════════════ */}
-            <Section icon={Target} title="Conversion Funnel" subtitle={data.pipeline.commentary}>
+            <Section icon={Target} title="Conversion Funnel" subtitle={data.pipeline?.commentary || ""}>
                 <div className="space-y-3">
                     {funnelStages.map((stage) => (
                         <div key={stage.label} className="flex items-center gap-4">
@@ -460,11 +468,11 @@ function AIInsightsPage() {
                         </div>
                     ))}
                 </div>
-                {data.pipeline.avg_first_contact_hours != null && (
+                {data.pipeline?.avg_first_contact_hours != null && (
                     <div className="mt-5 rounded-xl bg-sleep-50 border border-sleep-200 p-4 text-sm text-sleep-800">
                         <Zap className="inline h-4 w-4 mr-1.5 text-sleep-600" />
-                        Average first contact speed: <strong>{data.pipeline.avg_first_contact_hours} hours</strong>.
-                        {data.pipeline.avg_schedule_days != null && <> Average time to schedule: <strong>{data.pipeline.avg_schedule_days} days</strong>.</>}
+                        Average first contact speed: <strong>{data.pipeline?.avg_first_contact_hours} hours</strong>.
+                        {data.pipeline?.avg_schedule_days != null && <> Average time to schedule: <strong>{data.pipeline?.avg_schedule_days} days</strong>.</>}
                     </div>
                 )}
             </Section>
@@ -473,9 +481,9 @@ function AIInsightsPage() {
             {/* SECTION 3 — HOW TO IMPROVE CONVERSIONS                    */}
             {/* ═══════════════════════════════════════════════════════════ */}
             <Section icon={Sparkles} title="How to Improve Conversions" subtitle="AI-generated strategic recommendations based on your actual data patterns.">
-                {data.act_now.length > 0 ? (
+                {actNow.length > 0 ? (
                     <div className="space-y-3">
-                        {data.act_now.slice(0, 6).map((item) => (
+                        {actNow.slice(0, 6).map((item) => (
                             <div key={item.lead_id} className="rounded-xl border border-gray-200 p-4 hover:border-sleep-300 hover:bg-sleep-50/30 transition-colors">
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1 min-w-0">
@@ -520,16 +528,16 @@ function AIInsightsPage() {
             {/* ═══════════════════════════════════════════════════════════ */}
             {/* SECTION 4 — COMMUNICATION INSIGHTS                        */}
             {/* ═══════════════════════════════════════════════════════════ */}
-            <Section icon={MessageSquare} title="Communication Insights" subtitle={data.communication.commentary}>
+            <Section icon={MessageSquare} title="Communication Insights" subtitle={comm.commentary}>
                 <div className="grid gap-4 md:grid-cols-2 mb-6">
                     <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-5">
                         <div className="text-xs uppercase tracking-wide text-gray-500">Best Time Window</div>
-                        <div className="mt-2 text-3xl font-bold text-gray-900">{data.communication.best_time_of_day}</div>
+                        <div className="mt-2 text-3xl font-bold text-gray-900">{comm.best_time_of_day}</div>
                         <div className="mt-1 text-sm text-gray-500">Highest answer rate based on your outreach data</div>
                     </div>
                     <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-5">
                         <div className="text-xs uppercase tracking-wide text-gray-500">Best Contact Method</div>
-                        <div className="mt-2 text-3xl font-bold text-gray-900">{data.communication.best_contact_method}</div>
+                        <div className="mt-2 text-3xl font-bold text-gray-900">{comm.best_contact_method}</div>
                         <div className="mt-1 text-sm text-gray-500">Channel with the highest success rate</div>
                     </div>
                 </div>
@@ -538,7 +546,7 @@ function AIInsightsPage() {
                     <div className="h-56 rounded-xl bg-gray-50 p-3">
                         <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 px-1 mb-1">Answer Rate by Time of Day</div>
                         <ResponsiveContainer width="100%" height="85%">
-                            <BarChart data={data.communication.timing_rows}>
+                            <BarChart data={comm.timing_rows}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                 <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                                 <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
@@ -550,7 +558,7 @@ function AIInsightsPage() {
                     <div className="h-56 rounded-xl bg-gray-50 p-3">
                         <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 px-1 mb-1">Success Rate by Method</div>
                         <ResponsiveContainer width="100%" height="85%">
-                            <BarChart data={data.communication.method_rows}>
+                            <BarChart data={comm.method_rows}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                 <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
                                 <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
@@ -565,9 +573,9 @@ function AIInsightsPage() {
                 <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
                     <Copy className="h-4 w-4 text-gray-400" /> Outreach Scripts
                 </h3>
-                {data.communication.templates.length > 0 ? (
+                {comm.templates.length > 0 ? (
                     <div className="grid gap-3 md:grid-cols-2">
-                        {data.communication.templates.map((tmpl) => (
+                        {comm.templates.map((tmpl) => (
                             <div key={tmpl.id} className="rounded-xl border border-gray-200 p-4 hover:border-sleep-200 transition-colors">
                                 <div className="flex items-center justify-between gap-3 mb-2">
                                     <span className="text-sm font-semibold text-gray-900">{tmpl.title}</span>
@@ -590,15 +598,15 @@ function AIInsightsPage() {
             {/* SECTION 6 — COORDINATOR PERFORMANCE                       */}
             {/* ═══════════════════════════════════════════════════════════ */}
             <Section icon={Users} title="Coordinator Performance" subtitle="Who is converting leads — ranked by completion rate.">
-                {(data.operational?.team_performance?.length ?? 0) > 0 ? (
+                {(operational?.team_performance?.length ?? 0) > 0 ? (
                     <div>
-                        {data.operational?.commentary && (
+                        {operational?.commentary && (
                             <div className="rounded-xl bg-sleep-50 border border-sleep-200 p-4 mb-4">
-                                <p className="text-sm text-sleep-800 leading-relaxed"><Brain className="inline h-4 w-4 mr-1.5 text-sleep-600" />{data.operational.commentary}</p>
+                                <p className="text-sm text-sleep-800 leading-relaxed"><Brain className="inline h-4 w-4 mr-1.5 text-sleep-600" />{operational.commentary}</p>
                             </div>
                         )}
                         <div className="space-y-3">
-                            {data.operational!.team_performance.slice(0, 6).map((u: any, i: number) => {
+                            {operational!.team_performance.slice(0, 6).map((u: any, i: number) => {
                                 return (
                                     <div key={u.name} className="rounded-xl border border-gray-100 p-4">
                                         <div className="flex items-center gap-4 mb-3">
@@ -649,16 +657,16 @@ function AIInsightsPage() {
             {/* SECTION 7 — GEOGRAPHIC INSIGHTS (CITY NAMES)              */}
             {/* ═══════════════════════════════════════════════════════════ */}
             <Section icon={BarChart3} title="Geographic Insights" subtitle="Where your leads are coming from — resolved to city names. Use this for targeted marketing.">
-                {(data.geographic?.top_cities?.length ?? 0) > 0 ? (
+                {(geographic?.top_cities?.length ?? 0) > 0 ? (
                     <div>
-                        {data.geographic?.commentary && (
+                        {geographic?.commentary && (
                             <div className="rounded-xl bg-sleep-50 border border-sleep-200 p-4 mb-4">
-                                <p className="text-sm text-sleep-800 leading-relaxed"><Brain className="inline h-4 w-4 mr-1.5 text-sleep-600" />{data.geographic.commentary}</p>
+                                <p className="text-sm text-sleep-800 leading-relaxed"><Brain className="inline h-4 w-4 mr-1.5 text-sleep-600" />{geographic.commentary}</p>
                             </div>
                         )}
                         <div className="space-y-2.5">
-                            {data.geographic!.top_cities.slice(0, 10).map((z: any) => {
-                                const maxCount = data.geographic!.top_cities[0]?.count || 1
+                            {geographic!.top_cities.slice(0, 10).map((z: any) => {
+                                const maxCount = geographic!.top_cities[0]?.count || 1
                                 return (
                                     <div key={z.city} className="flex items-center gap-3">
                                         <span className="w-28 text-sm font-semibold text-gray-800 shrink-0 truncate">{z.city}</span>
@@ -688,10 +696,10 @@ function AIInsightsPage() {
             {/* SECTION 8 — EXPANSION OPPORTUNITIES                       */}
             {/* ═══════════════════════════════════════════════════════════ */}
             <Section icon={Target} title="Expansion Opportunities" subtitle="Specific locations recorded by coordinators during calls — identify where to scale next.">
-                {data.geographic?.top_locations?.length ? (
+                {geographic?.top_locations?.length ? (
                     <div>
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {data.geographic!.top_locations.slice(0, 12).map((l: any, i: number) => (
+                            {geographic!.top_locations.slice(0, 12).map((l: any, i: number) => (
                                 <div key={l.location} className="flex items-center gap-3 p-4 rounded-xl border border-gray-100 hover:border-amber-200 hover:shadow-sm transition-all">
                                     <div className={`flex h-11 w-11 items-center justify-center rounded-xl text-lg font-bold text-white shrink-0 ${i === 0 ? 'bg-gradient-to-br from-amber-500 to-orange-500 shadow-lg shadow-amber-200' : i < 3 ? 'bg-gradient-to-br from-amber-400 to-amber-500' : 'bg-gray-400'}`}>
                                         {l.count}
@@ -720,14 +728,14 @@ function AIInsightsPage() {
             {/* ═══════════════════════════════════════════════════════════ */}
             {/* SECTION 9 — TRENDS & FORECASTING                          */}
             {/* ═══════════════════════════════════════════════════════════ */}
-                <Section icon={LineChartIcon} title="Trends & Forecasting" subtitle={data.trends.commentary}>
-                    {(data.trends.weekly.length > 0 || data.trends.monthly.length > 0) ? (
+                <Section icon={LineChartIcon} title="Trends & Forecasting" subtitle={trends.commentary}>
+                    {(trends.weekly.length > 0 || trends.monthly.length > 0) ? (
                         <div className="space-y-4">
-                            {data.trends.weekly.length > 0 && (
+                            {trends.weekly.length > 0 && (
                                 <div className="h-56 rounded-xl bg-gray-50 p-3">
                                     <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 px-1 mb-1">Weekly Volume</div>
                                     <ResponsiveContainer width="100%" height="85%">
-                                        <AreaChart data={data.trends.weekly}>
+                                        <AreaChart data={trends.weekly}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                             <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
                                             <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
@@ -738,11 +746,11 @@ function AIInsightsPage() {
                                     </ResponsiveContainer>
                                 </div>
                             )}
-                            {data.trends.monthly.length > 0 && (
+                            {trends.monthly.length > 0 && (
                                 <div className="h-56 rounded-xl bg-gray-50 p-3">
                                     <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 px-1 mb-1">Monthly Trend</div>
                                     <ResponsiveContainer width="100%" height="85%">
-                                        <LineChart data={data.trends.monthly}>
+                                        <LineChart data={trends.monthly}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                             <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
                                             <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
@@ -763,7 +771,7 @@ function AIInsightsPage() {
                         <div className="flex items-center gap-2 text-xs font-semibold text-white/60 uppercase tracking-wide mb-2">
                             <TrendingUp className="h-3.5 w-3.5" /> Forecast
                         </div>
-                        <p className="text-sm font-medium leading-relaxed">{data.trends.forecast.summary}</p>
+                        <p className="text-sm font-medium leading-relaxed">{trends.forecast.summary}</p>
                     </div>
                     {/* Powered by Claude badge */}
                     <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
