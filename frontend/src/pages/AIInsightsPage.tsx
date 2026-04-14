@@ -737,50 +737,11 @@ function AIInsightsPage() {
                 )}
             </Section>
 
-            {/* ═══════════════════════════════════════════════════════════ */}
-            {/* SECTION 9 — TRENDS & FORECASTING                          */}
-            {/* ═══════════════════════════════════════════════════════════ */}
-                <Section icon={TrendingUp} title="Trends & Forecasting" subtitle={safeText(trends.commentary)}>
-                    {(trends.weekly || []).length > 0 ? (
-                        <div className="space-y-4">
-                            <div className="rounded-xl bg-gray-50 p-4">
-                                <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-3">Weekly Lead Volume</div>
-                                <div className="flex items-end gap-1 h-32">
-                                    {(trends.weekly || []).map((w: any) => {
-                                        const max = Math.max(...(trends.weekly || []).map((x: any) => x.leads || 0), 1)
-                                        return (
-                                            <div key={w.label} className="flex-1 flex flex-col items-center gap-1">
-                                                <div className="w-full bg-sleep-400 rounded-t" style={{ height: `${Math.max(((w.leads || 0) / max) * 100, 4)}%` }} />
-                                                <span className="text-[9px] text-gray-400">{w.label}</span>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="rounded-xl border border-dashed border-sleep-200 bg-sleep-50/50 p-4 text-sm text-sleep-800">
-                            Trend data will appear once enough weekly history exists.
-                        </div>
-                    )}
-                    <div className="mt-4 rounded-xl bg-gray-950 p-5 text-white">
-                        <div className="flex items-center gap-2 text-xs font-semibold text-white/60 uppercase tracking-wide mb-2">
-                            <TrendingUp className="h-3.5 w-3.5" /> Forecast
-                        </div>
-                        <p className="text-sm font-medium leading-relaxed">{safeText(trends.forecast?.summary)}</p>
-                    </div>
-                    {/* Powered by Claude badge */}
-                    <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
-                        <Sparkles className="h-3.5 w-3.5" />
-                        <span>Powered by Claude AI · Real-time analysis refreshes on demand</span>
-                    </div>
-                </Section>
-
-            {data.insufficient_data && (
-                <div className="rounded-xl border border-dashed border-sleep-200 bg-sleep-50/50 p-5 text-sm text-sleep-800">
-                    There is limited historical data, so these recommendations are directional. As more leads progress through the funnel, insights will become more precise and actionable.
-                </div>
-            )}
+            {/* Powered by Claude badge */}
+            <div className="flex items-center justify-center gap-2 text-xs text-gray-400 pt-2">
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Powered by Claude AI · Real-time analysis refreshes on demand</span>
+            </div>
         </div>
     )
 }
