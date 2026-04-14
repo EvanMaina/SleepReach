@@ -408,3 +408,47 @@ html.dark .border-b,
 html.dark .divide-y > * {
     border-color: rgba(45, 58, 74, 0.5) !important;
 }
+
+/* ── ALL MODALS visible in dark mode ── */
+html.dark [class*="max-w-"][class*="bg-white"],
+html.dark [class*="max-w-"][class*="rounded"],
+html.dark .modal,
+html.dark [role="dialog"] {
+    background-color: #1a2332 !important;
+    color: #e2e8f0 !important;
+}
+
+/* Modal header areas with gradients */
+html.dark [class*="max-w-"] [class*="bg-gradient"] {
+    color: #ffffff !important;
+}
+
+/* Modal labels */
+html.dark label,
+html.dark .uppercase.tracking-wider {
+    color: #a8b8c8 !important;
+}
+
+/* Modal select dropdowns */
+html.dark select {
+    background-color: #131c28 !important;
+    border-color: #2d3a4a !important;
+    color: #e2e8f0 !important;
+}
+
+/* Toggle/switch text in modals */
+html.dark [class*="max-w-"] .text-gray-900,
+html.dark [class*="max-w-"] .text-gray-800,
+html.dark [class*="max-w-"] .text-gray-700 {
+    color: #e2e8f0 !important;
+}
+
+/* File upload zone */
+html.dark [class*="border-dashed"] {
+    background-color: #131c28 !important;
+    border-color: #2d3a4a !important;
+}
+html.dark [class*="border-dashed"] span,
+html.dark [class*="border-dashed"] p {
+    color: #a8b8c8 !important;
+}
