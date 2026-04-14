@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..core.auth import get_current_user
@@ -34,7 +34,7 @@ async def generate_ai_email(
     """Generate an AI-powered personalized email for a specific lead."""
     import httpx
     from ..models.lead import Lead
-    from ..services.encryption_service import EncryptionService
+    from ..services.encryption import EncryptionService
     from ..core.config import settings
 
     lead = db.query(Lead).filter(Lead.id == lead_id, Lead.deleted_at.is_(None)).first()
