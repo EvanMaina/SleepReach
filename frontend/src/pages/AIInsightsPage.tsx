@@ -11,7 +11,6 @@ import {
     Clock,
     Copy,
     Heart,
-    LineChart as LineChartIcon,
     MessageSquare,
     PhoneCall,
     RefreshCw,
@@ -21,19 +20,7 @@ import {
     Users,
     Zap,
 } from 'lucide-react'
-import {
-    ResponsiveContainer,
-    AreaChart,
-    Area,
-    CartesianGrid,
-    XAxis,
-    YAxis,
-    Tooltip,
-    LineChart,
-    Line,
-    BarChart,
-    Bar,
-} from 'recharts'
+/* recharts removed — using CSS-based visualizations for stability */
 import toast from 'react-hot-toast'
 import { aiInsightsAPI } from '../lib/api'
 
@@ -544,29 +531,33 @@ function AIInsightsPage() {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2 mb-6">
-                    <div className="h-56 rounded-xl bg-gray-50 p-3">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 px-1 mb-1">Answer Rate by Time of Day</div>
-                        <ResponsiveContainer width="100%" height="85%">
-                            <BarChart data={comm.timing_rows}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-                                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-                                <Tooltip />
-                                <Bar dataKey="positive_rate" name="Answer Rate %" fill="#4a6fa5" radius={[6, 6, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                    <div className="rounded-xl bg-gray-50 p-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-3">Answer Rate by Time of Day</div>
+                        <div className="space-y-2">
+                            {(comm.timing_rows || []).map((row: any) => (
+                                <div key={row.label} className="flex items-center gap-3">
+                                    <span className="w-20 text-xs font-medium text-gray-600 shrink-0">{row.label}</span>
+                                    <div className="flex-1 h-6 bg-gray-200 rounded-lg overflow-hidden">
+                                        <div className="h-full bg-sleep-500 rounded-lg" style={{ width: `${Math.min(row.positive_rate || 0, 100)}%` }} />
+                                    </div>
+                                    <span className="w-10 text-xs font-bold text-gray-700 text-right">{row.positive_rate || 0}%</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                    <div className="h-56 rounded-xl bg-gray-50 p-3">
-                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 px-1 mb-1">Success Rate by Method</div>
-                        <ResponsiveContainer width="100%" height="85%">
-                            <BarChart data={comm.method_rows}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-                                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-                                <Tooltip />
-                                <Bar dataKey="success_rate" name="Success Rate %" fill="#26a9b5" radius={[6, 6, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                    <div className="rounded-xl bg-gray-50 p-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-3">Success Rate by Method</div>
+                        <div className="space-y-2">
+                            {(comm.method_rows || []).map((row: any) => (
+                                <div key={row.label} className="flex items-center gap-3">
+                                    <span className="w-20 text-xs font-medium text-gray-600 shrink-0">{row.label}</span>
+                                    <div className="flex-1 h-6 bg-gray-200 rounded-lg overflow-hidden">
+                                        <div className="h-full bg-teal-500 rounded-lg" style={{ width: `${Math.min(row.success_rate || 0, 100)}%` }} />
+                                    </div>
+                                    <span className="w-10 text-xs font-bold text-gray-700 text-right">{row.success_rate || 0}%</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
@@ -729,43 +720,27 @@ function AIInsightsPage() {
             {/* ═══════════════════════════════════════════════════════════ */}
             {/* SECTION 9 — TRENDS & FORECASTING                          */}
             {/* ═══════════════════════════════════════════════════════════ */}
-                <Section icon={LineChartIcon} title="Trends & Forecasting" subtitle={trends.commentary}>
-                    {(trends.weekly.length > 0 || trends.monthly.length > 0) ? (
+                <Section icon={TrendingUp} title="Trends & Forecasting" subtitle={trends.commentary || ''}>
+                    {(trends.weekly || []).length > 0 ? (
                         <div className="space-y-4">
-                            {trends.weekly.length > 0 && (
-                                <div className="h-56 rounded-xl bg-gray-50 p-3">
-                                    <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 px-1 mb-1">Weekly Volume</div>
-                                    <ResponsiveContainer width="100%" height="85%">
-                                        <AreaChart data={trends.weekly}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                            <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
-                                            <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
-                                            <Tooltip />
-                                            <Area dataKey="leads" name="Leads" stroke="#4a6fa5" fill="#4a6fa5" fillOpacity={0.15} />
-                                            <Area dataKey="scheduled" name="Scheduled" stroke="#26a9b5" fill="#26a9b5" fillOpacity={0.12} />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
+                            <div className="rounded-xl bg-gray-50 p-4">
+                                <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 mb-3">Weekly Lead Volume</div>
+                                <div className="flex items-end gap-1 h-32">
+                                    {(trends.weekly || []).map((w: any) => {
+                                        const max = Math.max(...(trends.weekly || []).map((x: any) => x.leads || 0), 1)
+                                        return (
+                                            <div key={w.label} className="flex-1 flex flex-col items-center gap-1">
+                                                <div className="w-full bg-sleep-400 rounded-t" style={{ height: `${Math.max(((w.leads || 0) / max) * 100, 4)}%` }} />
+                                                <span className="text-[9px] text-gray-400">{w.label}</span>
+                                            </div>
+                                        )
+                                    })}
                                 </div>
-                            )}
-                            {trends.monthly.length > 0 && (
-                                <div className="h-56 rounded-xl bg-gray-50 p-3">
-                                    <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 px-1 mb-1">Monthly Trend</div>
-                                    <ResponsiveContainer width="100%" height="85%">
-                                        <LineChart data={trends.monthly}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                            <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
-                                            <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10 }} />
-                                            <Tooltip />
-                                            <Line type="monotone" dataKey="leads" name="Leads" stroke="#4a6fa5" strokeWidth={2.5} dot={false} />
-                                            <Line type="monotone" dataKey="completed" name="Completed" stroke="#ee9a1d" strokeWidth={2.5} dot={false} />
-                                        </LineChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            )}
+                            </div>
                         </div>
                     ) : (
                         <div className="rounded-xl border border-dashed border-sleep-200 bg-sleep-50/50 p-4 text-sm text-sleep-800">
-                            Trend charts will appear once enough weekly and monthly history exists.
+                            Trend data will appear once enough weekly history exists.
                         </div>
                     )}
                     <div className="mt-4 rounded-xl bg-gray-950 p-5 text-white">
