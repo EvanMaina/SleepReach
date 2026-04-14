@@ -452,3 +452,16 @@ html.dark [class*="border-dashed"] span,
 html.dark [class*="border-dashed"] p {
     color: #a8b8c8 !important;
 }
+
+/* ── Modal header gradients — kill white in dark mode ── */
+html.dark .via-white { --tw-gradient-via: #1a2332 !important; --tw-gradient-stops: var(--tw-gradient-from), #1a2332, var(--tw-gradient-to) !important; }
+html.dark .to-white { --tw-gradient-to: #1a2332 !important; }
+html.dark .from-emerald-50 { --tw-gradient-from: rgba(16, 185, 129, 0.1) !important; }
+html.dark .from-sleep-50 { --tw-gradient-from: rgba(74, 111, 165, 0.1) !important; }
+html.dark .from-blue-50 { --tw-gradient-from: rgba(59, 130, 246, 0.1) !important; }
+
+/* Ensure modal containers get dark bg even with gradients */
+html.dark .bg-gradient-to-r[class*="via-white"] {
+    background-image: none !important;
+    background: #1a2332 !important;
+}
