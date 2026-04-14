@@ -773,22 +773,50 @@ function AIInsightsPage() {
     )
 }
 
-/* ─── Error Boundary — prevents white screen crash ─── */
-function SafeAIInsightsPage() {
-    try {
-        return <AIInsightsPage />
-    } catch (e: any) {
-        return (
-            <div className="p-8">
-                <h1 className="text-2xl font-bold text-red-600 mb-4">AI Insights Debug Error</h1>
-                <pre className="bg-red-50 p-4 rounded-xl text-sm text-red-800 whitespace-pre-wrap">
-                    {e?.message || 'Unknown error'}
-                    {'\n\n'}
-                    {e?.stack || ''}
-                </pre>
-            </div>
-        )
+/* ─── Error Boundary — the ONLY way to catch React render errors ─── */
+class AIInsightsErrorBoundary extends React.Component<
+    { children: React.ReactNode },
+    { hasError: boolean; errorMsg: string }
+> {
+    state = { hasError: false, errorMsg: '' }
+    static getDerivedStateFromError(error: Error) {
+        return { hasError: true, errorMsg: error?.message || 'Unknown error' }
+    }
+    componentDidCatch(error: Error, info: React.ErrorInfo) {
+        console.error('AI Insights crash:', error, info.componentStack)
+    }
+    render() {
+        if (this.state.hasError) {
+            return (
+                <div className="p-8">
+                    <div className="max-w-2xl mx-auto">
+                        <div className="flex items-center gap-3 mb-4">
+                            <Brain className="h-8 w-8 text-red-400" />
+                            <h2 className="text-xl font-bold text-gray-900">AI Insights Error</h2>
+                        </div>
+                        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+                            <p className="text-sm text-red-700 font-mono">{this.state.errorMsg}</p>
+                        </div>
+                        <button
+                            onClick={() => { this.setState({ hasError: false, errorMsg: '' }); window.location.reload() }}
+                            className="inline-flex items-center gap-2 rounded-xl bg-sleep-600 px-5 py-3 text-sm font-semibold text-white hover:bg-sleep-700"
+                        >
+                            <RefreshCw className="h-4 w-4" /> Reload Page
+                        </button>
+                    </div>
+                </div>
+            )
+        }
+        return this.props.children
     }
 }
 
-export { SafeAIInsightsPage as default }
+function AIInsightsPageSafe() {
+    return (
+        <AIInsightsErrorBoundary>
+            <AIInsightsPage />
+        </AIInsightsErrorBoundary>
+    )
+}
+
+export { AIInsightsPageSafe as default }
