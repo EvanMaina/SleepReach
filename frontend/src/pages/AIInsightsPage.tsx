@@ -137,6 +137,18 @@ function funnelBarWidth(pct: number) {
     return `${Math.max(pct, 5)}%`
 }
 
+/* ─────────── Safe text — prevents "Objects are not valid as React child" ─────────── */
+function safeText(val: any): string {
+    if (val == null) return ''
+    if (typeof val === 'string') return val
+    if (typeof val === 'number') return String(val)
+    if (typeof val === 'object') {
+        // Claude sometimes returns objects instead of strings
+        return Object.values(val).filter(v => typeof v === 'string').join(' ') || JSON.stringify(val)
+    }
+    return String(val)
+}
+
 /* ─────────── Section Card ─────────── */
 function Section({ icon: Icon, title, subtitle, children, className = '' }: {
     icon: typeof Brain
@@ -327,8 +339,8 @@ function AIInsightsPage() {
                                 <h1 className="text-2xl font-bold">AI Insights</h1>
                                 <span className={`rounded-full px-3 py-1 text-xs font-semibold ${tone.bg}/20 ${tone.text}`}>{tone.label}</span>
                             </div>
-                            <p className="mt-2 max-w-3xl text-sm text-white/70">{summary.headline}</p>
-                            <p className="mt-1 max-w-3xl text-sm text-white/50">{summary.detail}</p>
+                            <p className="mt-2 max-w-3xl text-sm text-white/70">{safeText(summary.headline)}</p>
+                            <p className="mt-1 max-w-3xl text-sm text-white/50">{safeText(summary.detail)}</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -430,7 +442,7 @@ function AIInsightsPage() {
             {/* ═══════════════════════════════════════════════════════════ */}
             {/* SECTION 2 — CONVERSION FUNNEL                             */}
             {/* ═══════════════════════════════════════════════════════════ */}
-            <Section icon={Target} title="Conversion Funnel" subtitle={data.pipeline?.commentary || ""}>
+            <Section icon={Target} title="Conversion Funnel" subtitle={safeText(data.pipeline?.commentary)}>
                 <div className="space-y-3">
                     {funnelStages.map((stage) => (
                         <div key={stage.label} className="flex items-center gap-4">
@@ -524,7 +536,7 @@ function AIInsightsPage() {
             {/* ═══════════════════════════════════════════════════════════ */}
             {/* SECTION 4 — COMMUNICATION INSIGHTS                        */}
             {/* ═══════════════════════════════════════════════════════════ */}
-            <Section icon={MessageSquare} title="Communication Insights" subtitle={comm.commentary}>
+            <Section icon={MessageSquare} title="Communication Insights" subtitle={safeText(comm.commentary)}>
                 <div className="grid gap-4 md:grid-cols-2 mb-6">
                     <div className="rounded-xl border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-5">
                         <div className="text-xs uppercase tracking-wide text-gray-500">Best Time Window</div>
@@ -602,7 +614,7 @@ function AIInsightsPage() {
                     <div>
                         {operational?.commentary && (
                             <div className="rounded-xl bg-sleep-50 border border-sleep-200 p-4 mb-4">
-                                <p className="text-sm text-sleep-800 leading-relaxed"><Brain className="inline h-4 w-4 mr-1.5 text-sleep-600" />{operational.commentary}</p>
+                                <p className="text-sm text-sleep-800 leading-relaxed"><Brain className="inline h-4 w-4 mr-1.5 text-sleep-600" />{safeText(operational.commentary)}</p>
                             </div>
                         )}
                         <div className="space-y-3">
@@ -661,7 +673,7 @@ function AIInsightsPage() {
                     <div>
                         {geographic?.commentary && (
                             <div className="rounded-xl bg-sleep-50 border border-sleep-200 p-4 mb-4">
-                                <p className="text-sm text-sleep-800 leading-relaxed"><Brain className="inline h-4 w-4 mr-1.5 text-sleep-600" />{geographic.commentary}</p>
+                                <p className="text-sm text-sleep-800 leading-relaxed"><Brain className="inline h-4 w-4 mr-1.5 text-sleep-600" />{safeText(geographic.commentary)}</p>
                             </div>
                         )}
                         <div className="space-y-2.5">
@@ -728,7 +740,7 @@ function AIInsightsPage() {
             {/* ═══════════════════════════════════════════════════════════ */}
             {/* SECTION 9 — TRENDS & FORECASTING                          */}
             {/* ═══════════════════════════════════════════════════════════ */}
-                <Section icon={TrendingUp} title="Trends & Forecasting" subtitle={trends.commentary || ''}>
+                <Section icon={TrendingUp} title="Trends & Forecasting" subtitle={safeText(trends.commentary)}>
                     {(trends.weekly || []).length > 0 ? (
                         <div className="space-y-4">
                             <div className="rounded-xl bg-gray-50 p-4">
@@ -755,7 +767,7 @@ function AIInsightsPage() {
                         <div className="flex items-center gap-2 text-xs font-semibold text-white/60 uppercase tracking-wide mb-2">
                             <TrendingUp className="h-3.5 w-3.5" /> Forecast
                         </div>
-                        <p className="text-sm font-medium leading-relaxed">{trends.forecast.summary}</p>
+                        <p className="text-sm font-medium leading-relaxed">{safeText(trends.forecast?.summary)}</p>
                     </div>
                     {/* Powered by Claude badge */}
                     <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-400">
