@@ -303,6 +303,14 @@ function AIInsightsPage() {
         lightColors: ['bg-blue-50 text-blue-700', 'bg-indigo-50 text-indigo-700', 'bg-emerald-50 text-emerald-700', 'bg-teal-50 text-teal-700'][i] || 'bg-gray-50 text-gray-700',
     }))
 
+    // DEBUG: Log data to help find crash source
+    try {
+        console.log('AI Insights data keys:', data ? Object.keys(data) : 'null')
+        console.log('summary:', !!summary, 'stages:', stages?.length, 'actNow:', actNow?.length)
+        console.log('comm keys:', comm ? Object.keys(comm) : 'none')
+        console.log('trends keys:', trends ? Object.keys(trends) : 'none')
+    } catch (e) { console.error('Debug log failed:', e) }
+
     return (
         <div className="space-y-6 pb-8">
             {/* ═══════════════════════════════════════════════════════════ */}
@@ -766,42 +774,21 @@ function AIInsightsPage() {
 }
 
 /* ─── Error Boundary — prevents white screen crash ─── */
-class AIInsightsErrorBoundary extends React.Component<
-    { children: React.ReactNode },
-    { hasError: boolean }
-> {
-    state = { hasError: false }
-    static getDerivedStateFromError() { return { hasError: true } }
-    render() {
-        if (this.state.hasError) {
-            return (
-                <div className="flex items-center justify-center py-32">
-                    <div className="max-w-md text-center">
-                        <div className="flex h-14 w-14 mx-auto items-center justify-center rounded-2xl bg-red-50 border border-red-100 mb-4">
-                            <Brain className="h-7 w-7 text-red-400" />
-                        </div>
-                        <h2 className="text-lg font-bold text-gray-900">Something went wrong</h2>
-                        <p className="mt-2 text-sm text-gray-500">The AI Insights page encountered an error.</p>
-                        <button
-                            onClick={() => { this.setState({ hasError: false }); window.location.reload() }}
-                            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-sleep-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sleep-700"
-                        >
-                            <RefreshCw className="h-4 w-4" /> Reload Page
-                        </button>
-                    </div>
-                </div>
-            )
-        }
-        return this.props.children
+function SafeAIInsightsPage() {
+    try {
+        return <AIInsightsPage />
+    } catch (e: any) {
+        return (
+            <div className="p-8">
+                <h1 className="text-2xl font-bold text-red-600 mb-4">AI Insights Debug Error</h1>
+                <pre className="bg-red-50 p-4 rounded-xl text-sm text-red-800 whitespace-pre-wrap">
+                    {e?.message || 'Unknown error'}
+                    {'\n\n'}
+                    {e?.stack || ''}
+                </pre>
+            </div>
+        )
     }
 }
 
-function AIInsightsPageWrapped() {
-    return (
-        <AIInsightsErrorBoundary>
-            <AIInsightsPage />
-        </AIInsightsErrorBoundary>
-    )
-}
-
-export { AIInsightsPageWrapped as default }
+export { SafeAIInsightsPage as default }
