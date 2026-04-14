@@ -64,6 +64,7 @@ import {
   Upload,
   Image,
   FileSpreadsheet,
+  Sparkles,
 } from "lucide-react";
 import api, { leadsAPI, communicationsAPI } from "../lib/api";
 import { useAuth } from "../contexts/AuthContext";
@@ -1331,10 +1332,31 @@ export default function CoordinatorPage({
     setSmsMessage(personalizeTemplate(template?.message || "", lead));
   };
 
+  const [aiEmailScript, setAiEmailScript] = useState<{ action: string; script: string } | null>(null);
+
   const openEmailDialog = async (lead: Lead | null) => {
     const { email } = await ensureTemplatesLoaded();
     setEmailDialogLead(lead);
     setEmailDialogOpen(true);
+    setAiEmailScript(null);
+
+    // Check if AI has a personalized script for this lead
+    if (lead) {
+      try {
+        const res = await api.get("/ai-insights");
+        const actNow = res.data?.act_now || [];
+        const match = actNow.find((item: any) => item.lead_id === lead.id);
+        if (match?.script && match?.recommended_action) {
+          setAiEmailScript({ action: match.recommended_action, script: match.script });
+          // Auto-apply the AI script
+          setSelectedEmailTemplate("ai_recommended");
+          setEmailSubject(`Following up on your sleep consultation inquiry`);
+          setEmailBody(match.script);
+          return;
+        }
+      } catch { /* fall through to default template */ }
+    }
+
     const templateId = lead ? "follow_up" : "custom";
     const template = email.find((item) => item.id === templateId);
     setSelectedEmailTemplate(templateId);
@@ -2817,6 +2839,18 @@ export default function CoordinatorPage({
                 Templates
               </p>
               <div className="flex flex-wrap gap-2">
+                {aiEmailScript && (
+                  <button
+                    onClick={() => {
+                      setSelectedEmailTemplate("ai_recommended");
+                      setEmailSubject("Following up on your sleep consultation inquiry");
+                      setEmailBody(aiEmailScript.script);
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors flex items-center gap-1 ${selectedEmailTemplate === "ai_recommended" ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-white text-purple-600 border-purple-200 hover:border-purple-300 hover:bg-purple-50"}`}
+                  >
+                    <Sparkles size={12} /> AI Recommended
+                  </button>
+                )}
                 {emailTemplates
                   .filter((template) => template.id !== "lead_receipt")
                   .map((template) => (
