@@ -465,3 +465,14 @@ html.dark .bg-gradient-to-r[class*="via-white"] {
     background-image: none !important;
     background: #1a2332 !important;
 }
+
+/* ── Settings page dark mode — ALL sections visible ── */
+html.dark .bg-sleep-50\/50,
+html.dark .bg-sleep-50\/30 { background-color: rgba(74, 111, 165, 0.1) !important; }
+html.dark .bg-gray-50\/50 { background-color: rgba(30, 45, 61, 0.5) !important; }
+html.dark .bg-gray-50\/80 { background-color: #131c28 !important; }
+html.dark .text-gray-900, html.dark .text-gray-800 { color: #f1f5f9 !important; }
+html.dark .text-gray-700 { color: #e2e8f0 !important; }
+html.dark .text-gray-600 { color: #cbd5e1 !important; }
+html.dark .text-gray-500 { color: #a8b8c8 !important; }
+html.dark .text-gray-400 { color: #8899aa !important; }
