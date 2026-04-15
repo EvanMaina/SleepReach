@@ -107,6 +107,7 @@ export const usersAPI = {
     create: (data: any) => api.post('/users', data),
     update: (id: string, data: any) => api.put(`/users/${id}`, data),
     delete: (id: string) => api.delete(`/users/${id}`),
+    deletePermanently: (id: string) => api.delete(`/users/${id}/permanent`),
     getPreferences: () => api.get('/users/me/preferences'),
     updatePreferences: (data: any) => api.put('/users/me/preferences', data),
     getClinicSettings: () => api.get('/users/clinic-settings'),

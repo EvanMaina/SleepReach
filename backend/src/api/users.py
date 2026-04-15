@@ -415,3 +415,32 @@ async def deactivate_user(
     user.status = UserStatus.INACTIVE
     db.commit()
     return {"success": True, "message": "User deactivated"}
+
+
+@router.delete("/{user_id}/permanent")
+async def permanently_delete_user(
+    user_id: str,
+    caller: User = Depends(require_role("primary_admin")),
+    db: Session = Depends(get_db),
+):
+    """
+    Permanently delete a user from the database.
+    Only primary_admin can perform this action.
+    Cannot delete yourself or another primary_admin.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if str(caller.id) == str(user.id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot delete your own account")
+
+    if user.role == UserRole.PRIMARY_ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot permanently delete a primary admin")
+
+    # Delete related records first
+    from ..models.user import UserPreferences
+    db.query(UserPreferences).filter(UserPreferences.user_id == user.id).delete()
+    db.delete(user)
+    db.commit()
+    return {"success": True, "message": "User permanently deleted"}
