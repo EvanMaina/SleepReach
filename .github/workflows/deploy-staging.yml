@@ -1,0 +1,68 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [stg]
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REGISTRY: 131880217305.dkr.ecr.us-east-2.amazonaws.com
+  ECS_CLUSTER: sleepreach-cluster
+
+jobs:
+  checks:
+    name: Pre-Deploy Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+      - name: TypeScript check
+        run: cd frontend && npx tsc --noEmit
+      - name: Vite build check
+        run: cd frontend && npx vite build
+
+  deploy:
+    name: Deploy Staging
+    needs: checks
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & push backend image
+        run: |
+          docker build -t $ECR_REGISTRY/sleepreach/backend:stg-${{ github.sha }} -t $ECR_REGISTRY/sleepreach/backend:stg-latest --target production -f backend/Dockerfile backend/
+          docker push $ECR_REGISTRY/sleepreach/backend:stg-${{ github.sha }}
+          docker push $ECR_REGISTRY/sleepreach/backend:stg-latest
+
+      - name: Build & push frontend image
+        run: |
+          docker build -t $ECR_REGISTRY/sleepreach/frontend:stg-${{ github.sha }} -t $ECR_REGISTRY/sleepreach/frontend:stg-latest --target production -f frontend/Dockerfile frontend/
+          docker push $ECR_REGISTRY/sleepreach/frontend:stg-${{ github.sha }}
+          docker push $ECR_REGISTRY/sleepreach/frontend:stg-latest
+
+      - name: Update ECS services
+        run: |
+          aws ecs update-service --cluster $ECS_CLUSTER --service sleepreach-stg-backend --force-new-deployment --desired-count 1
+          aws ecs update-service --cluster $ECS_CLUSTER --service sleepreach-stg-frontend --force-new-deployment --desired-count 1
+          aws ecs update-service --cluster $ECS_CLUSTER --service sleepreach-stg-celery --force-new-deployment --desired-count 1
+
+      - name: Wait for services stable
+        run: |
+          aws ecs wait services-stable --cluster $ECS_CLUSTER --services sleepreach-stg-backend sleepreach-stg-frontend
+          echo "Staging deployment complete!"
