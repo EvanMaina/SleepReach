@@ -1,0 +1,309 @@
+# =============================================================================
+# SleepReach — Manual Rollback Workflow
+# Allows quick rollback to a previous ECS task definition revision or ECR image
+# =============================================================================
+name: 🔄 Rollback Production
+
+on:
+    workflow_dispatch:
+        inputs:
+            rollback_type:
+                description: "Rollback method"
+                required: true
+                type: choice
+                options:
+                    - previous-task-definition
+                    - specific-image-tag
+            image_tag:
+                description: "ECR image tag (only for specific-image-tag, e.g. prod-18513d3)"
+                required: false
+                type: string
+            services:
+                description: "Which services to rollback"
+                required: true
+                type: choice
+                options:
+                    - both
+                    - backend-only
+                    - celery-only
+            confirm:
+                description: "Type 'ROLLBACK' to confirm"
+                required: true
+                type: string
+
+concurrency:
+    group: deploy-production
+    cancel-in-progress: false
+
+env:
+    AWS_REGION: us-east-2
+    ECR_REGISTRY: 131880217305.dkr.ecr.us-east-2.amazonaws.com
+    ECR_REPOSITORY: sleepreach/backend
+    ECS_CLUSTER: sleepreach-cluster
+    ECS_SERVICE_BACKEND: sleepreach-prod-backend
+    ECS_SERVICE_CELERY: sleepreach-prod-celery
+    TASK_DEF_BACKEND: sleepreach-prod-backend
+    TASK_DEF_CELERY: sleepreach-prod-celery
+    CONTAINER_NAME_BACKEND: backend
+    CONTAINER_NAME_CELERY: celery
+    PRODUCTION_URL: https://api.sleeplessinarizona.com
+
+permissions:
+    contents: read
+
+jobs:
+    rollback:
+        name: "🔄 Rollback Production"
+        runs-on: ubuntu-latest
+        environment: production
+        steps:
+            # --- Safety Check ---
+            - name: Verify confirmation
+              run: |
+                  if [ "${{ github.event.inputs.confirm }}" != "ROLLBACK" ]; then
+                    echo "❌ Confirmation failed. You must type 'ROLLBACK' to proceed."
+                    echo "   Got: '${{ github.event.inputs.confirm }}'"
+                    exit 1
+                  fi
+                  echo "✅ Rollback confirmed by ${{ github.actor }}"
+
+            - uses: actions/checkout@v4
+
+            # --- AWS Authentication ---
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v4
+              with:
+                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                  aws-region: ${{ env.AWS_REGION }}
+
+            - name: Login to Amazon ECR
+              uses: aws-actions/amazon-ecr-login@v2
+
+            # --- Determine Rollback Target ---
+            - name: Get rollback target
+              id: target
+              run: |
+                  ROLLBACK_TYPE="${{ github.event.inputs.rollback_type }}"
+
+                  if [ "$ROLLBACK_TYPE" = "previous-task-definition" ]; then
+                    echo "📋 Rolling back to previous task definition revision..."
+
+                    # Get current backend task def revision
+                    CURRENT_BACKEND=$(aws ecs describe-services \
+                      --cluster ${{ env.ECS_CLUSTER }} \
+                      --services ${{ env.ECS_SERVICE_BACKEND }} \
+                      --query 'services[0].taskDefinition' --output text)
+                    CURRENT_REV=$(echo $CURRENT_BACKEND | grep -oP ':\K\d+$')
+                    PREV_REV=$((CURRENT_REV - 1))
+
+                    # Get previous task def ARN
+                    PREV_BACKEND_ARN="$(echo $CURRENT_BACKEND | sed "s/:${CURRENT_REV}$/:${PREV_REV}/")"
+
+                    # Get current celery task def revision
+                    CURRENT_CELERY=$(aws ecs describe-services \
+                      --cluster ${{ env.ECS_CLUSTER }} \
+                      --services ${{ env.ECS_SERVICE_CELERY }} \
+                      --query 'services[0].taskDefinition' --output text)
+                    CURRENT_CELERY_REV=$(echo $CURRENT_CELERY | grep -oP ':\K\d+$')
+                    PREV_CELERY_REV=$((CURRENT_CELERY_REV - 1))
+                    PREV_CELERY_ARN="$(echo $CURRENT_CELERY | sed "s/:${CURRENT_CELERY_REV}$/:${PREV_CELERY_REV}/")"
+
+                    echo "Current backend: revision $CURRENT_REV → Rolling back to revision $PREV_REV"
+                    echo "Current celery:  revision $CURRENT_CELERY_REV → Rolling back to revision $PREV_CELERY_REV"
+
+                    echo "backend_task_def=$PREV_BACKEND_ARN" >> $GITHUB_OUTPUT
+                    echo "celery_task_def=$PREV_CELERY_ARN" >> $GITHUB_OUTPUT
+                    echo "method=previous-task-definition" >> $GITHUB_OUTPUT
+
+                  elif [ "$ROLLBACK_TYPE" = "specific-image-tag" ]; then
+                    IMAGE_TAG="${{ github.event.inputs.image_tag }}"
+                    if [ -z "$IMAGE_TAG" ]; then
+                      echo "❌ Image tag is required for specific-image-tag rollback"
+                      exit 1
+                    fi
+
+                    FULL_IMAGE="${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${IMAGE_TAG}"
+                    echo "🐳 Rolling back to specific image: $FULL_IMAGE"
+
+                    # Verify image exists
+                    aws ecr describe-images \
+                      --repository-name ${{ env.ECR_REPOSITORY }} \
+                      --image-ids imageTag=${IMAGE_TAG} > /dev/null 2>&1 || {
+                      echo "❌ Image tag '${IMAGE_TAG}' not found in ECR!"
+                      echo "Available prod tags:"
+                      aws ecr describe-images \
+                        --repository-name ${{ env.ECR_REPOSITORY }} \
+                        --query 'imageDetails[?imageTags[?starts_with(@,`prod-`)]].imageTags[]' \
+                        --output text | tr '\t' '\n' | sort -r | head -10
+                      exit 1
+                    }
+
+                    echo "image=$FULL_IMAGE" >> $GITHUB_OUTPUT
+                    echo "method=specific-image" >> $GITHUB_OUTPUT
+                  fi
+
+            # --- Rollback Backend (previous task def) ---
+            - name: Rollback backend to previous task definition
+              if: >
+                  steps.target.outputs.method == 'previous-task-definition' &&
+                  (github.event.inputs.services == 'both' || github.event.inputs.services == 'backend-only')
+              run: |
+                  echo "🔄 Updating backend service to: ${{ steps.target.outputs.backend_task_def }}"
+                  aws ecs update-service \
+                    --cluster ${{ env.ECS_CLUSTER }} \
+                    --service ${{ env.ECS_SERVICE_BACKEND }} \
+                    --task-definition "${{ steps.target.outputs.backend_task_def }}" \
+                    --force-new-deployment
+
+                  echo "⏳ Waiting for backend service to stabilize..."
+                  aws ecs wait services-stable \
+                    --cluster ${{ env.ECS_CLUSTER }} \
+                    --services ${{ env.ECS_SERVICE_BACKEND }}
+                  echo "✅ Backend rolled back successfully"
+
+            # --- Rollback Celery (previous task def) ---
+            - name: Rollback celery to previous task definition
+              if: >
+                  steps.target.outputs.method == 'previous-task-definition' &&
+                  (github.event.inputs.services == 'both' || github.event.inputs.services == 'celery-only')
+              run: |
+                  echo "🔄 Updating celery service to: ${{ steps.target.outputs.celery_task_def }}"
+                  aws ecs update-service \
+                    --cluster ${{ env.ECS_CLUSTER }} \
+                    --service ${{ env.ECS_SERVICE_CELERY }} \
+                    --task-definition "${{ steps.target.outputs.celery_task_def }}" \
+                    --force-new-deployment
+
+                  echo "⏳ Waiting for celery service to stabilize..."
+                  aws ecs wait services-stable \
+                    --cluster ${{ env.ECS_CLUSTER }} \
+                    --services ${{ env.ECS_SERVICE_CELERY }}
+                  echo "✅ Celery rolled back successfully"
+
+            # --- Rollback Backend (specific image) ---
+            - name: Rollback backend to specific image
+              if: >
+                  steps.target.outputs.method == 'specific-image' &&
+                  (github.event.inputs.services == 'both' || github.event.inputs.services == 'backend-only')
+              run: |
+                  IMAGE="${{ steps.target.outputs.image }}"
+                  echo "🔄 Deploying backend with image: $IMAGE"
+
+                  # Get current task definition
+                  aws ecs describe-task-definition \
+                    --task-definition ${{ env.TASK_DEF_BACKEND }} \
+                    --query 'taskDefinition' --output json > /tmp/backend-td.json
+
+                  # Clean and update image
+                  python3 -c "
+                  import json
+                  with open('/tmp/backend-td.json') as f:
+                      td = json.load(f)
+                  for key in ['taskDefinitionArn','revision','status','requiresAttributes','compatibilities','registeredAt','registeredBy']:
+                      td.pop(key, None)
+                  for c in td['containerDefinitions']:
+                      if c['name'] == '${{ env.CONTAINER_NAME_BACKEND }}':
+                          c['image'] = '${IMAGE}'
+                  with open('/tmp/backend-td-updated.json','w') as f:
+                      json.dump(td, f)
+                  "
+
+                  # Register new task definition
+                  NEW_TD=$(aws ecs register-task-definition \
+                    --cli-input-json file:///tmp/backend-td-updated.json \
+                    --query 'taskDefinition.taskDefinitionArn' --output text)
+
+                  # Update service
+                  aws ecs update-service \
+                    --cluster ${{ env.ECS_CLUSTER }} \
+                    --service ${{ env.ECS_SERVICE_BACKEND }} \
+                    --task-definition "$NEW_TD" \
+                    --force-new-deployment
+
+                  echo "⏳ Waiting for backend service to stabilize..."
+                  aws ecs wait services-stable \
+                    --cluster ${{ env.ECS_CLUSTER }} \
+                    --services ${{ env.ECS_SERVICE_BACKEND }}
+                  echo "✅ Backend deployed with image: $IMAGE"
+
+            # --- Rollback Celery (specific image) ---
+            - name: Rollback celery to specific image
+              if: >
+                  steps.target.outputs.method == 'specific-image' &&
+                  (github.event.inputs.services == 'both' || github.event.inputs.services == 'celery-only')
+              run: |
+                  IMAGE="${{ steps.target.outputs.image }}"
+                  echo "🔄 Deploying celery with image: $IMAGE"
+
+                  aws ecs describe-task-definition \
+                    --task-definition ${{ env.TASK_DEF_CELERY }} \
+                    --query 'taskDefinition' --output json > /tmp/celery-td.json
+
+                  python3 -c "
+                  import json
+                  with open('/tmp/celery-td.json') as f:
+                      td = json.load(f)
+                  for key in ['taskDefinitionArn','revision','status','requiresAttributes','compatibilities','registeredAt','registeredBy']:
+                      td.pop(key, None)
+                  for c in td['containerDefinitions']:
+                      if c['name'] == '${{ env.CONTAINER_NAME_CELERY }}':
+                          c['image'] = '${IMAGE}'
+                  with open('/tmp/celery-td-updated.json','w') as f:
+                      json.dump(td, f)
+                  "
+
+                  NEW_TD=$(aws ecs register-task-definition \
+                    --cli-input-json file:///tmp/celery-td-updated.json \
+                    --query 'taskDefinition.taskDefinitionArn' --output text)
+
+                  aws ecs update-service \
+                    --cluster ${{ env.ECS_CLUSTER }} \
+                    --service ${{ env.ECS_SERVICE_CELERY }} \
+                    --task-definition "$NEW_TD" \
+                    --force-new-deployment
+
+                  echo "⏳ Waiting for celery service to stabilize..."
+                  aws ecs wait services-stable \
+                    --cluster ${{ env.ECS_CLUSTER }} \
+                    --services ${{ env.ECS_SERVICE_CELERY }}
+                  echo "✅ Celery deployed with image: $IMAGE"
+
+            # --- Post-Rollback Verification ---
+            - name: Verify production health
+              run: |
+                  echo "🔥 Running post-rollback health checks..."
+                  sleep 15
+
+                  HEALTH=$(curl -sf ${{ env.PRODUCTION_URL }}/health 2>&1) || {
+                    echo "❌ CRITICAL: Production health check failed after rollback!"
+                    exit 1
+                  }
+                  echo "✅ Health: $HEALTH"
+
+                  LIVE=$(curl -sf ${{ env.PRODUCTION_URL }}/health/live 2>&1) || {
+                    echo "❌ CRITICAL: Production liveness check failed after rollback!"
+                    exit 1
+                  }
+                  echo "✅ Liveness: $LIVE"
+                  echo "🎉 Post-rollback verification passed!"
+
+            # --- Summary ---
+            - name: Rollback summary
+              if: always()
+              run: |
+                  echo "## 🔄 Production Rollback Summary" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+                  echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+                  echo "| **Method** | ${{ github.event.inputs.rollback_type }} |" >> $GITHUB_STEP_SUMMARY
+                  echo "| **Services** | ${{ github.event.inputs.services }} |" >> $GITHUB_STEP_SUMMARY
+                  echo "| **Image Tag** | ${{ github.event.inputs.image_tag || 'N/A (previous revision)' }} |" >> $GITHUB_STEP_SUMMARY
+                  echo "| **Initiated by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+                  echo "| **Time** | $(date -u +%Y-%m-%dT%H:%M:%SZ) |" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "### ⚠️ Post-Rollback Actions" >> $GITHUB_STEP_SUMMARY
+                  echo "1. Verify application functionality at https://app.sleeplessinarizona.com" >> $GITHUB_STEP_SUMMARY
+                  echo "2. Check CloudWatch logs for any errors" >> $GITHUB_STEP_SUMMARY
+                  echo "3. Investigate root cause of the issue that triggered rollback" >> $GITHUB_STEP_SUMMARY
+                  echo "4. Create a fix on \`dev\` branch, test, then re-deploy" >> $GITHUB_STEP_SUMMARY

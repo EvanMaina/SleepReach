@@ -1,68 +1,358 @@
+# =============================================================================
+# SleepReach — Deploy to Staging
+#
+# Triggers:
+#   1. workflow_call — Called from Promote workflow (primary mechanism)
+#   2. push to stg — Direct push fallback (e.g., hotfix)
+#   3. workflow_dispatch — Manual trigger from Actions tab
+# =============================================================================
 name: Deploy to Staging
 
 on:
   push:
     branches: [stg]
+  workflow_dispatch:
+  # Called as a reusable workflow from promote.yml
+  workflow_call:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
 
 env:
   AWS_REGION: us-east-2
   ECR_REGISTRY: 131880217305.dkr.ecr.us-east-2.amazonaws.com
+  ECR_REPOSITORY: sleepreach/backend
+  ECR_REPOSITORY_FRONTEND: sleepreach/frontend
   ECS_CLUSTER: sleepreach-cluster
+  ECS_SERVICE_BACKEND: sleepreach-stg-backend
+  ECS_SERVICE_CELERY: sleepreach-stg-celery
+  ECS_SERVICE_FRONTEND: sleepreach-stg-frontend
+  TASK_DEF_BACKEND: sleepreach-stg-backend
+  TASK_DEF_CELERY: sleepreach-stg-celery
+  TASK_DEF_FRONTEND: sleepreach-stg-frontend
+  CONTAINER_NAME_BACKEND: backend
+  CONTAINER_NAME_CELERY: celery
+  CONTAINER_NAME_FRONTEND: frontend
+  STAGING_URL: https://stg.sleeplessinarizona.com
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "22"
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
-  checks:
-    name: Pre-Deploy Checks
+  # ===========================================================================
+  # Build, Push, and Deploy to Staging
+  # ===========================================================================
+  build-and-deploy:
+    name: "🚀 Build & Deploy to Staging"
     runs-on: ubuntu-latest
+    environment: staging
+    outputs:
+      deploy_sha: ${{ steps.deploy-info.outputs.sha_short }}
+      image_tag: ${{ steps.image-tag.outputs.tag }}
     steps:
+      # Always checkout the stg branch explicitly.
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - name: Install frontend dependencies
-        run: cd frontend && npm ci
-      - name: TypeScript check
-        run: cd frontend && npx tsc --noEmit
-      - name: Vite build check
-        run: cd frontend && npx vite build
+          ref: stg
 
-  deploy:
-    name: Deploy Staging
-    needs: checks
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
+      # Determine the ACTUAL commit SHA being deployed
+      - name: Get deployment info
+        id: deploy-info
+        run: |
+          DEPLOY_SHA=$(git rev-parse HEAD)
+          DEPLOY_SHA_SHORT=$(echo $DEPLOY_SHA | cut -c1-7)
+          echo "sha=$DEPLOY_SHA" >> $GITHUB_OUTPUT
+          echo "sha_short=$DEPLOY_SHA_SHORT" >> $GITHUB_OUTPUT
+          echo "📦 Deploying staging from commit: $DEPLOY_SHA_SHORT"
+          echo "   Full SHA: $DEPLOY_SHA"
 
+      # --- AWS Authentication ---
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build & push backend image
-        run: |
-          docker build -t $ECR_REGISTRY/sleepreach/backend:stg-${{ github.sha }} -t $ECR_REGISTRY/sleepreach/backend:stg-latest --target production -f backend/Dockerfile backend/
-          docker push $ECR_REGISTRY/sleepreach/backend:stg-${{ github.sha }}
-          docker push $ECR_REGISTRY/sleepreach/backend:stg-latest
+      # --- Build Frontend ---
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Build & push frontend image
+      - name: Build frontend bundles
         run: |
-          docker build -t $ECR_REGISTRY/sleepreach/frontend:stg-${{ github.sha }} -t $ECR_REGISTRY/sleepreach/frontend:stg-latest --target production -f frontend/Dockerfile frontend/
-          docker push $ECR_REGISTRY/sleepreach/frontend:stg-${{ github.sha }}
-          docker push $ECR_REGISTRY/sleepreach/frontend:stg-latest
+          cd frontend
+          npm ci
+          npm run build
+          npm run build:widget
+          npm run build:assessment
+        env:
+          VITE_API_URL: ${{ env.STAGING_URL }}
 
-      - name: Update ECS services
+      - name: Copy frontend bundles to backend
         run: |
-          aws ecs update-service --cluster $ECS_CLUSTER --service sleepreach-stg-backend --force-new-deployment --desired-count 1
-          aws ecs update-service --cluster $ECS_CLUSTER --service sleepreach-stg-frontend --force-new-deployment --desired-count 1
-          aws ecs update-service --cluster $ECS_CLUSTER --service sleepreach-stg-celery --force-new-deployment --desired-count 1
+          mkdir -p backend/frontend-bundles/dist
+          mkdir -p backend/frontend-bundles/dist-widget
+          mkdir -p backend/frontend-bundles/dist-assessment
+          cp -r frontend/dist/* backend/frontend-bundles/dist/ 2>/dev/null || true
+          cp -r frontend/dist-widget/* backend/frontend-bundles/dist-widget/ 2>/dev/null || true
+          cp -r frontend/dist-assessment/* backend/frontend-bundles/dist-assessment/ 2>/dev/null || true
 
-      - name: Wait for services stable
+      # --- Build & Push Docker Image ---
+      - name: Set image tag
+        id: image-tag
         run: |
-          aws ecs wait services-stable --cluster $ECS_CLUSTER --services sleepreach-stg-backend sleepreach-stg-frontend
-          echo "Staging deployment complete!"
+          SHA=${{ steps.deploy-info.outputs.sha_short }}
+          echo "tag=stg-${SHA}" >> $GITHUB_OUTPUT
+          echo "full_image=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:stg-${SHA}" >> $GITHUB_OUTPUT
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --target production \
+            --tag ${{ steps.image-tag.outputs.full_image }} \
+            --tag ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:stg-latest \
+            --label "git.sha=${{ steps.deploy-info.outputs.sha }}" \
+            --label "git.branch=stg" \
+            --label "build.timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --file backend/Dockerfile \
+            backend/
+
+      # --- Security Scan ---
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: ${{ steps.image-tag.outputs.full_image }}
+          severity: CRITICAL,HIGH
+          exit-code: 0
+          format: table
+        continue-on-error: true
+
+      # --- Push to ECR ---
+      - name: Push Docker image to ECR
+        run: |
+          docker push ${{ steps.image-tag.outputs.full_image }}
+          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:stg-latest
+          echo "✅ Pushed: ${{ steps.image-tag.outputs.full_image }}"
+
+      # --- Deploy Backend Service ---
+      - name: Download current staging backend task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.TASK_DEF_BACKEND }} \
+            --query 'taskDefinition' \
+            --output json > staging-backend-task-def.json
+          python3 -c "
+          import json
+          with open('staging-backend-task-def.json') as f:
+              td = json.load(f)
+          for key in ['taskDefinitionArn','revision','status','requiresAttributes','compatibilities','registeredAt','registeredBy']:
+              td.pop(key, None)
+          with open('staging-backend-task-def.json','w') as f:
+              json.dump(td, f, indent=2)
+          "
+
+      - name: Update staging backend task definition with new image
+        id: backend-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: staging-backend-task-def.json
+          container-name: ${{ env.CONTAINER_NAME_BACKEND }}
+          image: ${{ steps.image-tag.outputs.full_image }}
+
+      - name: Deploy staging backend to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.backend-task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE_BACKEND }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          wait-for-minutes: 15
+
+      # --- Deploy Celery Service ---
+      - name: Download current staging celery task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.TASK_DEF_CELERY }} \
+            --query 'taskDefinition' \
+            --output json > staging-celery-task-def.json
+          python3 -c "
+          import json
+          with open('staging-celery-task-def.json') as f:
+              td = json.load(f)
+          for key in ['taskDefinitionArn','revision','status','requiresAttributes','compatibilities','registeredAt','registeredBy']:
+              td.pop(key, None)
+          with open('staging-celery-task-def.json','w') as f:
+              json.dump(td, f, indent=2)
+          "
+
+      - name: Update staging celery task definition with new image
+        id: celery-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: staging-celery-task-def.json
+          container-name: ${{ env.CONTAINER_NAME_CELERY }}
+          image: ${{ steps.image-tag.outputs.full_image }}
+
+      - name: Deploy staging celery to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.celery-task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE_CELERY }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          wait-for-minutes: 15
+
+      # --- Build & Deploy Frontend Service (nginx + React SPA) ---
+      - name: Set frontend image tag
+        id: frontend-image-tag
+        run: |
+          SHA=${{ steps.deploy-info.outputs.sha_short }}
+          echo "tag=stg-${SHA}" >> $GITHUB_OUTPUT
+          echo "full_image=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_FRONTEND }}:stg-${SHA}" >> $GITHUB_OUTPUT
+
+      - name: Build frontend Docker image
+        run: |
+          docker build \
+            --target production \
+            --tag ${{ steps.frontend-image-tag.outputs.full_image }} \
+            --tag ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_FRONTEND }}:stg-latest \
+            --label "git.sha=${{ steps.deploy-info.outputs.sha }}" \
+            --label "git.branch=stg" \
+            --label "build.timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --label "environment=staging" \
+            --file frontend/Dockerfile \
+            frontend/
+
+      - name: Push frontend Docker image to ECR
+        run: |
+          docker push ${{ steps.frontend-image-tag.outputs.full_image }}
+          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_FRONTEND }}:stg-latest
+          echo "✅ Pushed frontend: ${{ steps.frontend-image-tag.outputs.full_image }}"
+
+      - name: Download current staging frontend task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.TASK_DEF_FRONTEND }} \
+            --query 'taskDefinition' \
+            --output json > staging-frontend-task-def.json
+          python3 -c "
+          import json
+          with open('staging-frontend-task-def.json') as f:
+              td = json.load(f)
+          for key in ['taskDefinitionArn','revision','status','requiresAttributes','compatibilities','registeredAt','registeredBy']:
+              td.pop(key, None)
+          with open('staging-frontend-task-def.json','w') as f:
+              json.dump(td, f, indent=2)
+          "
+
+      - name: Update staging frontend task definition with new image
+        id: frontend-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: staging-frontend-task-def.json
+          container-name: ${{ env.CONTAINER_NAME_FRONTEND }}
+          image: ${{ steps.frontend-image-tag.outputs.full_image }}
+
+      - name: Deploy staging frontend to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.frontend-task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE_FRONTEND }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          wait-for-minutes: 20
+
+      # --- Smoke Tests ---
+      - name: Run staging smoke tests
+        run: |
+          echo "🔥 Running smoke tests against staging..."
+          sleep 15
+
+          # ALB DNS for direct access (bypasses external DNS dependency)
+          ALB_DNS="neuroreach-ai-alb-1879069977.us-east-2.elb.amazonaws.com"
+
+          # Test via ALB directly with Host header
+          echo "📡 Testing via ALB direct (Host header routing)..."
+          HEALTH_STATUS=$(curl -sk https://${ALB_DNS}/health/live -H "Host: stg.sleeplessinarizona.com" 2>&1) || {
+            echo "❌ Staging liveness check failed via ALB!"
+            echo "Response: $HEALTH_STATUS"
+            exit 1
+          }
+          echo "✅ Liveness (ALB direct): $HEALTH_STATUS"
+
+          HEALTH_RESPONSE=$(curl -sk https://${ALB_DNS}/health -H "Host: stg.sleeplessinarizona.com" 2>&1) || {
+            echo "❌ Staging health check failed via ALB!"
+            echo "Response: $HEALTH_RESPONSE"
+            exit 1
+          }
+          echo "✅ Health (ALB direct): $HEALTH_RESPONSE"
+
+          # Also test via custom domain (non-blocking)
+          echo ""
+          echo "📡 Testing via custom domain (non-blocking)..."
+          DOMAIN_STATUS=$(curl -sf ${{ env.STAGING_URL }}/health/live 2>&1) && {
+            echo "✅ Custom domain reachable: $DOMAIN_STATUS"
+          } || {
+            echo "⚠️  Custom domain not yet reachable (DNS CNAME may not be configured)"
+            echo "   Configure CNAME: stg.sleeplessinarizona.com → ${ALB_DNS}"
+          }
+
+          echo ""
+          echo "🎉 All staging smoke tests passed!"
+
+      # --- Deployment Summary ---
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo "## 🚀 Staging Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | Staging |" >> $GITHUB_STEP_SUMMARY
+          echo "| **URL** | ${{ env.STAGING_URL }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Image** | \`${{ steps.image-tag.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`${{ steps.deploy-info.outputs.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | stg |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Actor** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Cluster** | ${{ env.ECS_CLUSTER }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Backend Service** | ${{ env.ECS_SERVICE_BACKEND }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Celery Service** | ${{ env.ECS_SERVICE_CELERY }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Frontend Service** | ${{ env.ECS_SERVICE_FRONTEND }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================================
+  # Notify
+  # ===========================================================================
+  notify:
+    name: "📧 Notify"
+    runs-on: ubuntu-latest
+    needs: [build-and-deploy]
+    if: always()
+    steps:
+      - name: Notify on success
+        if: needs.build-and-deploy.result == 'success'
+        run: |
+          echo "✅ Staging deployment successful!"
+          echo "URL: https://stg.sleeplessinarizona.com"
+          echo "Image: ${{ needs.build-and-deploy.outputs.image_tag }}"
+          echo "Commit: ${{ needs.build-and-deploy.outputs.deploy_sha }}"
+          echo "Deployed by: ${{ github.actor }}"
+
+      - name: Notify on failure
+        if: needs.build-and-deploy.result == 'failure'
+        run: |
+          echo "❌ Staging deployment FAILED!"
+          echo "Commit: ${{ needs.build-and-deploy.outputs.deploy_sha }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

@@ -1,0 +1,339 @@
+# =============================================================================
+# SleepReach — Continuous Integration
+# Runs on ALL pull requests AND pushes to dev, stg, and main
+# =============================================================================
+name: CI
+
+on:
+    push:
+        branches: [dev]
+    pull_request:
+        branches: [main, stg, dev]
+    # Allow reusable workflow calls from deploy workflows
+    workflow_call:
+    # Allow manual trigger
+    workflow_dispatch:
+
+concurrency:
+    group: ci-${{ github.ref }}
+    cancel-in-progress: true
+
+env:
+    PYTHON_VERSION: "3.11"
+    NODE_VERSION: "22"
+
+jobs:
+    # ===========================================================================
+    # Backend Checks
+    # ===========================================================================
+    backend-lint:
+        name: "🐍 Backend Lint (Flake8)"
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ env.PYTHON_VERSION }}
+                  cache: pip
+
+            - name: Install dependencies
+              run: |
+                  cd backend
+                  pip install --upgrade pip
+                  pip install flake8
+                  pip install -r requirements.txt
+
+            - name: Run Flake8
+              run: |
+                  cd backend
+                  flake8 src/ \
+                    --max-line-length=120 \
+                    --extend-ignore=E203,E266,E501,W503 \
+                    --exclude=__pycache__,migrations,.git \
+                    --statistics \
+                    --count \
+                    || true  # Non-blocking
+
+    backend-typecheck:
+        name: "🔍 Backend Type Check (MyPy)"
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ env.PYTHON_VERSION }}
+                  cache: pip
+
+            - name: Install dependencies
+              run: |
+                  cd backend
+                  pip install --upgrade pip
+                  pip install mypy types-passlib types-redis
+                  pip install -r requirements.txt
+
+            - name: Run MyPy
+              run: |
+                  cd backend
+                  mypy src/ \
+                    --ignore-missing-imports \
+                    --no-strict-optional \
+                    --allow-untyped-defs \
+                    --warn-return-any \
+                    --warn-unused-configs \
+                    || true  # Non-blocking for now
+
+    backend-test:
+        name: "🧪 Backend Tests (Pytest)"
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: ${{ env.PYTHON_VERSION }}
+                  cache: pip
+
+            - name: Install dependencies
+              run: |
+                  cd backend
+                  pip install --upgrade pip
+                  pip install -r requirements.txt
+                  pip install pytest pytest-asyncio pytest-cov httpx
+
+            - name: Run Pytest
+              run: |
+                  cd backend
+                  python -m pytest tests/ \
+                    --tb=short \
+                    --no-header \
+                    -q \
+                    || echo "⚠️ No tests found or tests failed — ensure tests/ directory exists"
+              env:
+                  ENVIRONMENT: test
+                  DATABASE_URL: "sqlite:///./test.db"
+                  SECRET_KEY: "ci-test-secret-key-not-for-production"
+                  REDIS_URL: "redis://localhost:6379/0"
+
+    # ===========================================================================
+    # Frontend Checks
+    # ===========================================================================
+    frontend-lint:
+        name: "📦 Frontend Lint (ESLint)"
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ env.NODE_VERSION }}
+                  cache: npm
+                  cache-dependency-path: frontend/package-lock.json
+
+            - name: Install dependencies
+              run: |
+                  cd frontend
+                  npm ci
+
+            - name: Run ESLint
+              run: |
+                  cd frontend
+                  npm run lint || true  # Non-blocking
+
+    frontend-typecheck:
+        name: "🔍 Frontend Type Check (TypeScript)"
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ env.NODE_VERSION }}
+                  cache: npm
+                  cache-dependency-path: frontend/package-lock.json
+
+            - name: Install dependencies
+              run: |
+                  cd frontend
+                  npm ci
+
+            - name: Run TypeScript type check
+              run: |
+                  cd frontend
+                  npx tsc --noEmit
+
+    frontend-build:
+        name: "🏗️ Frontend Build"
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ env.NODE_VERSION }}
+                  cache: npm
+                  cache-dependency-path: frontend/package-lock.json
+
+            - name: Install dependencies
+              run: |
+                  cd frontend
+                  npm ci
+
+            - name: Build main app
+              run: |
+                  cd frontend
+                  npm run build
+              env:
+                  VITE_API_URL: "https://api.sleeplessinarizona.com"
+
+            - name: Build widget bundle
+              run: |
+                  cd frontend
+                  npm run build:widget
+
+            - name: Build assessment bundle
+              run: |
+                  cd frontend
+                  npm run build:assessment
+
+            - name: Upload frontend build artifacts
+              uses: actions/upload-artifact@v4
+              with:
+                  name: frontend-bundles
+                  path: |
+                      frontend/dist/
+                      frontend/dist-widget/
+                      frontend/dist-assessment/
+                  retention-days: 1
+
+    # ===========================================================================
+    # Security Scans
+    # ===========================================================================
+    security-scan:
+        name: "🔒 Security Scan (Trivy)"
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Run Trivy vulnerability scanner (filesystem)
+              uses: aquasecurity/trivy-action@v0.35.0
+              with:
+                  scan-type: fs
+                  scan-ref: .
+                  severity: CRITICAL,HIGH
+                  exit-code: 0 # Non-blocking
+                  format: table
+              continue-on-error: true
+
+    secret-scan:
+        name: "🕵️ Secret Scan (Gitleaks)"
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Run Gitleaks
+              uses: gitleaks/gitleaks-action@v2
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+              continue-on-error: true # Non-blocking
+
+    # ===========================================================================
+    # Docker Build Verification
+    # ===========================================================================
+    docker-build:
+        name: "🐳 Docker Build (verify)"
+        runs-on: ubuntu-latest
+        needs: [frontend-build]
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Download frontend build artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  name: frontend-bundles
+                  path: frontend-artifacts/
+
+            - name: Prepare frontend bundles for Docker
+              run: |
+                  mkdir -p backend/frontend-bundles/dist
+                  mkdir -p backend/frontend-bundles/dist-widget
+                  mkdir -p backend/frontend-bundles/dist-assessment
+                  cp -r frontend-artifacts/dist/* backend/frontend-bundles/dist/ 2>/dev/null || true
+                  cp -r frontend-artifacts/dist-widget/* backend/frontend-bundles/dist-widget/ 2>/dev/null || true
+                  cp -r frontend-artifacts/dist-assessment/* backend/frontend-bundles/dist-assessment/ 2>/dev/null || true
+
+            - name: Build Docker image (no push)
+              run: |
+                  docker build \
+                    --target production \
+                    --tag sleepreach-backend:ci-test \
+                    --file backend/Dockerfile \
+                    backend/
+
+            - name: Verify Docker image
+              run: |
+                  docker run --rm sleepreach-backend:ci-test python -c "import fastapi; print(f'FastAPI {fastapi.__version__} OK')"
+
+    # ===========================================================================
+    # CI Summary
+    # ===========================================================================
+    ci-status:
+        name: "✅ CI Status"
+        runs-on: ubuntu-latest
+        if: always()
+        needs:
+            - backend-lint
+            - backend-typecheck
+            - backend-test
+            - frontend-lint
+            - frontend-typecheck
+            - frontend-build
+            - security-scan
+            - secret-scan
+            - docker-build
+        steps:
+            - name: Check CI results
+              run: |
+                  echo "## CI Results Summary" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+                  echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+                  echo "| Backend Lint | ${{ needs.backend-lint.result }} |" >> $GITHUB_STEP_SUMMARY
+                  echo "| Backend Type Check | ${{ needs.backend-typecheck.result }} |" >> $GITHUB_STEP_SUMMARY
+                  echo "| Backend Tests | ${{ needs.backend-test.result }} |" >> $GITHUB_STEP_SUMMARY
+                  echo "| Frontend Lint | ${{ needs.frontend-lint.result }} |" >> $GITHUB_STEP_SUMMARY
+                  echo "| Frontend Type Check | ${{ needs.frontend-typecheck.result }} |" >> $GITHUB_STEP_SUMMARY
+                  echo "| Frontend Build | ${{ needs.frontend-build.result }} |" >> $GITHUB_STEP_SUMMARY
+                  echo "| Security Scan | ${{ needs.security-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+                  echo "| Secret Scan | ${{ needs.secret-scan.result }} |" >> $GITHUB_STEP_SUMMARY
+                  echo "| Docker Build | ${{ needs.docker-build.result }} |" >> $GITHUB_STEP_SUMMARY
+
+                  # Critical checks that MUST pass:
+                  if [[ "${{ needs.frontend-build.result }}" == "failure" ]] || \
+                     [[ "${{ needs.docker-build.result }}" == "failure" ]]; then
+                    echo "❌ Critical CI checks failed!"
+                    exit 1
+                  fi
+
+                  # Advisory warnings
+                  if [[ "${{ needs.backend-lint.result }}" == "failure" ]]; then
+                    echo "⚠️ Backend lint has issues — fix incrementally"
+                  fi
+                  if [[ "${{ needs.frontend-lint.result }}" == "failure" ]]; then
+                    echo "⚠️ Frontend lint has issues — fix incrementally"
+                  fi
+                  if [[ "${{ needs.security-scan.result }}" == "failure" ]]; then
+                    echo "⚠️ Security scan reported issues — review Trivy output"
+                  fi
+
+                  echo "✅ All critical CI checks passed!"

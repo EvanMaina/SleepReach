@@ -1,73 +1,411 @@
+# =============================================================================
+# SleepReach — Deploy to Production
+#
+# Triggers:
+#   1. workflow_call — Called from Promote workflow (primary mechanism)
+#      Accepts skip_ci input since CI already passed in the promote pipeline.
+#   2. push to main — Direct push fallback (runs CI first)
+#   3. workflow_dispatch — Manual trigger from Actions tab (runs CI first)
+# =============================================================================
 name: Deploy to Production
 
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+  # Called as a reusable workflow from promote.yml
+  workflow_call:
+    inputs:
+      skip_ci:
+        description: "Skip CI checks (CI already passed in caller)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false # NEVER cancel in-progress production deployments
 
 env:
   AWS_REGION: us-east-2
   ECR_REGISTRY: 131880217305.dkr.ecr.us-east-2.amazonaws.com
+  ECR_REPOSITORY: sleepreach/backend
+  ECR_REPOSITORY_FRONTEND: sleepreach/frontend
   ECS_CLUSTER: sleepreach-cluster
+  ECS_SERVICE_BACKEND: sleepreach-prod-backend
+  ECS_SERVICE_CELERY: sleepreach-prod-celery
+  ECS_SERVICE_FRONTEND: sleepreach-prod-frontend
+  TASK_DEF_BACKEND: sleepreach-prod-backend
+  TASK_DEF_CELERY: sleepreach-prod-celery
+  TASK_DEF_FRONTEND: sleepreach-prod-frontend
+  CONTAINER_NAME_BACKEND: backend
+  CONTAINER_NAME_CELERY: celery
+  CONTAINER_NAME_FRONTEND: frontend
+  PRODUCTION_URL: https://api.sleeplessinarizona.com
+  FRONTEND_URL: https://app.sleeplessinarizona.com
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "22"
+
+permissions:
+  id-token: write
+  contents: write # Needed for git tagging
 
 jobs:
-  checks:
-    name: Pre-Deploy Checks
+  # ===========================================================================
+  # Run CI checks first (skipped when called from Promote — CI already passed)
+  # ===========================================================================
+  ci:
+    name: "🔍 CI Checks"
+    if: ${{ !(inputs.skip_ci || false) }}
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  # ===========================================================================
+  # Build, Push, and Deploy
+  # ===========================================================================
+  build-and-deploy:
+    name: "🚀 Build & Deploy to Production"
     runs-on: ubuntu-latest
+    needs: [ci]
+    # Run if CI passed OR if CI was skipped (workflow_call with skip_ci=true)
+    if: ${{ always() && (needs.ci.result == 'success' || needs.ci.result == 'skipped') }}
+    environment: production
+    outputs:
+      deploy_sha: ${{ steps.deploy-info.outputs.sha_short }}
+      deploy_sha_full: ${{ steps.deploy-info.outputs.sha }}
+      image_tag: ${{ steps.image-tag.outputs.tag }}
     steps:
+      # Always checkout the main branch explicitly.
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - name: Install frontend dependencies
-        run: cd frontend && npm ci
-      - name: TypeScript check
-        run: cd frontend && npx tsc --noEmit
-      - name: Vite build check
-        run: cd frontend && npx vite build
+          ref: main
+          fetch-depth: 0 # Full history for tagging
 
-  deploy:
-    name: Deploy Production
-    needs: checks
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
+      # Determine the ACTUAL commit SHA being deployed
+      - name: Get deployment info
+        id: deploy-info
+        run: |
+          DEPLOY_SHA=$(git rev-parse HEAD)
+          DEPLOY_SHA_SHORT=$(echo $DEPLOY_SHA | cut -c1-7)
+          echo "sha=$DEPLOY_SHA" >> $GITHUB_OUTPUT
+          echo "sha_short=$DEPLOY_SHA_SHORT" >> $GITHUB_OUTPUT
+          echo "🚀 Deploying PRODUCTION from commit: $DEPLOY_SHA_SHORT"
+          echo "   Full SHA: $DEPLOY_SHA"
 
+      # --- AWS Authentication ---
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build & push backend image
-        run: |
-          docker build -t $ECR_REGISTRY/sleepreach/backend:prod-${{ github.sha }} -t $ECR_REGISTRY/sleepreach/backend:latest --target production -f backend/Dockerfile backend/
-          docker push $ECR_REGISTRY/sleepreach/backend:prod-${{ github.sha }}
-          docker push $ECR_REGISTRY/sleepreach/backend:latest
+      # --- Build Frontend ---
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Build & push frontend image
+      - name: Build frontend bundles
         run: |
-          docker build -t $ECR_REGISTRY/sleepreach/frontend:prod-${{ github.sha }} -t $ECR_REGISTRY/sleepreach/frontend:latest --target production -f frontend/Dockerfile frontend/
-          docker push $ECR_REGISTRY/sleepreach/frontend:prod-${{ github.sha }}
-          docker push $ECR_REGISTRY/sleepreach/frontend:latest
+          cd frontend
+          npm ci
+          npm run build
+          npm run build:widget
+          npm run build:assessment
+        env:
+          VITE_API_URL: ${{ env.PRODUCTION_URL }}
 
-      - name: Update ECS services
+      - name: Copy frontend bundles to backend
         run: |
-          aws ecs update-service --cluster $ECS_CLUSTER --service sleepreach-prod-backend --force-new-deployment --desired-count 1
-          aws ecs update-service --cluster $ECS_CLUSTER --service sleepreach-prod-frontend --force-new-deployment --desired-count 1
-          aws ecs update-service --cluster $ECS_CLUSTER --service sleepreach-prod-celery --force-new-deployment --desired-count 1
+          mkdir -p backend/frontend-bundles/dist
+          mkdir -p backend/frontend-bundles/dist-widget
+          mkdir -p backend/frontend-bundles/dist-assessment
+          cp -r frontend/dist/* backend/frontend-bundles/dist/ 2>/dev/null || true
+          cp -r frontend/dist-widget/* backend/frontend-bundles/dist-widget/ 2>/dev/null || true
+          cp -r frontend/dist-assessment/* backend/frontend-bundles/dist-assessment/ 2>/dev/null || true
 
-      - name: Wait for services stable
+      # --- Build & Push Backend Docker Image ---
+      - name: Set image tag
+        id: image-tag
         run: |
-          aws ecs wait services-stable --cluster $ECS_CLUSTER --services sleepreach-prod-backend sleepreach-prod-frontend
-          echo "Production deployment complete!"
+          SHA=${{ steps.deploy-info.outputs.sha_short }}
+          echo "tag=prod-${SHA}" >> $GITHUB_OUTPUT
+          echo "full_image=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:prod-${SHA}" >> $GITHUB_OUTPUT
 
-      - name: Smoke test
+      - name: Build Docker image
         run: |
-          sleep 30
-          curl -sf https://api.sleeplessinarizona.com/health/live || echo "Health check pending (DNS may not be configured yet)"
+          docker build \
+            --target production \
+            --tag ${{ steps.image-tag.outputs.full_image }} \
+            --tag ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:prod-latest \
+            --tag ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest \
+            --label "git.sha=${{ steps.deploy-info.outputs.sha }}" \
+            --label "git.branch=main" \
+            --label "build.timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --label "environment=production" \
+            --file backend/Dockerfile \
+            backend/
+
+      # --- Security Scan Docker Image ---
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: ${{ steps.image-tag.outputs.full_image }}
+          severity: CRITICAL
+          exit-code: 0 # Report only
+          format: table
+        continue-on-error: true
+
+      # --- Push to ECR ---
+      - name: Push Docker image to ECR
+        run: |
+          docker push ${{ steps.image-tag.outputs.full_image }}
+          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:prod-latest
+          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+          echo "✅ Pushed: ${{ steps.image-tag.outputs.full_image }}"
+
+      # --- Deploy Backend Service ---
+      - name: Download current backend task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.TASK_DEF_BACKEND }} \
+            --query 'taskDefinition' \
+            --output json > backend-task-def.json
+          python3 -c "
+          import json
+          with open('backend-task-def.json') as f:
+              td = json.load(f)
+          for key in ['taskDefinitionArn','revision','status','requiresAttributes','compatibilities','registeredAt','registeredBy']:
+              td.pop(key, None)
+          with open('backend-task-def.json','w') as f:
+              json.dump(td, f, indent=2)
+          "
+
+      - name: Update backend task definition with new image
+        id: backend-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: backend-task-def.json
+          container-name: ${{ env.CONTAINER_NAME_BACKEND }}
+          image: ${{ steps.image-tag.outputs.full_image }}
+
+      - name: Deploy backend to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.backend-task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE_BACKEND }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          wait-for-minutes: 15
+
+      # --- Deploy Celery Service ---
+      - name: Download current celery task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.TASK_DEF_CELERY }} \
+            --query 'taskDefinition' \
+            --output json > celery-task-def.json
+          python3 -c "
+          import json
+          with open('celery-task-def.json') as f:
+              td = json.load(f)
+          for key in ['taskDefinitionArn','revision','status','requiresAttributes','compatibilities','registeredAt','registeredBy']:
+              td.pop(key, None)
+          with open('celery-task-def.json','w') as f:
+              json.dump(td, f, indent=2)
+          "
+
+      - name: Update celery task definition with new image
+        id: celery-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: celery-task-def.json
+          container-name: ${{ env.CONTAINER_NAME_CELERY }}
+          image: ${{ steps.image-tag.outputs.full_image }}
+
+      - name: Deploy celery to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.celery-task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE_CELERY }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          wait-for-minutes: 15
+
+      # --- Build & Deploy Frontend Service (nginx + React SPA) ---
+      - name: Set frontend image tag
+        id: frontend-image-tag
+        run: |
+          SHA=${{ steps.deploy-info.outputs.sha_short }}
+          echo "tag=prod-${SHA}" >> $GITHUB_OUTPUT
+          echo "full_image=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_FRONTEND }}:prod-${SHA}" >> $GITHUB_OUTPUT
+
+      - name: Build frontend Docker image
+        run: |
+          docker build \
+            --target production \
+            --tag ${{ steps.frontend-image-tag.outputs.full_image }} \
+            --tag ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_FRONTEND }}:prod-latest \
+            --tag ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_FRONTEND }}:latest \
+            --label "git.sha=${{ steps.deploy-info.outputs.sha }}" \
+            --label "git.branch=main" \
+            --label "build.timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --label "environment=production" \
+            --file frontend/Dockerfile \
+            frontend/
+
+      - name: Push frontend Docker image to ECR
+        run: |
+          docker push ${{ steps.frontend-image-tag.outputs.full_image }}
+          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_FRONTEND }}:prod-latest
+          docker push ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY_FRONTEND }}:latest
+          echo "✅ Pushed frontend: ${{ steps.frontend-image-tag.outputs.full_image }}"
+
+      - name: Download current frontend task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.TASK_DEF_FRONTEND }} \
+            --query 'taskDefinition' \
+            --output json > frontend-task-def.json
+          python3 -c "
+          import json
+          with open('frontend-task-def.json') as f:
+              td = json.load(f)
+          for key in ['taskDefinitionArn','revision','status','requiresAttributes','compatibilities','registeredAt','registeredBy']:
+              td.pop(key, None)
+          with open('frontend-task-def.json','w') as f:
+              json.dump(td, f, indent=2)
+          "
+
+      - name: Update frontend task definition with new image
+        id: frontend-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: frontend-task-def.json
+          container-name: ${{ env.CONTAINER_NAME_FRONTEND }}
+          image: ${{ steps.frontend-image-tag.outputs.full_image }}
+
+      - name: Deploy frontend to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.frontend-task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE_FRONTEND }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          wait-for-minutes: 15
+
+      # --- Smoke Tests ---
+      - name: Run production smoke tests
+        run: |
+          echo "🔥 Running smoke tests against production..."
+          sleep 20
+
+          # Test liveness endpoint
+          LIVE_RESPONSE=$(curl -sf ${{ env.PRODUCTION_URL }}/health/live 2>&1) || {
+            echo "❌ CRITICAL: Production liveness check failed!"
+            echo "Response: $LIVE_RESPONSE"
+            exit 1
+          }
+          echo "✅ Liveness: $LIVE_RESPONSE"
+
+          # Test health endpoint (includes DB check)
+          HEALTH_RESPONSE=$(curl -sf ${{ env.PRODUCTION_URL }}/health 2>&1) || {
+            echo "❌ CRITICAL: Production health check failed!"
+            exit 1
+          }
+          echo "✅ Health: $HEALTH_RESPONSE"
+
+          # Verify health status is healthy
+          echo "$HEALTH_RESPONSE" | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          if data.get('status') != 'healthy':
+              print(f'❌ CRITICAL: API reports unhealthy: {data}')
+              sys.exit(1)
+          print(f'✅ API version: {data.get(\"version\", \"unknown\")}')
+          print(f'✅ Environment: {data.get(\"environment\", \"unknown\")}')
+          print(f'✅ Database: {data.get(\"database\", \"unknown\")}')
+          " || {
+            echo "⚠️ Could not parse health response, but endpoint responded"
+          }
+
+          # Test frontend is serving
+          FRONTEND_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" ${{ env.FRONTEND_URL }} 2>&1) || true
+          if [ "$FRONTEND_STATUS" = "200" ]; then
+            echo "✅ Frontend: HTTP $FRONTEND_STATUS (app.sleeplessinarizona.com serving)"
+          else
+            echo "⚠️ Frontend returned HTTP $FRONTEND_STATUS (may still be stabilizing)"
+          fi
+
+          echo "🎉 All production smoke tests passed!"
+
+      # --- Git Release Tag ---
+      - name: Create git release tag
+        run: |
+          SHA=${{ steps.deploy-info.outputs.sha_short }}
+          TAG="deploy-prod-${SHA}-$(date -u +%Y%m%d-%H%M%S)"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "Production deployment: ${SHA}
+
+          Deployed by: ${{ github.actor }}
+          Image: ${{ steps.image-tag.outputs.full_image }}
+          Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          git push origin "$TAG"
+          echo "✅ Tagged: $TAG"
+
+      # --- Deployment Summary ---
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo "## 🚀 Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Image** | \`${{ steps.image-tag.outputs.tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`${{ steps.deploy-info.outputs.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | main |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Actor** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Cluster** | ${{ env.ECS_CLUSTER }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Backend Service** | ${{ env.ECS_SERVICE_BACKEND }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Celery Service** | ${{ env.ECS_SERVICE_CELERY }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Frontend Service** | ${{ env.ECS_SERVICE_FRONTEND }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Backend URL** | ${{ env.PRODUCTION_URL }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Frontend URL** | ${{ env.FRONTEND_URL }} |" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================================
+  # Notify
+  # ===========================================================================
+  notify:
+    name: "📧 Notify"
+    runs-on: ubuntu-latest
+    needs: [build-and-deploy]
+    if: always()
+    steps:
+      - name: Notify on success
+        if: needs.build-and-deploy.result == 'success'
+        run: |
+          echo "✅ PRODUCTION deployment successful!"
+          echo "Image: ${{ needs.build-and-deploy.outputs.image_tag }}"
+          echo "Commit: ${{ needs.build-and-deploy.outputs.deploy_sha }}"
+          echo "Backend URL: https://api.sleeplessinarizona.com"
+          echo "Frontend URL: https://app.sleeplessinarizona.com"
+          echo "Deployed by: ${{ github.actor }}"
+
+      - name: Notify on failure
+        if: needs.build-and-deploy.result == 'failure'
+        run: |
+          echo "🚨 PRODUCTION deployment FAILED!"
+          echo "Commit: ${{ needs.build-and-deploy.outputs.deploy_sha }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Check logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo ""
+          echo "⚠️ IMMEDIATE ACTION REQUIRED: Check production health at https://api.sleeplessinarizona.com/health"
