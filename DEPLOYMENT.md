@@ -1,191 +1,449 @@
-# SleepReach — AWS Deployment Architecture
+# SleepReach — Deployment Guide
 
-## Overview
+## Prerequisites
 
-SleepReach is deployed on AWS ECS Fargate in the `us-east-2` (Ohio) region, sharing the VPC and ALB with NeuroReach AI for cost optimization.
+| Tool | Version | Purpose |
+|------|---------|---------|
+| **Node.js** | 22.x | Frontend builds |
+| **Python** | 3.11 | Backend runtime |
+| **Docker** | 24+ | Container builds |
+| **AWS CLI** | 2.x | Infrastructure management |
+| **Git** | 2.x | Version control |
 
-## Architecture Diagram
+### AWS Access
 
-```
-                    ┌──────────────────────────┐
-                    │   sleeplessinarizona.com  │
-                    │   (DNS managed by IT)     │
-                    └──────────┬───────────────┘
-                               │
-                    ┌──────────▼───────────────┐
-                    │   AWS ACM Certificate    │
-                    │   *.sleeplessinarizona.com│
-                    └──────────┬───────────────┘
-                               │
-                    ┌──────────▼───────────────┐
-                    │   Application Load       │
-                    │   Balancer (shared)       │
-                    │   neuroreach-ai-alb       │
-                    └──────────┬───────────────┘
-                               │
-              ┌────────────────┼────────────────┐
-              │                │                │
-    ┌─────────▼─────┐  ┌──────▼──────┐  ┌──────▼──────┐
-    │ app.sleep...  │  │ api.sleep...│  │ stg.sleep...│
-    │ → Frontend    │  │ → Backend   │  │ → Staging   │
-    └───────────────┘  └─────────────┘  └─────────────┘
-              │                │                │
-    ┌─────────▼────────────────▼────────────────▼─────────┐
-    │              ECS Cluster: sleepreach-cluster          │
-    │                                                       │
-    │  Production:                  Staging:                │
-    │  ├─ sleepreach-prod-backend   ├─ sleepreach-stg-backend│
-    │  ├─ sleepreach-prod-frontend  ├─ sleepreach-stg-frontend│
-    │  └─ sleepreach-prod-celery    └─ sleepreach-stg-celery │
-    └──────────────────────┬────────────────────────────────┘
-                           │
-         ┌─────────────────┼─────────────────┐
-         │                 │                 │
-    ┌────▼─────┐    ┌──────▼──────┐   ┌──────▼──────┐
-    │ RDS      │    │ ElastiCache │   │ Secrets     │
-    │ PostgreSQL│    │ Redis       │   │ Manager     │
-    └──────────┘    └─────────────┘   └─────────────┘
+```bash
+# Configure AWS CLI with the sleepreach profile
+aws configure --profile sleepreach
+# Region: us-east-2
+# Output: json
 ```
 
-## AWS Resources
+GitHub Secrets required (already configured):
+- `AWS_ACCESS_KEY_ID` — IAM user access key
+- `AWS_SECRET_ACCESS_KEY` — IAM user secret key
 
-### Compute (ECS Fargate)
-| Service | CPU | Memory | Environment |
-|---------|-----|--------|-------------|
-| sleepreach-prod-backend | 256 | 512MB | production |
-| sleepreach-prod-frontend | 256 | 512MB | production |
-| sleepreach-prod-celery | 256 | 512MB | production |
-| sleepreach-stg-backend | 256 | 512MB | staging |
-| sleepreach-stg-frontend | 256 | 512MB | staging |
-| sleepreach-stg-celery | 256 | 512MB | staging |
+---
 
-### Database (RDS PostgreSQL 14)
-| Instance | Type | Storage | Backup | Encrypted |
-|----------|------|---------|--------|-----------|
-| sleepreach-prod-db | db.t3.micro | 20GB gp3 | 7 days | Yes |
-| sleepreach-stg-db | db.t3.micro | 20GB gp3 | 3 days | Yes |
+## Environment Setup
 
-**Endpoint (prod):** `sleepreach-prod-db.cfggkciq6tun.us-east-2.rds.amazonaws.com:5432`
-**Endpoint (stg):** `sleepreach-stg-db.cfggkciq6tun.us-east-2.rds.amazonaws.com:5432`
+### Local Development
 
-### Cache (ElastiCache Redis 7.1)
-| Instance | Type | Environment |
-|----------|------|-------------|
-| sleepreach-prod-redis | cache.t3.micro | production |
-| sleepreach-stg-redis | cache.t3.micro | staging |
+```bash
+# Clone the repository
+git clone https://github.com/EvanMaina/SleepReach.git
+cd SleepReach
 
-### Networking
-- **VPC:** vpc-00bed95435b092a79 (shared with NeuroReach, 10.0.0.0/16)
-- **ALB:** neuroreach-ai-alb (shared, HTTPS on port 443)
-- **Security Groups:**
-  - `sg-0edebbac3eb66c47a` — ECS tasks
-  - `sg-08abf0d99874ca3cb` — RDS database
-  - `sg-0def53df8f192c482` — Redis cache
+# Backend setup
+cd backend
+python -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+pip install -r requirements.txt
 
-### Container Registry (ECR)
-- `131880217305.dkr.ecr.us-east-2.amazonaws.com/sleepreach/backend`
-- `131880217305.dkr.ecr.us-east-2.amazonaws.com/sleepreach/frontend`
+# Frontend setup
+cd ../frontend
+npm ci
+```
 
-### Monitoring
-- **Health Dashboard:** https://us-east-2.console.aws.amazon.com/cloudwatch/home?region=us-east-2#dashboards/dashboard/SleepReach-Production
-- **Log Groups:** `/ecs/sleepreach-prod-*` and `/ecs/sleepreach-stg-*` (30-day retention)
+### Local `.env` (backend/.env)
 
-### Secrets
-- `sleepreach/production` — Production credentials (Secrets Manager)
-- `sleepreach/staging` — Staging credentials (Secrets Manager)
+Your local dev environment uses **fake services** (MailDev for email, local SMS dev server). Production credentials live **only** in AWS Secrets Manager — never in code.
 
-## URLs
+```env
+ENVIRONMENT=development
+DATABASE_URL=postgresql://sleepreach:password@localhost:5432/sleepreach
+REDIS_URL=redis://localhost:6379/0
+EMAIL_MODE=maildev
+SMS_MODE=local
+```
 
-### Production
-| URL | Purpose |
-|-----|---------|
-| `https://app.sleeplessinarizona.com` | Coordinator Dashboard |
-| `https://api.sleeplessinarizona.com` | Backend API |
-| `https://api.sleeplessinarizona.com/widget-embed.js` | **Widget embed script** |
-| `https://api.sleeplessinarizona.com/assessment` | Assessment form |
+### Docker Compose (Local Dev)
 
-### Staging
-| URL | Purpose |
-|-----|---------|
-| `https://stg.sleeplessinarizona.com` | Staging Dashboard |
+```bash
+# Start all services locally
+docker-compose up -d
 
-### Widget Embed Code (for website)
+# Services started:
+#   - PostgreSQL (port 5432)
+#   - Redis (port 6379)
+#   - MailDev (port 1080 — fake email UI)
+#   - SMS Dev Server (port 8025 — fake SMS)
+#   - Backend (port 8000)
+#   - Frontend (port 3000)
+```
+
+| Service | Local URL | Purpose |
+|---------|-----------|---------|
+| Frontend | http://localhost:3000 | Dashboard |
+| Backend API | http://localhost:8000 | API |
+| MailDev | http://localhost:1080 | Fake email inbox |
+| SMS Dev | http://localhost:8025 | Fake SMS viewer |
+| API Docs | http://localhost:8000/docs | Swagger (dev only) |
+
+---
+
+## CI/CD Pipeline
+
+### Workflows (6 total)
+
+| Workflow | File | Trigger | Purpose |
+|----------|------|---------|---------|
+| **CI** | `ci.yml` | Push to `dev`, PRs | Lint, typecheck, build, security scan |
+| **Deploy Staging** | `deploy-staging.yml` | Push to `stg` | Build → ECR → ECS staging |
+| **Deploy Production** | `deploy-production.yml` | Push to `main` | Build → ECR → ECS production |
+| **Promote** | `promote.yml` | CI passes on `dev` | Auto: dev → stg → main (full pipeline) |
+| **Rollback** | `rollback.yml` | Manual dispatch | Rollback production to previous revision |
+| **Backup** | `backup.yml` | Daily 2AM UTC + Weekly Sunday 4AM UTC | Database backup to S3 |
+
+### CI Checks (`ci.yml`)
+
+Runs on every push to `dev` and all PRs:
+
+| Check | Tool | Blocking? |
+|-------|------|-----------|
+| Backend Lint | Flake8 | Advisory |
+| Backend Type Check | MyPy | Advisory |
+| Backend Tests | Pytest | Advisory |
+| Frontend Lint | ESLint | Advisory |
+| **Frontend Type Check** | **TypeScript** | **Yes — must pass** |
+| **Frontend Build** | **Vite** | **Yes — must pass** |
+| Security Scan | Trivy | Advisory |
+| Secret Scan | Gitleaks | Advisory |
+| **Docker Build** | **Docker** | **Yes — must pass** |
+
+### Automatic Promotion Flow
+
+```
+Push to dev
+    │
+    ▼
+CI runs automatically (ci.yml)
+    │
+    ▼ (CI passes)
+Promote workflow triggers (promote.yml)
+    │
+    ├── 1. Merge dev → stg
+    ├── 2. Deploy to Staging (ECS)
+    ├── 3. Merge stg → main
+    └── 4. Deploy to Production (ECS)
+```
+
+**One push to `dev` = automatic deployment to all environments.**
+
+---
+
+## Deployment Flow
+
+### Branch Strategy
+
+```
+dev (development) → stg (staging) → main (production)
+```
+
+### Step-by-Step: Deploy a Change
+
+```bash
+# 1. Make changes on dev branch
+git checkout dev
+# ... make changes ...
+git add -A && git commit -m "feat: your change"
+
+# 2. Push to dev — CI runs automatically
+git push origin dev
+
+# 3. If CI passes, Promote workflow auto-triggers:
+#    dev → stg (deploy) → main (deploy)
+#    No manual steps needed!
+```
+
+### Manual Deploy to Staging Only
+
+```bash
+git checkout stg
+git merge dev
+git push origin stg
+# deploy-staging.yml triggers automatically
+```
+
+### Manual Deploy to Production Only
+
+```bash
+git checkout main
+git merge stg
+git push origin main
+# deploy-production.yml triggers automatically
+```
+
+### What Each Deploy Does
+
+1. **Checkout** the target branch
+2. **Build frontend** (npm ci → build → build:widget → build:assessment)
+3. **Copy frontend bundles** into backend directory
+4. **Build Docker image** (multi-stage, production target)
+5. **Security scan** with Trivy
+6. **Push to ECR** (tagged `prod-{sha}` or `stg-{sha}`)
+7. **Update ECS task definitions** (backend, celery, frontend)
+8. **Deploy to ECS** with rolling update (wait for stability, 15 min timeout)
+9. **Run smoke tests** (health endpoints, frontend reachability)
+10. **Tag release** in git (production only: `deploy-prod-{sha}-{timestamp}`)
+
+---
+
+## GitHub Secrets
+
+| Secret | Purpose |
+|--------|---------|
+| `AWS_ACCESS_KEY_ID` | IAM access key for ECR/ECS/CloudWatch |
+| `AWS_SECRET_ACCESS_KEY` | IAM secret key |
+
+All application secrets (DB password, Paubox key, Twilio tokens, Anthropic key, encryption keys) are in **AWS Secrets Manager**, injected into ECS task definitions at runtime.
+
+---
+
+## Staging Environment
+
+| Resource | Value |
+|----------|-------|
+| **URL** | https://stg.sleeplessinarizona.com |
+| **ECS Services** | sleepreach-stg-backend, stg-frontend, stg-celery |
+| **Database** | sleepreach-stg-db (RDS, encrypted, 3-day backup) |
+| **Redis** | sleepreach-stg-redis (ElastiCache, TLS) |
+| **Secrets** | `sleepreach/staging` (Secrets Manager) |
+
+---
+
+## Production Environment
+
+| Resource | Value |
+|----------|-------|
+| **Dashboard** | https://app.sleeplessinarizona.com |
+| **API** | https://api.sleeplessinarizona.com |
+| **Widget** | https://api.sleeplessinarizona.com/widget-embed.js |
+| **Assessment** | https://api.sleeplessinarizona.com/assessment |
+| **ECS Services** | sleepreach-prod-backend, prod-frontend, prod-celery |
+| **Database** | sleepreach-prod-db (RDS, encrypted, 7-day backup) |
+| **Redis** | sleepreach-prod-redis (ElastiCache, TLS) |
+| **Secrets** | `sleepreach/production` (Secrets Manager) |
+
+### Widget Embed Code
+
 ```html
 <script src="https://api.sleeplessinarizona.com/widget-embed.js"></script>
 ```
 
 ### Jotform Webhook URL
+
 ```
 https://api.sleeplessinarizona.com/api/webhooks/jotform
 ```
 
-## Deployment Flow
+---
 
+## Promote & Rollback
+
+### Promote (Automatic)
+
+The Promote workflow runs automatically when CI passes on `dev`. It can also be triggered manually from the GitHub Actions tab.
+
+### Rollback Production
+
+1. Go to **GitHub Actions → Rollback Production**
+2. Click **Run workflow**
+3. Choose rollback method:
+   - `previous-task-definition` — Roll back to the previous ECS revision
+   - `specific-image-tag` — Deploy a specific ECR image (e.g., `prod-18513d3`)
+4. Choose services: `both`, `backend-only`, or `celery-only`
+5. Type `ROLLBACK` to confirm
+6. Post-rollback: automatic health check verification
+
+### Manual Rollback via AWS CLI
+
+```bash
+# List recent ECR images
+aws ecr describe-images \
+  --repository-name sleepreach/backend \
+  --query 'imageDetails[?imageTags[?starts_with(@,`prod-`)]].imageTags[]' \
+  --output text --profile sleepreach --region us-east-2
+
+# Force redeploy current task definition
+aws ecs update-service \
+  --cluster sleepreach-cluster \
+  --service sleepreach-prod-backend \
+  --force-new-deployment \
+  --profile sleepreach --region us-east-2
 ```
-dev (local) → stg (staging) → main (production)
+
+---
+
+## Database Migrations
+
+Migrations are applied via the initial schema files:
+
+- `database/init/001_initial_schema.sql` — Leads table, enums, indexes, RLS
+- `database/init/002_users_and_providers.sql` — Users, providers, notes, settings
+
+For new migrations, add numbered SQL files and apply via ECS exec or the backup task override pattern.
+
+---
+
+## Health Checks
+
+| Endpoint | Checks | Used By |
+|----------|--------|---------|
+| `GET /health` | API + Database connectivity | ALB health check |
+| `GET /health/ready` | DB + Redis + Queue depths | Deep readiness (CI smoke tests) |
+| `GET /health/live` | API process alive | ALB liveness probe |
+
+### Quick Health Check
+
+```bash
+# Production
+curl https://api.sleeplessinarizona.com/health
+curl https://api.sleeplessinarizona.com/health/ready
+curl https://api.sleeplessinarizona.com/health/live
 ```
 
-### How to deploy:
-1. **Develop locally** on `dev` branch
-2. **Push to staging:** `git checkout stg && git merge dev && git push`
-   - GitHub Actions runs: TypeScript check → Vite build → Docker build → Push to ECR → Update ECS
-3. **Test on staging:** Visit `https://stg.sleeplessinarizona.com`
-4. **Deploy to production:** `git checkout main && git merge stg && git push`
-   - Same CI/CD pipeline → Production ECS updated
+---
 
-### CI/CD Checks (runs before every deployment):
-1. TypeScript compilation (`tsc --noEmit`)
-2. Vite production build (catches import/build errors)
-3. Docker image build (validates Dockerfiles)
-4. ECS service health check (waits for healthy containers)
+## Monitoring
 
-## Backup Strategy
+### CloudWatch Dashboard
 
-### Database Backups
-- **Production:** Automated daily backups, 7-day retention
-  - Backup window: 03:00-04:00 UTC
-  - Point-in-time recovery enabled
-- **Staging:** Automated daily backups, 3-day retention
+**URL:** https://us-east-2.console.aws.amazon.com/cloudwatch/home?region=us-east-2#dashboards/dashboard/SleepReach-Production
 
-### Manual Snapshot
+### Alarms (4)
+
+| Alarm | Threshold | Notification |
+|-------|-----------|-------------|
+| Backend CPU High | > 80% for 5 min | SNS → emwaniki@tmsinstitute.co |
+| Backend Memory High | > 80% for 5 min | SNS → emwaniki@tmsinstitute.co |
+| ALB 5xx Errors | > 10 in 5 min | SNS → emwaniki@tmsinstitute.co |
+| RDS CPU High | > 80% for 5 min | SNS → emwaniki@tmsinstitute.co |
+
+### Log Groups
+
+| Log Group | Retention |
+|-----------|-----------|
+| `/ecs/sleepreach-prod-backend` | 30 days |
+| `/ecs/sleepreach-prod-frontend` | 30 days |
+| `/ecs/sleepreach-prod-celery` | 30 days |
+| `/ecs/sleepreach-stg-*` | 30 days |
+
+### View Logs
+
+```bash
+# Recent backend logs
+aws logs tail /ecs/sleepreach-prod-backend --since 1h \
+  --profile sleepreach --region us-east-2
+
+# Follow logs in real time
+aws logs tail /ecs/sleepreach-prod-backend --follow \
+  --profile sleepreach --region us-east-2
+```
+
+---
+
+## Troubleshooting
+
+### ECS Service Not Starting
+
+```bash
+# Check service events
+aws ecs describe-services \
+  --cluster sleepreach-cluster \
+  --services sleepreach-prod-backend \
+  --query 'services[0].events[:5]' \
+  --profile sleepreach --region us-east-2
+
+# Check task stopped reason
+aws ecs list-tasks --cluster sleepreach-cluster --service-name sleepreach-prod-backend \
+  --desired-status STOPPED --profile sleepreach --region us-east-2
+```
+
+### Health Check Failing
+
+```bash
+# Test directly
+curl -v https://api.sleeplessinarizona.com/health
+
+# Check ALB target group health
+aws elbv2 describe-target-health \
+  --target-group-arn <target-group-arn> \
+  --profile sleepreach --region us-east-2
+```
+
+### Database Connection Issues
+
+```bash
+# Verify RDS is available
+aws rds describe-db-instances \
+  --db-instance-identifier sleepreach-prod-db \
+  --query 'DBInstances[0].DBInstanceStatus' \
+  --profile sleepreach --region us-east-2
+```
+
+### Force Redeploy (Same Image)
+
+```bash
+aws ecs update-service \
+  --cluster sleepreach-cluster \
+  --service sleepreach-prod-backend \
+  --force-new-deployment \
+  --profile sleepreach --region us-east-2
+```
+
+---
+
+## Backup & Recovery
+
+### Automated Backups
+
+| Type | Schedule | Retention | S3 Bucket |
+|------|----------|-----------|-----------|
+| RDS Automated | Daily 03:00-04:00 UTC | 7 days (prod), 3 days (stg) | — (RDS managed) |
+| GitHub Actions Daily | Daily 02:00 UTC | In S3 | sleepreach-backups-prod |
+| GitHub Actions Weekly | Sunday 04:00 UTC | In S3 | sleepreach-backups-prod |
+
+### Manual Database Snapshot
+
 ```bash
 aws rds create-db-snapshot \
   --db-instance-identifier sleepreach-prod-db \
-  --db-snapshot-identifier sleepreach-manual-$(date +%Y%m%d)
+  --db-snapshot-identifier sleepreach-manual-$(date +%Y%m%d) \
+  --profile sleepreach --region us-east-2
 ```
 
-### Restore from Backup
+### Restore from Point-in-Time
+
 ```bash
 aws rds restore-db-instance-to-point-in-time \
   --source-db-instance-identifier sleepreach-prod-db \
   --target-db-instance-identifier sleepreach-restore-db \
-  --restore-time "2026-04-15T12:00:00Z"
+  --restore-time "2026-04-16T12:00:00Z" \
+  --profile sleepreach --region us-east-2
 ```
 
-## Environment Separation
+### Trigger Manual Backup via GitHub Actions
 
-| Setting | Local Dev | Staging | Production |
-|---------|-----------|---------|------------|
-| ENVIRONMENT | development | staging | production |
-| Database | Local Docker | RDS (stg) | RDS (prod) |
-| Redis | Local Docker | ElastiCache (stg) | ElastiCache (prod) |
-| Email | MailDev (fake) | Paubox (real) | Paubox (real) |
-| SMS | smsdev (fake) | Twilio (real) | Twilio (real) |
-| API Docs | Enabled | Enabled | Disabled |
+1. Go to **GitHub Actions → Database Backup**
+2. Click **Run workflow**
+3. Choose `daily` or `weekly`
 
-**Your local dev environment (`backend/.env`) never changes. Production credentials live only in AWS Secrets Manager.**
+---
 
 ## Cost Estimate (Monthly)
 
 | Service | Cost |
 |---------|------|
-| ECS Fargate (6 tasks) | ~$40 |
-| RDS db.t3.micro × 2 | ~$30 |
+| ECS Fargate (6 tasks × 0.25 vCPU, 512MB) | ~$40 |
+| RDS db.t3.micro × 2 (prod + stg) | ~$30 |
 | ElastiCache cache.t3.micro × 2 | ~$24 |
-| ALB (shared) | ~$8 |
-| CloudWatch | ~$5 |
-| ECR | ~$1 |
+| ALB (shared with NeuroReach) | ~$8 |
+| CloudWatch (dashboard + alarms + logs) | ~$5 |
+| ECR (container images) | ~$1 |
 | **Total** | **~$108/month** |
+
+---
 
 ## Contacts
 
