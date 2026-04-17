@@ -53,3 +53,12 @@ frontend/dist-assessment/
 frontend/dist-widget/
 package-lock.json
 test_api.py
+
+# One-time fix scripts with secrets
+scripts/fix_task_definitions.py
+
+# Claude AI session data
+.claude/
+
+# Uploaded attachments (local dev)
+backend/static/attachments/
