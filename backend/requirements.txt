@@ -91,3 +91,7 @@ tenacity==8.2.3
 
 # Date/Time utilities
 python-dateutil==2.8.2
+
+# AWS SDK (for S3 backup uploads)
+boto3>=1.34.0
+botocore>=1.34.0
