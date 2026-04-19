@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NeuroReach AI — Database Backup Script
+SleepReach — Database Backup Script
 Runs pg_dump and uploads to S3 bucket.
 Designed to run inside ECS Fargate task (same VPC as RDS).
 
@@ -10,7 +10,7 @@ Usage:
 Environment variables required:
     DATABASE_URL  — PostgreSQL connection string
     AWS_REGION    — AWS region (default: us-east-2)
-    S3_BACKUP_BUCKET — S3 bucket name (default: neuroreach-backups-prod)
+    S3_BACKUP_BUCKET — S3 bucket name (default: sleepreach-backups-prod)
 """
 
 import os
@@ -29,7 +29,7 @@ logging.basicConfig(
 logger = logging.getLogger("backup")
 
 # Configuration
-S3_BUCKET = os.environ.get("S3_BACKUP_BUCKET", "neuroreach-backups-prod")
+S3_BUCKET = os.environ.get("S3_BACKUP_BUCKET", "sleepreach-backups-prod")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-2")
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 BACKUP_TYPE = "daily"  # daily or weekly
@@ -120,7 +120,7 @@ def run_python_backup(db_config: dict, output_file: str) -> bool:
         logger.info(f"Found {len(tables)} tables to backup")
 
         with gzip.open(output_file, "wt", encoding="utf-8") as f:
-            f.write(f"-- NeuroReach AI Database Backup\n")
+            f.write(f"-- SleepReach Database Backup\n")
             f.write(f"-- Date: {datetime.now(timezone.utc).isoformat()}\n")
             f.write(f"-- Database: {db_config['database']}\n")
             f.write(f"-- Tables: {len(tables)}\n\n")
@@ -227,8 +227,8 @@ def main():
     timestamp = now.strftime("%Y%m%d-%H%M%S")
     date_prefix = now.strftime("%Y/%m/%d")
 
-    local_file = f"/tmp/neuroreach-backup-{timestamp}.dump"
-    s3_key = f"rds/{BACKUP_TYPE}/{date_prefix}/neuroreach-{BACKUP_TYPE}-{timestamp}.dump"
+    local_file = f"/tmp/sleepreach-backup-{timestamp}.dump"
+    s3_key = f"rds/{BACKUP_TYPE}/{date_prefix}/sleepreach-{BACKUP_TYPE}-{timestamp}.dump"
 
     # Run backup
     success = run_pg_dump(db_config, local_file)

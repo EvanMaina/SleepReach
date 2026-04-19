@@ -206,7 +206,7 @@ All application secrets (DB password, Paubox key, Twilio tokens, Anthropic key, 
 |----------|-------|
 | **URL** | https://stg.sleeplessinarizona.com |
 | **ECS Services** | sleepreach-stg-backend, stg-frontend, stg-celery |
-| **Database** | sleepreach-stg-db (RDS, encrypted, 3-day backup) |
+| **Database** | sleepreach-stg-db (RDS PostgreSQL 16.13, encrypted, 3-day backup) |
 | **Redis** | sleepreach-stg-redis (ElastiCache, TLS) |
 | **Secrets** | `sleepreach/staging` (Secrets Manager) |
 
@@ -221,7 +221,7 @@ All application secrets (DB password, Paubox key, Twilio tokens, Anthropic key, 
 | **Widget** | https://api.sleeplessinarizona.com/widget-embed.js |
 | **Assessment** | https://api.sleeplessinarizona.com/assessment |
 | **ECS Services** | sleepreach-prod-backend, prod-frontend, prod-celery |
-| **Database** | sleepreach-prod-db (RDS, encrypted, 7-day backup) |
+| **Database** | sleepreach-prod-db (RDS PostgreSQL 16.13, encrypted, 7-day backup) |
 | **Redis** | sleepreach-prod-redis (ElastiCache, TLS) |
 | **Secrets** | `sleepreach/production` (Secrets Manager) |
 
@@ -311,14 +311,22 @@ curl https://api.sleeplessinarizona.com/health/live
 
 **URL:** https://us-east-2.console.aws.amazon.com/cloudwatch/home?region=us-east-2#dashboards/dashboard/SleepReach-Production
 
-### Alarms (4)
+### Alarms (12)
 
 | Alarm | Threshold | Notification |
 |-------|-----------|-------------|
-| Backend CPU High | > 80% for 5 min | SNS → emwaniki@tmsinstitute.co |
-| Backend Memory High | > 80% for 5 min | SNS → emwaniki@tmsinstitute.co |
-| ALB 5xx Errors | > 10 in 5 min | SNS → emwaniki@tmsinstitute.co |
-| RDS CPU High | > 80% for 5 min | SNS → emwaniki@tmsinstitute.co |
+| Backend CPU High | > 80% for 5 min | SNS → sleepreach-production-alerts |
+| Backend Memory High | > 80% for 5 min | SNS → sleepreach-production-alerts |
+| ALB 5xx Errors | > 10 in 5 min | SNS → sleepreach-production-alerts |
+| RDS CPU High | > 80% for 5 min | SNS → sleepreach-production-alerts |
+| ALB Response Time High | P99 > 5s for 15 min (3/3) | SNS → sleepreach-production-alerts |
+| ALB Target 5xx High | > 10 in 10 min (2/2) | SNS → sleepreach-production-alerts |
+| ALB Unhealthy Hosts | ≥ 1 for 10 min | SNS → sleepreach-production-alerts |
+| Celery CPU High | > 80% for 10 min | SNS → sleepreach-production-alerts |
+| Celery Memory High | > 80% for 10 min | SNS → sleepreach-production-alerts |
+| Service Degraded | Running < Desired for 10 min | SNS → sleepreach-production-alerts |
+| RDS Connections High | > 80 for 10 min | SNS → sleepreach-production-alerts |
+| RDS Storage Low | < 5GB | SNS → sleepreach-production-alerts |
 
 ### Log Groups
 
