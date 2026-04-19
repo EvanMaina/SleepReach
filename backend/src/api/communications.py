@@ -6,6 +6,7 @@ to leads directly from the dashboard.
 """
 
 import hashlib
+import logging
 import time
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
@@ -24,6 +25,8 @@ from ..services.communication_templates import get_template_payload, save_templa
 
 
 from ..models.user import User
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Idempotency Cache (in-memory, 5-minute window)
@@ -255,8 +258,7 @@ async def send_email_to_lead(
         )
 
     except Exception as e:
-        import logging
-        logging.error(f"Failed to send email: {e}")
+        logger.error(f"Failed to send email: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to send email: {str(e)}",
@@ -423,8 +425,7 @@ async def send_sms_to_lead(
         )
 
     except Exception as e:
-        import logging
-        logging.error(f"Failed to send SMS: {e}")
+        logger.error(f"Failed to send SMS: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to send SMS: {str(e)}",

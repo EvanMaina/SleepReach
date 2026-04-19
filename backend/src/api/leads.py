@@ -7,6 +7,7 @@ and lead retrieval for the dashboard.
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
+import logging
 from pathlib import Path
 import re
 from typing import List, Optional
@@ -62,6 +63,8 @@ from ..services.cache import get_cache
 from ..core.auth import get_current_user, require_role
 from ..services.lead_scoring_v2 import is_in_service_area as _check_service_area
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/leads", tags=["Leads"])
 ATTACHMENTS_DIR = Path(__file__).resolve().parent.parent.parent / "static" / "attachments"
@@ -932,9 +935,7 @@ async def submit_lead(
         except Exception as e:
             # Log error but don't fail the request
             # Notifications are nice-to-have, not critical
-            import logging
-            logging.error(f"Failed to send notification: {e}")
-            pass
+            logger.error(f"Failed to send notification for {lead.lead_number}: {e}")
 
         # Create audit log entry (without PHI)
         audit_service = AuditService(db)

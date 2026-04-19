@@ -132,7 +132,9 @@ def dispatch_lead_receipt_notifications(
     Returns:
         Dict with send status
     """
-    if _is_celery_available():
+    celery_ok = _is_celery_available()
+
+    if celery_ok:
         try:
             from ..tasks.lead_tasks import send_lead_receipt_notifications
             result = send_lead_receipt_notifications.delay(

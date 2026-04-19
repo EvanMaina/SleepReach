@@ -933,7 +933,7 @@ async def jotform_webhook(
                     other_condition_text=lead_input.other_condition_text or "",
                 )
         except Exception as e:
-            logger.warning(f"Failed to send confirmation email for Jotform lead {lead.lead_number}: {e}")
+            logger.error(f"Failed to send confirmation email for Jotform lead {lead.lead_number}: {e}")
         
         try:
             audit_service = AuditService(db)
