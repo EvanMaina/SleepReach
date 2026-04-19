@@ -1,64 +1,153 @@
-# Python
+# =============================================================================
+# NeuroReach AI — Git Ignore
+# =============================================================================
+
+# --- Dependencies ---
+node_modules/
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-*.egg-info/
-dist/
+.Python
 build/
-.eggs/
-
-# Node
-node_modules/
+develop-eggs/
 dist/
-.cache/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Environment
+# --- Virtual environments ---
+.venv/
+env/
+venv/
+ENV/
+
+# --- Environment config files (contain secrets — NEVER commit) ---
 .env
 .env.local
 .env.production
+.env.development
+.env.staging
+.env.*.local
+backend/.env
+backend/.env.local
+backend/.env.development
+backend/.env.production
+backend/.env.staging
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+frontend/.env.staging
 
-# Docker
-*.log
-
-# IDE
-.vscode/
+# --- IDE ---
 .idea/
+.vscode/
 *.swp
 *.swo
+*~
 
-# OS
+# --- OS ---
 .DS_Store
 Thumbs.db
 
-# Database
-*.sql.bak
-pgdata/
-
-# Celery
-celerybeat-schedule
-celerybeat.pid
-
-# Coverage
-htmlcov/
+# --- Testing ---
 .coverage
+.pytest_cache/
+htmlcov/
+.tox/
+.nox/
 
-# Local repo/link artifacts
-NeuroReachAI/
-tmp/
+# --- Build artifacts ---
+*.log
+*.tmp
+*.temp
+frontend/dist/
+frontend/.vite/
+
+# --- Database ---
+*.db
+*.sqlite3
+
+# --- Secrets / certificates (NEVER commit) ---
+*.pem
+*.key
+secrets/
+
+# --- Docker ---
+.docker/
+
+# --- Alembic ---
+alembic/versions/*.pyc
+
+# --- ECS task definitions & overrides (contain secrets) ---
+*-task-def.json
+*-task-def-new.json
+*-taskdef-updated.json
+*-overrides.json
+*-containers.json
+current-taskdef.json
+syncfix-taskdef.json
+backend-task-def.json
+celery-task-def.json
+db-check-overrides.json
+db-init-overrides.json
+user-create-overrides.json
+
+# --- Test scripts (may contain credentials) ---
+test_paubox.py
+test_twilio.py
+test_twilio_direct.py
+_test.py
+
+# --- Deployment helper scripts ---
+fetch_logs.py
+gen_taskdefs.py
+ecs-logs.txt
+
+# --- Response dumps ---
+*_response.json
+*_resp.json
+leads_response.json
+login_resp.json
+login_response.json
+
+# --- Frontend build bundles in backend (CI-generated) ---
+backend/frontend-bundles/
+
+# --- Combined SQL (generated during deploy) ---
+backend/scripts/combined_init.sql
+
+# --- Temporary task definition files ---
+_tmp_*.json
+*-taskdef-current.json
+
+# --- Deployment utility scripts ---
+update_redis_endpoint.py
+generate_favicons.py
+
+# --- Frontend build artifacts (widget/assessment bundles) ---
+frontend/dist-widget/
+frontend/dist-assessment/
+
+# --- QA / temporary test files ---
+qa_test.py
+test_api.py
 tmp-playwright-smoke.spec.ts
 test-results/
 frontend/test-results/
-frontend/dist-assessment/
-frontend/dist-widget/
-package-lock.json
-test_api.py
-
-# One-time fix scripts with secrets
+tmp/
 scripts/fix_task_definitions.py
 
-# Claude AI session data
+# --- Claude / AI assistant ---
 .claude/
 
-# Uploaded attachments (local dev)
-backend/static/attachments/
+# --- Nested repo clones (accidental) ---
+NeuroReachAI/

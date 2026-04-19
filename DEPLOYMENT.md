@@ -460,3 +460,30 @@ aws rds restore-db-instance-to-point-in-time \
 | Primary Admin | Evan Mwaniki | emwaniki@tmsinstitute.co |
 | Administrator | Ruchir Patel | rpatel@sleeplessinarizona.com |
 | Administrator | Rachel Patel | rlpatel@sleeplessinarizona.com |
+
+---
+
+## QA Certification
+
+| Check | Status | Date |
+|-------|--------|------|
+| All 6 ECS services healthy (prod + stg) | ✅ PASS | 2026-04-19 |
+| PostgreSQL 16.13 on all RDS instances | ✅ PASS | 2026-04-19 |
+| Storage encryption at rest (RDS + Redis) | ✅ PASS | 2026-04-19 |
+| SSL/TLS certificates valid | ✅ PASS (exp Oct 2026) | 2026-04-19 |
+| HTTP → HTTPS redirect | ✅ PASS | 2026-04-19 |
+| CORS properly configured | ✅ PASS | 2026-04-19 |
+| /docs disabled in production | ✅ PASS | 2026-04-19 |
+| CloudWatch alarms (12) all OK | ✅ PASS | 2026-04-19 |
+| Circuit breaker / auto-rollback | ✅ PASS | 2026-04-19 |
+| Rolling deployment (200% max, 100% min) | ✅ PASS | 2026-04-19 |
+| Automated backups (RDS 7-day retention) | ✅ PASS | 2026-04-19 |
+| CI/CD pipeline (dev → stg → main → prod) | ✅ PASS | 2026-04-19 |
+| Health endpoints (/health, /health/ready) | ✅ PASS | 2026-04-19 |
+| API authentication & lead pipeline | ✅ PASS | 2026-04-19 |
+| Log retention (30 days) | ✅ PASS | 2026-04-19 |
+| Redis transit encryption | ⚠️ Known limitation — see notes | 2026-04-19 |
+
+### Known Limitations
+
+- **Redis Transit Encryption**: SleepReach prod and staging Redis clusters have `TransitEncryption = False`. This cannot be changed without recreating the clusters (would cause downtime). Data at rest is encrypted. Schedule a maintenance window to recreate with TLS enabled when convenient.
