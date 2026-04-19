@@ -6,160 +6,161 @@
 name: 🗄️ Database Backup
 
 on:
-    schedule:
-        - cron: "0 2 * * *" # Daily at 2:00 AM UTC
-        - cron: "0 4 * * 0" # Weekly on Sunday at 4:00 AM UTC
-    workflow_dispatch:
-        inputs:
-            backup_type:
-                description: "Backup type"
-                required: true
-                type: choice
-                options:
-                    - daily
-                    - weekly
+  schedule:
+    - cron: "0 2 * * *" # Daily at 2:00 AM UTC
+    - cron: "0 4 * * 0" # Weekly on Sunday at 4:00 AM UTC
+  workflow_dispatch:
+    inputs:
+      backup_type:
+        description: "Backup type"
+        required: true
+        type: choice
+        options:
+          - daily
+          - weekly
 
 env:
-    AWS_REGION: us-east-2
-    ECS_CLUSTER: sleepreach-cluster
-    TASK_DEF: sleepreach-prod-backend
-    CONTAINER_NAME: backend
-    S3_BUCKET: sleepreach-backups-prod
+  AWS_REGION: us-east-2
+  ECS_CLUSTER: sleepreach-cluster
+  TASK_DEF: sleepreach-prod-backend
+  CONTAINER_NAME: backend
+  S3_BUCKET: sleepreach-backups-prod
 
 permissions:
-    contents: read
+  contents: read
 
 jobs:
-    backup:
-        name: "🗄️ Run Database Backup"
-        runs-on: ubuntu-latest
-        steps:
-            - name: Determine backup type
-              id: backup-type
-              run: |
-                  if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-                    echo "type=${{ github.event.inputs.backup_type }}" >> $GITHUB_OUTPUT
-                  elif [ "${{ github.event.schedule }}" = "0 4 * * 0" ]; then
-                    echo "type=weekly" >> $GITHUB_OUTPUT
-                  else
-                    echo "type=daily" >> $GITHUB_OUTPUT
-                  fi
+  backup:
+    name: "🗄️ Run Database Backup"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine backup type
+        id: backup-type
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "type=${{ github.event.inputs.backup_type }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.schedule }}" = "0 4 * * 0" ]; then
+            echo "type=weekly" >> $GITHUB_OUTPUT
+          else
+            echo "type=daily" >> $GITHUB_OUTPUT
+          fi
 
-            - name: Configure AWS credentials
-              uses: aws-actions/configure-aws-credentials@v4
-              with:
-                  aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-                  aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-                  aws-region: ${{ env.AWS_REGION }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-            - name: Get current task definition and network config
-              id: config
-              run: |
-                  # Get latest task definition ARN
-                  TASK_DEF_ARN=$(aws ecs describe-services \
-                    --cluster ${{ env.ECS_CLUSTER }} \
-                    --services sleepreach-prod-backend \
-                    --query 'services[0].taskDefinition' --output text)
-                  echo "task_def=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
+      - name: Get current task definition and network config
+        id: config
+        run: |
+          # Get latest task definition ARN
+          TASK_DEF_ARN=$(aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services sleepreach-prod-backend \
+            --query 'services[0].taskDefinition' --output text)
+          echo "task_def=$TASK_DEF_ARN" >> $GITHUB_OUTPUT
 
-                  # Get network configuration from the running service
-                  SUBNETS=$(aws ecs describe-services \
-                    --cluster ${{ env.ECS_CLUSTER }} \
-                    --services sleepreach-prod-backend \
-                    --query 'services[0].networkConfiguration.awsvpcConfiguration.subnets' --output text)
-                  SUBNETS_CSV=$(echo $SUBNETS | tr '[:blank:]' ',')
-                  echo "subnets=$SUBNETS_CSV" >> $GITHUB_OUTPUT
+          # Get network configuration from the running service
+          SUBNETS=$(aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services sleepreach-prod-backend \
+            --query 'services[0].networkConfiguration.awsvpcConfiguration.subnets' --output text)
+          SUBNETS_CSV=$(echo $SUBNETS | tr '[:blank:]' ',')
+          echo "subnets=$SUBNETS_CSV" >> $GITHUB_OUTPUT
 
-                  SG=$(aws ecs describe-services \
-                    --cluster ${{ env.ECS_CLUSTER }} \
-                    --services sleepreach-prod-backend \
-                    --query 'services[0].networkConfiguration.awsvpcConfiguration.securityGroups[0]' --output text)
-                  echo "security_group=$SG" >> $GITHUB_OUTPUT
+          SG=$(aws ecs describe-services \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services sleepreach-prod-backend \
+            --query 'services[0].networkConfiguration.awsvpcConfiguration.securityGroups[0]' --output text)
+          echo "security_group=$SG" >> $GITHUB_OUTPUT
 
-                  echo "📋 Task Def: $TASK_DEF_ARN"
-                  echo "🔌 Subnets: $SUBNETS_CSV"
-                  echo "🔒 Security Group: $SG"
+          echo "📋 Task Def: $TASK_DEF_ARN"
+          echo "🔌 Subnets: $SUBNETS_CSV"
+          echo "🔒 Security Group: $SG"
 
-            - name: Run backup ECS task
-              id: run-task
-              run: |
-                  BACKUP_TYPE="${{ steps.backup-type.outputs.type }}"
-                  echo "🗄️ Running $BACKUP_TYPE backup..."
+      - name: Run backup ECS task
+        id: run-task
+        run: |
+          BACKUP_TYPE="${{ steps.backup-type.outputs.type }}"
+          echo "🗄️ Running $BACKUP_TYPE backup..."
 
-                  TASK_ARN=$(aws ecs run-task \
-                    --cluster ${{ env.ECS_CLUSTER }} \
-                    --task-definition "${{ steps.config.outputs.task_def }}" \
-                    --launch-type FARGATE \
-                    --network-configuration "awsvpcConfiguration={subnets=[${{ steps.config.outputs.subnets }}],securityGroups=[${{ steps.config.outputs.security_group }}],assignPublicIp=DISABLED}" \
-                    --overrides '{
-                      "containerOverrides": [{
-                        "name": "${{ env.CONTAINER_NAME }}",
-                        "command": ["python", "scripts/backup_database.py", "--type", "'"$BACKUP_TYPE"'"],
-                        "environment": [
-                          {"name": "S3_BACKUP_BUCKET", "value": "${{ env.S3_BUCKET }}"}
-                        ]
-                      }]
-                    }' \
-                    --query 'tasks[0].taskArn' --output text)
+          TASK_ARN=$(aws ecs run-task \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --task-definition "${{ steps.config.outputs.task_def }}" \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ steps.config.outputs.subnets }}],securityGroups=[${{ steps.config.outputs.security_group }}],assignPublicIp=DISABLED}" \
+            --overrides '{
+              "containerOverrides": [{
+                "name": "${{ env.CONTAINER_NAME }}",
+                "command": ["python", "scripts/backup_database.py", "--type", "'"$BACKUP_TYPE"'"],
+                "environment": [
+                  {"name": "S3_BACKUP_BUCKET", "value": "${{ env.S3_BUCKET }}"}
+                ]
+              }],
+              "taskRoleArn": "arn:aws:iam::131880217305:role/sleepreach-ecs-task-role"
+            }' \
+            --query 'tasks[0].taskArn' --output text)
 
-                  echo "task_arn=$TASK_ARN" >> $GITHUB_OUTPUT
-                  echo "📦 Task started: $TASK_ARN"
+          echo "task_arn=$TASK_ARN" >> $GITHUB_OUTPUT
+          echo "📦 Task started: $TASK_ARN"
 
-            - name: Wait for backup task to complete
-              run: |
-                  TASK_ARN="${{ steps.run-task.outputs.task_arn }}"
-                  echo "⏳ Waiting for backup task to complete..."
+      - name: Wait for backup task to complete
+        run: |
+          TASK_ARN="${{ steps.run-task.outputs.task_arn }}"
+          echo "⏳ Waiting for backup task to complete..."
 
-                  aws ecs wait tasks-stopped \
-                    --cluster ${{ env.ECS_CLUSTER }} \
-                    --tasks "$TASK_ARN"
+          aws ecs wait tasks-stopped \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --tasks "$TASK_ARN"
 
-                  # Check exit code
-                  EXIT_CODE=$(aws ecs describe-tasks \
-                    --cluster ${{ env.ECS_CLUSTER }} \
-                    --tasks "$TASK_ARN" \
-                    --query 'tasks[0].containers[0].exitCode' --output text)
+          # Check exit code
+          EXIT_CODE=$(aws ecs describe-tasks \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --tasks "$TASK_ARN" \
+            --query 'tasks[0].containers[0].exitCode' --output text)
 
-                  REASON=$(aws ecs describe-tasks \
-                    --cluster ${{ env.ECS_CLUSTER }} \
-                    --tasks "$TASK_ARN" \
-                    --query 'tasks[0].stoppedReason' --output text)
+          REASON=$(aws ecs describe-tasks \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --tasks "$TASK_ARN" \
+            --query 'tasks[0].stoppedReason' --output text)
 
-                  echo "Exit code: $EXIT_CODE"
-                  echo "Stopped reason: $REASON"
+          echo "Exit code: $EXIT_CODE"
+          echo "Stopped reason: $REASON"
 
-                  if [ "$EXIT_CODE" != "0" ]; then
-                    echo "❌ Backup task failed with exit code: $EXIT_CODE"
-                    echo "Reason: $REASON"
-                    exit 1
-                  fi
+          if [ "$EXIT_CODE" != "0" ]; then
+            echo "❌ Backup task failed with exit code: $EXIT_CODE"
+            echo "Reason: $REASON"
+            exit 1
+          fi
 
-                  echo "✅ Backup task completed successfully!"
+          echo "✅ Backup task completed successfully!"
 
-            - name: Verify backup in S3
-              run: |
-                  BACKUP_TYPE="${{ steps.backup-type.outputs.type }}"
-                  DATE_PREFIX=$(date -u +%Y/%m/%d)
+      - name: Verify backup in S3
+        run: |
+          BACKUP_TYPE="${{ steps.backup-type.outputs.type }}"
+          DATE_PREFIX=$(date -u +%Y/%m/%d)
 
-                  echo "🔍 Checking S3 for today's $BACKUP_TYPE backup..."
-                  BACKUPS=$(aws s3 ls "s3://${{ env.S3_BUCKET }}/rds/$BACKUP_TYPE/$DATE_PREFIX/" 2>&1 || echo "none")
+          echo "🔍 Checking S3 for today's $BACKUP_TYPE backup..."
+          BACKUPS=$(aws s3 ls "s3://${{ env.S3_BUCKET }}/rds/$BACKUP_TYPE/$DATE_PREFIX/" 2>&1 || echo "none")
 
-                  if echo "$BACKUPS" | grep -q "sleepreach"; then
-                    echo "✅ Backup found in S3:"
-                    echo "$BACKUPS"
-                  else
-                    echo "⚠️ Could not verify backup in S3 (task may still be uploading)"
-                    echo "Check: s3://${{ env.S3_BUCKET }}/rds/$BACKUP_TYPE/$DATE_PREFIX/"
-                  fi
+          if echo "$BACKUPS" | grep -q "sleepreach"; then
+            echo "✅ Backup found in S3:"
+            echo "$BACKUPS"
+          else
+            echo "⚠️ Could not verify backup in S3 (task may still be uploading)"
+            echo "Check: s3://${{ env.S3_BUCKET }}/rds/$BACKUP_TYPE/$DATE_PREFIX/"
+          fi
 
-            - name: Backup summary
-              if: always()
-              run: |
-                  echo "## 🗄️ Database Backup Summary" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
-                  echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-                  echo "| **Type** | ${{ steps.backup-type.outputs.type }} |" >> $GITHUB_STEP_SUMMARY
-                  echo "| **S3 Bucket** | ${{ env.S3_BUCKET }} |" >> $GITHUB_STEP_SUMMARY
-                  echo "| **Task ARN** | ${{ steps.run-task.outputs.task_arn }} |" >> $GITHUB_STEP_SUMMARY
-                  echo "| **Time** | $(date -u +%Y-%m-%dT%H:%M:%SZ) |" >> $GITHUB_STEP_SUMMARY
+      - name: Backup summary
+        if: always()
+        run: |
+          echo "## 🗄️ Database Backup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Detail | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Type** | ${{ steps.backup-type.outputs.type }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **S3 Bucket** | ${{ env.S3_BUCKET }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Task ARN** | ${{ steps.run-task.outputs.task_arn }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Time** | $(date -u +%Y-%m-%dT%H:%M:%SZ) |" >> $GITHUB_STEP_SUMMARY
