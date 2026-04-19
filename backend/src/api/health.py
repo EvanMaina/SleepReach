@@ -282,6 +282,142 @@ async def invalidate_all_caches() -> Dict[str, Any]:
     }
 
 
+@router.get(
+    "/health/notifications",
+    summary="Notification System Health",
+    description="Check health of all notification delivery systems: Paubox email, Twilio SMS, and Celery broker.",
+)
+async def notification_health_check() -> Dict[str, Any]:
+    """
+    Health check for the notification pipeline.
+
+    Tests connectivity (without sending real messages) for:
+    - Paubox Email API: authenticated GET to /messages endpoint
+    - Twilio SMS API: account.fetch() to verify credentials
+    - Celery broker (Redis): connection probe
+
+    Returns:
+        Dict with per-component health and overall status
+    """
+    import concurrent.futures
+    import time as _time
+
+    components: Dict[str, Any] = {}
+    overall_healthy = True
+
+    def _check_paubox() -> Dict[str, Any]:
+        """Probe Paubox API with a lightweight authenticated request."""
+        try:
+            import httpx
+            from ..core.config import settings as _s
+
+            if not _s.paubox_enabled:
+                return {"status": "disabled", "configured": False}
+            if not all([_s.paubox_api_key, _s.paubox_api_username, _s.paubox_api_base_url]):
+                return {"status": "misconfigured", "configured": False}
+
+            # GET /message_receipt/<fake> → 404 proves auth & connectivity
+            url = f"{_s.paubox_api_base_url}/message_receipt/healthcheck-probe"
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Token token={_s.paubox_api_key}",
+            }
+            t0 = _time.time()
+            with httpx.Client(timeout=10.0) as client:
+                resp = client.get(url, headers=headers)
+            latency_ms = round((_time.time() - t0) * 1000, 1)
+
+            # 200/404 = API reachable & authenticated; 401/403 = auth failure
+            if resp.status_code in (200, 404):
+                return {"status": "healthy", "configured": True, "latency_ms": latency_ms}
+            elif resp.status_code in (401, 403):
+                return {"status": "auth_failed", "configured": True, "http_status": resp.status_code}
+            else:
+                return {"status": "unexpected", "configured": True, "http_status": resp.status_code}
+        except Exception as e:
+            return {"status": "unreachable", "configured": True, "error": str(e)[:120]}
+
+    def _check_twilio() -> Dict[str, Any]:
+        """Probe Twilio API with account.fetch()."""
+        try:
+            from ..core.config import settings as _s
+
+            sms_mode = getattr(_s, "sms_mode", "local").lower()
+            if sms_mode != "twilio":
+                return {"status": "disabled", "sms_mode": sms_mode, "configured": False}
+            if not all([_s.twilio_account_sid, _s.twilio_auth_token]):
+                return {"status": "misconfigured", "configured": False}
+
+            from twilio.rest import Client
+            t0 = _time.time()
+            client = Client(_s.twilio_account_sid, _s.twilio_auth_token)
+            acct = client.api.account.fetch()
+            latency_ms = round((_time.time() - t0) * 1000, 1)
+
+            return {
+                "status": "healthy",
+                "configured": True,
+                "account_status": acct.status,
+                "latency_ms": latency_ms,
+            }
+        except Exception as e:
+            return {"status": "unreachable", "configured": True, "error": str(e)[:120]}
+
+    def _check_celery_broker() -> Dict[str, Any]:
+        """Probe the Celery broker (Redis) connection."""
+        try:
+            from ..core.config import settings as _s
+
+            if not _s.celery_enabled:
+                return {"status": "disabled", "configured": False}
+
+            from ..tasks.celery_app import celery_app
+            t0 = _time.time()
+            conn = celery_app.connection()
+            conn.ensure_connection(max_retries=1, timeout=5)
+            conn.close()
+            latency_ms = round((_time.time() - t0) * 1000, 1)
+
+            return {"status": "healthy", "configured": True, "latency_ms": latency_ms}
+        except Exception as e:
+            return {"status": "unreachable", "configured": True, "error": str(e)[:120]}
+
+    # Run all three probes in parallel with 15s overall timeout
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+        fut_paubox = pool.submit(_check_paubox)
+        fut_twilio = pool.submit(_check_twilio)
+        fut_celery = pool.submit(_check_celery_broker)
+
+        try:
+            components["paubox"] = fut_paubox.result(timeout=15)
+        except Exception as e:
+            components["paubox"] = {"status": "timeout", "error": str(e)[:80]}
+
+        try:
+            components["twilio"] = fut_twilio.result(timeout=15)
+        except Exception as e:
+            components["twilio"] = {"status": "timeout", "error": str(e)[:80]}
+
+        try:
+            components["celery_broker"] = fut_celery.result(timeout=15)
+        except Exception as e:
+            components["celery_broker"] = {"status": "timeout", "error": str(e)[:80]}
+
+    # Determine overall health
+    for name, comp in components.items():
+        status = comp.get("status", "unknown")
+        if status not in ("healthy", "disabled"):
+            overall_healthy = False
+            break
+
+    return {
+        "status": "healthy" if overall_healthy else "degraded",
+        "timestamp": datetime.utcnow().isoformat(),
+        "environment": settings.environment,
+        "components": components,
+    }
+
+
 @router.post(
     "/api/admin/test-follow-up",
     summary="Test Follow-Up Send",
