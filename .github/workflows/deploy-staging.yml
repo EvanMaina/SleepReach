@@ -59,6 +59,17 @@ jobs:
         with:
           ref: stg
 
+      # ---------------------------------------------------------------------
+      # REPO IDENTITY GUARD — prevents cross-contamination between tools.
+      # Fails fast (before any ECR push) if the checked-out tree isn't
+      # SleepReach. Root cause of 2026-04-20 incident was a tree from the
+      # other tool being deployed to SleepReach AWS resources.
+      # ---------------------------------------------------------------------
+      - name: "🔐 Verify repo identity (SleepReach)"
+        run: |
+          chmod +x scripts/verify_repo_identity.sh
+          ./scripts/verify_repo_identity.sh
+
       # Determine the ACTUAL commit SHA being deployed
       - name: Get deployment info
         id: deploy-info
@@ -313,6 +324,38 @@ jobs:
           echo "🎉 All staging smoke tests passed!"
 
       # --- Deployment Summary ---
+
+      # ---------------------------------------------------------------------
+      # POST-DEPLOY IDENTITY VERIFICATION
+      # Curl the live frontend and assert <title> contains "SleepReach".
+      # If the nginx container is serving the wrong tool, this step fails
+      # and the deploy is marked red.
+      # ---------------------------------------------------------------------
+      - name: "🔐 Post-deploy: verify live frontend <title> is SleepReach"
+        run: |
+          URL="${{ env.STAGING_URL }}"
+          echo "🔎 Fetching $URL and checking <title>..."
+          for i in 1 2 3 4 5 6; do
+            HTML=$(curl -s --max-time 10 "$URL/" || true)
+            TITLE=$(echo "$HTML" | grep -oiE '<title>[^<]*</title>' | head -n1 || echo '')
+            if echo "$TITLE" | grep -iq 'SleepReach'; then
+              echo "✅ Live frontend title OK: $TITLE"
+              if echo "$HTML" | grep -iq 'NeuroReach\|tmsinstitute\.co'; then
+                echo "❌ CRITICAL: live HTML contains forbidden markers!"
+                echo "$HTML" | grep -iE 'NeuroReach\|tmsinstitute\.co' | head -5
+                exit 1
+              fi
+              echo "✅ No cross-contamination markers in live HTML."
+              exit 0
+            fi
+            echo "⏳ Attempt $i/6: title was '$TITLE' — waiting 10s for ALB to cut over..."
+            sleep 10
+          done
+          echo "❌ CRITICAL: $URL is NOT serving SleepReach — contamination detected."
+          echo "   Last title seen: $TITLE"
+          echo "   First 500 bytes of HTML:"
+          echo "$HTML" | head -c 500
+          exit 1
       - name: Deployment summary
         if: always()
         run: |
