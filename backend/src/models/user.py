@@ -112,8 +112,18 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.current_timestamp())
     updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.current_timestamp(), onupdate=func.current_timestamp())
 
-    # Relationship to preferences
-    preferences = relationship("UserPreferences", uselist=False, back_populates="user", lazy="joined")
+    # Relationship to preferences.
+    # cascade="all, delete-orphan" + passive_deletes=True lets the ORM rely on the
+    # `ON DELETE CASCADE` FK at the DB layer, avoiding SQLAlchemy attempting to
+    # blank the PK of UserPreferences (its PK is also a FK to users.id).
+    preferences = relationship(
+        "UserPreferences",
+        uselist=False,
+        back_populates="user",
+        lazy="joined",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
     @property
     def full_name(self) -> str:

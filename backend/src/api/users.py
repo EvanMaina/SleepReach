@@ -438,9 +438,23 @@ async def permanently_delete_user(
     if user.role == UserRole.PRIMARY_ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot permanently delete a primary admin")
 
-    # Delete related records first
-    from ..models.user import UserPreferences
-    db.query(UserPreferences).filter(UserPreferences.user_id == user.id).delete()
+    # Related records (user_preferences, password_reset_tokens) are removed via
+    # ON DELETE CASCADE foreign keys and the cascade on User.preferences.
+    # Use a fresh session without the joined-loaded preferences to avoid SQLAlchemy
+    # attempting to blank out the preferences PK before the DB cascade runs.
+    user_id_val = user.id
+    try:
+        db.expire(user, ["preferences"])
+    except Exception:
+        pass
     db.delete(user)
-    db.commit()
+    try:
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.exception(f"Failed to permanently delete user {user_id_val}: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete user. Please try again.",
+        )
     return {"success": True, "message": "User permanently deleted"}
