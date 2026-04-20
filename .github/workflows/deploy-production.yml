@@ -239,6 +239,26 @@ jobs:
           wait-for-service-stability: true
           wait-for-minutes: 15
 
+      # ---------------------------------------------------------------------
+      # CRITICAL: Enforce Celery desiredCount = 1
+      # The worker command uses `celery ... worker -B` (embedded Beat scheduler).
+      # Running >1 replica = multiple Beat schedulers = EVERY scheduled task
+      # fires N times (duplicate emails/SMS to leads). Always pin to 1.
+      # If horizontal scaling is ever needed, split into a dedicated Beat
+      # service (desired=1, cmd `celery beat`) + N worker replicas (cmd
+      # `celery worker` without `-B`).
+      # ---------------------------------------------------------------------
+      - name: Enforce celery desiredCount=1 (prevent duplicate Beat)
+        run: |
+          echo "🔒 Pinning ${{ env.ECS_SERVICE_CELERY }} to desiredCount=1 to prevent duplicate Beat schedulers..."
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.ECS_SERVICE_CELERY }} \
+            --desired-count 1 \
+            --query 'service.{svc:serviceName,desired:desiredCount,running:runningCount}' \
+            --output json
+          echo "✅ Celery service pinned to 1 replica."
+
       # --- Build & Deploy Frontend Service (nginx + React SPA) ---
       - name: Set frontend image tag
         id: frontend-image-tag
