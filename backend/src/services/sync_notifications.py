@@ -53,11 +53,16 @@ _CELERY_CHECK_INTERVAL = 30.0  # Re-check every 30 seconds
 
 def _is_celery_available() -> bool:
     """
-    Check if Celery is enabled AND the broker (Redis) is reachable.
+    Check if Celery is enabled AND a worker is actually consuming tasks.
 
-    The result is cached for 30 seconds per-process to avoid pinging Redis
-    on every single notification call. If Redis goes down mid-process, the
-    fallback kicks in within 30 seconds.
+    Uses celery.control.ping() — a live-worker probe that round-trips through
+    the broker to any running worker. Unlike a bare broker TCP probe, this
+    guarantees tasks we publish will actually be executed (not just queued
+    into Redis to sit there forever).
+
+    Cached for 30 seconds per-process so the ping cost (~200-500ms) doesn't
+    happen on every notification call. If the worker dies, fallback kicks in
+    within 30 seconds.
 
     Returns:
         True if tasks can be dispatched via Celery, False otherwise.
@@ -74,20 +79,25 @@ def _is_celery_available() -> bool:
     if _celery_available is not None and (now - _celery_checked_at) < _CELERY_CHECK_INTERVAL:
         return _celery_available
 
-    # Probe the broker
+    # Probe a live worker via broadcast ping (single round-trip)
     try:
         from ..tasks.celery_app import celery_app
-        conn = celery_app.connection()
-        conn.ensure_connection(max_retries=1, timeout=3)
-        conn.close()
-        _celery_available = True
+        replies = celery_app.control.ping(timeout=2.0)
+        if replies:
+            _celery_available = True
+            _celery_checked_at = now
+            logger.info("Celery worker probe: ALIVE (%d replies)", len(replies))
+            return True
+        # No worker responded — broker may be reachable but nothing is consuming.
+        # Treat as unavailable so we fall through to the sync path that we KNOW works.
+        _celery_available = False
         _celery_checked_at = now
-        logger.debug("Celery broker probe: REACHABLE")
-        return True
+        logger.warning("Celery worker probe: NO REPLIES in 2s. Using sync fallback.")
+        return False
     except Exception as e:
         _celery_available = False
         _celery_checked_at = now
-        logger.warning("Celery broker probe: UNREACHABLE (%s). Using sync fallback.", e)
+        logger.warning("Celery worker probe: FAILED (%s). Using sync fallback.", e)
         return False
 
 

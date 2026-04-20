@@ -32,6 +32,23 @@ from .api import health_router, leads_router, analytics_router, metrics_router, 
 from .services.cache import get_cache
 
 
+# Configure root logger so named loggers (src.api.*, src.services.*, etc.)
+# actually reach CloudWatch. Without this, uvicorn's root logger stays at
+# WARNING, which silently swallows every logger.info() / logger.error() from
+# application code — making notification dispatch failures invisible.
+_root = logging.getLogger()
+if not _root.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter(
+        "%(asctime)s %(levelname)s %(name)s - %(message)s"
+    ))
+    _root.addHandler(_handler)
+_root.setLevel(getattr(logging, (settings.log_level or "INFO").upper(), logging.INFO))
+
+# Keep noisy libraries at WARNING
+for _noisy in ("urllib3", "botocore", "boto3", "s3transfer", "asyncio"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 
