@@ -646,17 +646,37 @@ export default function ProvidersPage() {
             }
 
             if (modalMode === 'create') {
-                await providersAPI.create(payload)
+                // Create returns the new ProviderResponse — prepend to current
+                // page and refresh aggregate stats only. Do NOT refetch the full
+                // table (that causes the whole list to flash a loading state
+                // for a single-row change, which is a jarring UX regression).
+                const response = await providersAPI.create(payload)
+                const created = response?.data as ProviderRecord | undefined
+                if (created?.id) {
+                    setProviders((prev) => [created, ...prev.filter((p) => p.id !== created.id)])
+                    setTotalProviders((prev) => prev + 1)
+                }
+                // Stats (counts, conversion rate) may have shifted — refresh quietly
+                providersAPI.stats().then((res) => setStats(res.data || null)).catch(() => { })
             } else if (editingProviderId) {
-                await providersAPI.update(editingProviderId, payload)
+                // Update returns the patched ProviderResponse — replace just
+                // that one row in state. No full-table refetch.
+                const response = await providersAPI.update(editingProviderId, payload)
+                const updated = response?.data as ProviderRecord | undefined
+                if (updated?.id) {
+                    setProviders((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)))
+                    // If the detail modal is showing this provider, update it in place too
+                    if (detailProvider?.id === updated.id) {
+                        setDetailProvider((prev) => (prev ? { ...prev, ...updated } : prev))
+                    }
+                }
+                // Status changes can move the provider between active/pending/inactive
+                // buckets — refresh stats in the background (non-blocking).
+                providersAPI.stats().then((res) => setStats(res.data || null)).catch(() => { })
             }
 
             setFormOpen(false)
             setEditingProviderId(null)
-            await fetchProviders()
-            if (detailProvider?.id === editingProviderId && editingProviderId) {
-                await openDetails(editingProviderId)
-            }
         } catch (err: any) {
             const detail = err?.response?.data?.detail
             const message = typeof detail === 'string' ? detail : 'Failed to save provider'

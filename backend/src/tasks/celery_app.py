@@ -56,10 +56,27 @@ celery_app = Celery(
     ],
 )
 
+# CRITICAL: Register this app as the process-wide default Celery app.
+# Tasks in src/tasks/lead_tasks.py use @shared_task, which lazily binds to
+# whichever Celery instance is registered as the "current default" at call time.
+#
+# On the worker: `celery -A src.tasks.celery_app worker ...` calls set_default()
+#   automatically → @shared_task binds to this configured app → routes correctly.
+#
+# On the FastAPI backend (which imports celery_app but doesn't run a worker):
+#   without this line, @shared_task binds to Celery's library-level bare default
+#   app (which has NO routing config), causing .delay() to publish with
+#   routing_key="celery" into a queue named "celery" that nobody consumes.
+#
+# set_default() ensures every process (API, worker, Beat, scripts) that imports
+# this module publishes and consumes through the SAME configured app.
+celery_app.set_default()
+
 
 # =============================================================================
 # Celery Configuration
 # =============================================================================
+
 
 _conf = dict(
     # Task execution settings
@@ -206,8 +223,12 @@ celery_app.conf.task_queues = (
 )
 
 
-# Task routing
+# Task routing — EVERY task has an explicit route for defense in depth.
+# Without explicit routes, a misconfigured publisher process can fall back to
+# Celery's library-level default (queue "celery", routing_key "celery"), which
+# is a queue nobody consumes from. Explicit routing prevents that silent drop.
 celery_app.conf.task_routes = {
+    # ─── Priority queues ────────────────────────────────────────────────
     "src.tasks.lead_tasks.process_lead_async": {
         "queue": "leads.high",
         "routing_key": "leads.high",
@@ -224,11 +245,67 @@ celery_app.conf.task_routes = {
         "queue": "elasticsearch",
         "routing_key": "elasticsearch",
     },
+    "src.tasks.lead_tasks.check_elasticsearch_sync": {
+        "queue": "elasticsearch",
+        "routing_key": "elasticsearch",
+    },
     "src.tasks.lead_tasks.move_to_dead_letter": {
         "queue": "dlq",
         "routing_key": "dlq",
     },
+    # ─── Notification tasks (MUST route to default queue, consumed by worker) ───
+    "src.tasks.lead_tasks.send_lead_receipt_notifications": {
+        "queue": "default",
+        "routing_key": "default",
+    },
+    "src.tasks.lead_tasks.send_coordinator_email": {
+        "queue": "default",
+        "routing_key": "default",
+    },
+    "src.tasks.lead_tasks.send_coordinator_sms": {
+        "queue": "default",
+        "routing_key": "default",
+    },
+    # ─── Scheduled / Beat tasks ────────────────────────────────────────
+    "src.tasks.lead_tasks.process_dead_letter_queue": {
+        "queue": "default",
+        "routing_key": "default",
+    },
+    "src.tasks.lead_tasks.warm_dashboard_cache": {
+        "queue": "default",
+        "routing_key": "default",
+    },
+    "src.tasks.lead_tasks.refresh_platform_analytics_views": {
+        "queue": "default",
+        "routing_key": "default",
+    },
+    "src.tasks.lead_tasks.send_daily_lead_digest": {
+        "queue": "default",
+        "routing_key": "default",
+    },
+    "src.tasks.lead_tasks.send_automated_follow_ups": {
+        "queue": "default",
+        "routing_key": "default",
+    },
+    "src.tasks.lead_tasks.send_test_follow_up": {
+        "queue": "default",
+        "routing_key": "default",
+    },
+    "src.tasks.lead_tasks.send_not_interested_follow_ups": {
+        "queue": "default",
+        "routing_key": "default",
+    },
+    # ─── Infrastructure tasks ──────────────────────────────────────────
+    "src.tasks.celery_app.health_check": {
+        "queue": "default",
+        "routing_key": "default",
+    },
+    "src.tasks.celery_app.retry_with_backoff": {
+        "queue": "default",
+        "routing_key": "default",
+    },
 }
+
 
 
 # =============================================================================
