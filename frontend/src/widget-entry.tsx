@@ -1,7 +1,7 @@
 /**
  * Widget Embed Entry Point
  *
- * SleepReach floating launcher that mirrors the TMS/NeuroReach pattern:
+ * SleepReach floating launcher that mirrors the SleepReach pattern:
  * clicking the CTA opens the dedicated assessment page in a new tab.
  */
 import { createRoot } from 'react-dom/client'

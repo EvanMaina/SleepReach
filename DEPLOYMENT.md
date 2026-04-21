@@ -446,7 +446,7 @@ aws rds restore-db-instance-to-point-in-time \
 | ECS Fargate (6 tasks × 0.25 vCPU, 512MB) | ~$40 |
 | RDS db.t3.micro × 2 (prod + stg) | ~$30 |
 | ElastiCache cache.t3.micro × 2 | ~$24 |
-| ALB (shared with NeuroReach) | ~$8 |
+| ALB (shared with SleepReach) | ~$8 |
 | CloudWatch (dashboard + alarms + logs) | ~$5 |
 | ECR (container images) | ~$1 |
 | **Total** | **~$108/month** |

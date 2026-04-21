@@ -1,0 +1,348 @@
+{
+    "widgets": [
+        {
+            "type": "text",
+            "x": 0,
+            "y": 0,
+            "width": 24,
+            "height": 1,
+            "properties": {
+                "markdown": "# SleepReach Production Dashboard\nCluster: sleepreach-cluster | ALB: neuroreach-ai-alb | Region: us-east-2"
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 1,
+            "width": 12,
+            "height": 6,
+            "properties": {
+                "title": "ECS - CPU Utilization",
+                "metrics": [
+                    [
+                        "AWS/ECS",
+                        "CPUUtilization",
+                        "ClusterName",
+                        "sleepreach-cluster",
+                        "ServiceName",
+                        "sleepreach-prod-backend",
+                        {
+                            "label": "Prod Backend"
+                        }
+                    ],
+                    [
+                        "...",
+                        "sleepreach-prod-celery",
+                        {
+                            "label": "Prod Celery"
+                        }
+                    ],
+                    [
+                        "...",
+                        "sleepreach-prod-frontend",
+                        {
+                            "label": "Prod Frontend"
+                        }
+                    ],
+                    [
+                        "...",
+                        "sleepreach-stg-backend",
+                        {
+                            "label": "Stg Backend"
+                        }
+                    ],
+                    [
+                        "...",
+                        "sleepreach-stg-frontend",
+                        {
+                            "label": "Stg Frontend"
+                        }
+                    ]
+                ],
+                "period": 300,
+                "stat": "Average",
+                "region": "us-east-2",
+                "view": "timeSeries",
+                "stacked": false
+            }
+        },
+        {
+            "type": "metric",
+            "x": 12,
+            "y": 1,
+            "width": 12,
+            "height": 6,
+            "properties": {
+                "title": "ECS - Memory Utilization",
+                "metrics": [
+                    [
+                        "AWS/ECS",
+                        "MemoryUtilization",
+                        "ClusterName",
+                        "sleepreach-cluster",
+                        "ServiceName",
+                        "sleepreach-prod-backend",
+                        {
+                            "label": "Prod Backend"
+                        }
+                    ],
+                    [
+                        "...",
+                        "sleepreach-prod-celery",
+                        {
+                            "label": "Prod Celery"
+                        }
+                    ],
+                    [
+                        "...",
+                        "sleepreach-prod-frontend",
+                        {
+                            "label": "Prod Frontend"
+                        }
+                    ],
+                    [
+                        "...",
+                        "sleepreach-stg-backend",
+                        {
+                            "label": "Stg Backend"
+                        }
+                    ],
+                    [
+                        "...",
+                        "sleepreach-stg-frontend",
+                        {
+                            "label": "Stg Frontend"
+                        }
+                    ]
+                ],
+                "period": 300,
+                "stat": "Average",
+                "region": "us-east-2",
+                "view": "timeSeries",
+                "stacked": false
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 7,
+            "width": 12,
+            "height": 6,
+            "properties": {
+                "title": "ALB - Requests and Errors",
+                "metrics": [
+                    [
+                        "AWS/ApplicationELB",
+                        "RequestCount",
+                        "LoadBalancer",
+                        "app/neuroreach-ai-alb/09820aa0f84e6f0b",
+                        {
+                            "label": "Requests",
+                            "stat": "Sum"
+                        }
+                    ],
+                    [
+                        ".",
+                        "HTTPCode_Target_5XX_Count",
+                        ".",
+                        ".",
+                        {
+                            "label": "5XX",
+                            "stat": "Sum",
+                            "color": "#d62728"
+                        }
+                    ],
+                    [
+                        ".",
+                        "HTTPCode_Target_4XX_Count",
+                        ".",
+                        ".",
+                        {
+                            "label": "4XX",
+                            "stat": "Sum",
+                            "color": "#ff7f0e"
+                        }
+                    ]
+                ],
+                "period": 300,
+                "region": "us-east-2",
+                "view": "timeSeries",
+                "stacked": false
+            }
+        },
+        {
+            "type": "metric",
+            "x": 12,
+            "y": 7,
+            "width": 12,
+            "height": 6,
+            "properties": {
+                "title": "ALB - Response Time (p50 p95 p99)",
+                "metrics": [
+                    [
+                        "AWS/ApplicationELB",
+                        "TargetResponseTime",
+                        "LoadBalancer",
+                        "app/neuroreach-ai-alb/09820aa0f84e6f0b",
+                        {
+                            "label": "p50",
+                            "stat": "p50"
+                        }
+                    ],
+                    [
+                        "...",
+                        {
+                            "label": "p95",
+                            "stat": "p95",
+                            "color": "#ff7f0e"
+                        }
+                    ],
+                    [
+                        "...",
+                        {
+                            "label": "p99",
+                            "stat": "p99",
+                            "color": "#d62728"
+                        }
+                    ]
+                ],
+                "period": 300,
+                "region": "us-east-2",
+                "view": "timeSeries",
+                "stacked": false
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 13,
+            "width": 12,
+            "height": 6,
+            "properties": {
+                "title": "RDS - CPU Utilization",
+                "metrics": [
+                    [
+                        "AWS/RDS",
+                        "CPUUtilization",
+                        "DBInstanceIdentifier",
+                        "sleepreach-prod-db",
+                        {
+                            "label": "Prod DB"
+                        }
+                    ],
+                    [
+                        "...",
+                        "sleepreach-stg-db",
+                        {
+                            "label": "Staging DB"
+                        }
+                    ]
+                ],
+                "period": 300,
+                "stat": "Average",
+                "region": "us-east-2",
+                "view": "timeSeries",
+                "stacked": false
+            }
+        },
+        {
+            "type": "metric",
+            "x": 12,
+            "y": 13,
+            "width": 12,
+            "height": 6,
+            "properties": {
+                "title": "RDS - Database Connections",
+                "metrics": [
+                    [
+                        "AWS/RDS",
+                        "DatabaseConnections",
+                        "DBInstanceIdentifier",
+                        "sleepreach-prod-db",
+                        {
+                            "label": "Prod Connections"
+                        }
+                    ],
+                    [
+                        "...",
+                        "sleepreach-stg-db",
+                        {
+                            "label": "Stg Connections"
+                        }
+                    ]
+                ],
+                "period": 300,
+                "stat": "Average",
+                "region": "us-east-2",
+                "view": "timeSeries",
+                "stacked": false
+            }
+        },
+        {
+            "type": "metric",
+            "x": 0,
+            "y": 19,
+            "width": 12,
+            "height": 6,
+            "properties": {
+                "title": "RDS - Free Storage Space",
+                "metrics": [
+                    [
+                        "AWS/RDS",
+                        "FreeStorageSpace",
+                        "DBInstanceIdentifier",
+                        "sleepreach-prod-db",
+                        {
+                            "label": "Prod Free Storage"
+                        }
+                    ],
+                    [
+                        "...",
+                        "sleepreach-stg-db",
+                        {
+                            "label": "Stg Free Storage"
+                        }
+                    ]
+                ],
+                "period": 300,
+                "stat": "Average",
+                "region": "us-east-2",
+                "view": "timeSeries",
+                "stacked": false
+            }
+        },
+        {
+            "type": "metric",
+            "x": 12,
+            "y": 19,
+            "width": 12,
+            "height": 6,
+            "properties": {
+                "title": "Redis - Memory Usage",
+                "metrics": [
+                    [
+                        "AWS/ElastiCache",
+                        "DatabaseMemoryUsagePercentage",
+                        "CacheClusterId",
+                        "sleepreach-prod-redis-tls-001",
+                        {
+                            "label": "Prod Redis Memory"
+                        }
+                    ],
+                    [
+                        "...",
+                        "sleepreach-stg-redis-tls-001",
+                        {
+                            "label": "Stg Redis Memory"
+                        }
+                    ]
+                ],
+                "period": 300,
+                "stat": "Average",
+                "region": "us-east-2",
+                "view": "timeSeries",
+                "stacked": false
+            }
+        }
+    ]
+}

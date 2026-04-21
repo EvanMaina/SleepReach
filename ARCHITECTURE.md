@@ -33,7 +33,7 @@ Internet
                               ┌─────────────────────────┐
                               │  Application Load        │
                               │  Balancer (shared)       │
-                              │  neuroreach-ai-alb       │
+                              │  SleepReach-ai-alb       │
                               │  Port 443 (HTTPS)        │
                               │  Port 80 → 301 redirect  │
                               └──────────┬──────────────┘
@@ -111,8 +111,8 @@ Internet
 | sleepreach-stg-redis | cache.t3.micro | ✅ rediss:// |
 
 ### Networking
-- **VPC:** vpc-00bed95435b092a79 (shared with NeuroReach, 10.0.0.0/16)
-- **ALB:** neuroreach-ai-alb (shared, HTTPS:443 + HTTP:80→301)
+- **VPC:** vpc-00bed95435b092a79 (shared with SleepReach, 10.0.0.0/16)
+- **ALB:** SleepReach-ai-alb (shared, HTTPS:443 + HTTP:80→301)
 - **ACM Certificate:** *.sleeplessinarizona.com (ISSUED, auto-renewing)
 - **Security Groups:**
   - `sg-0edebbac3eb66c47a` — ECS tasks (inbound from ALB only)
@@ -351,7 +351,7 @@ Coordinator Dashboard → Manual Follow-up → Conversion
 | ECS Fargate (6 tasks × 0.25 vCPU, 512MB) | ~$40 |
 | RDS db.t3.micro × 2 (prod + stg) | ~$30 |
 | ElastiCache cache.t3.micro × 2 | ~$24 |
-| ALB (shared with NeuroReach) | ~$8 |
+| ALB (shared with SleepReach) | ~$8 |
 | CloudWatch (dashboard + alarms + logs) | ~$5 |
 | ECR (container images) | ~$1 |
 | **Total** | **~$108/month** |

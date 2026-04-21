@@ -1,7 +1,7 @@
 /**
  * CoordinatorPage — Full-featured lead management dashboard
  *
- * Replicates NeuroReach coordinator features:
+ * Replicates SleepReach coordinator features:
  * - Column visibility settings gear (Task A)
  * - Action icons: Call (3CX), SMS, Email, Eye/View (Task B)
  * - QuickActionPanel for call outcome recording (Task C)
@@ -2952,7 +2952,7 @@ export default function CoordinatorPage({
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
 /* QUICK ACTION PANEL COMPONENT                                              */
-/* Replicates NeuroReach QuickActionPanel — for non-scheduled leads          */
+/* Replicates SleepReach QuickActionPanel — for non-scheduled leads          */
 /* ═══════════════════════════════════════════════════════════════════════════ */
 function QuickActionPanel({
   lead,
@@ -3617,7 +3617,7 @@ function QuickActionPanel({
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
 /* CONSULTATION PANEL COMPONENT                                              */
-/* Replicates NeuroReach ConsultationPanel — for scheduled leads             */
+/* Replicates SleepReach ConsultationPanel — for scheduled leads             */
 /* ═══════════════════════════════════════════════════════════════════════════ */
 function ConsultationPanel({
   lead,

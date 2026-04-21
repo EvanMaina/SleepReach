@@ -154,7 +154,7 @@ function ProviderFormModal({
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-gray-900">{mode === 'create' ? 'Add Provider' : 'Edit Provider'}</h2>
-                            <p className="text-sm text-gray-500">Manage referral partners with the same workflow as NeuroReach.</p>
+                            <p className="text-sm text-gray-500">Manage referral partners with the same workflow as SleepReach.</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="rounded-xl p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600">

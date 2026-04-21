@@ -81,7 +81,7 @@ const CONDITION_LABELS: Record<string, string> = {
     'OTHER': 'Other',
 }
 
-/* All conditions to always display (even with 0 leads) — replicates NeuroReach behavior */
+/* All conditions to always display (even with 0 leads) — replicates SleepReach behavior */
 const ALL_CONDITIONS = ['SLEEP_APNEA', 'INSOMNIA', 'RESTLESS_LEG', 'NARCOLEPSY', 'WALKING_DREAMS', 'OTHER']
 
 /* All treatment types to always display (even with 0 leads) */
@@ -160,7 +160,7 @@ export default function DashboardPage() {
                 if (cohortRes.data.available_years?.length) {
                     setCohortAvailableYears(cohortRes.data.available_years)
                 }
-                // Filter out zero-size cohorts (like NeuroReach)
+                // Filter out zero-size cohorts (like SleepReach)
                 const allCohorts = (cohortRes.data.cohorts || [])
                 const nonEmptyCohorts = allCohorts.filter((c: any) => c.cohort_size > 0)
                 setCohorts(nonEmptyCohorts.map((c: any) => ({

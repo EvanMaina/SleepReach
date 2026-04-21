@@ -330,7 +330,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         _insecure_secrets.append("SECRET_KEY")
     if settings.encryption_key.rstrip("0") == "dev-encryption-key-32bytes!":
         _insecure_secrets.append("ENCRYPTION_KEY")
-    if "neuroreach_dev_password" in settings.database_url:
+    if "sleepreach_dev_password" in settings.database_url:
         _insecure_secrets.append("DATABASE_URL")
 
     _missing_services = []

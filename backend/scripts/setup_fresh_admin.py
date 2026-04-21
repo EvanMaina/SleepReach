@@ -44,15 +44,15 @@ if DATABASE_URL:
     parsed = urlparse(DATABASE_URL)
     DB_HOST = parsed.hostname or "localhost"
     DB_PORT = str(parsed.port or 5432)
-    DB_NAME = parsed.path.lstrip("/") or "neuroreach"
-    DB_USER = parsed.username or "neuroreach"
-    DB_PASSWORD = parsed.password or "neuroreach_dev_password"
+    DB_NAME = parsed.path.lstrip("/") or "SleepReach"
+    DB_USER = parsed.username or "SleepReach"
+    DB_PASSWORD = parsed.password or "SleepReach_dev_password"
 else:
     DB_HOST = os.getenv("DB_HOST", "localhost")
     DB_PORT = os.getenv("DB_PORT", "5432")
-    DB_NAME = os.getenv("DB_NAME", "neuroreach")
-    DB_USER = os.getenv("DB_USER", "neuroreach")
-    DB_PASSWORD = os.getenv("DB_PASSWORD", "neuroreach_dev_password")
+    DB_NAME = os.getenv("DB_NAME", "SleepReach")
+    DB_USER = os.getenv("DB_USER", "SleepReach")
+    DB_PASSWORD = os.getenv("DB_PASSWORD", "SleepReach_dev_password")
 
 # SMTP config -- uses SMTP_HOST (matches backend/.env) with fallback
 SMTP_HOST = os.getenv("SMTP_HOST", os.getenv("MAILDEV_HOST", "localhost"))
@@ -95,7 +95,7 @@ def parse_name_from_email(email: str) -> tuple:
 def send_invitation_email(email, first_name, last_name, temp_password, role):
     """Send invitation email via SMTP (MailDev in dev, real SMTP in prod). Best-effort."""
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = "Welcome to TMS NeuroReach -- Your Account Has Been Created"
+    msg["Subject"] = "Welcome to TMS SleepReach -- Your Account Has Been Created"
     msg["From"] = "noreply@tmsinstitute.co"
     msg["To"] = email
 
@@ -103,7 +103,7 @@ def send_invitation_email(email, first_name, last_name, temp_password, role):
 
     text = (
         f"Hi {first_name} {last_name},\n\n"
-        f"An administrator has created your TMS NeuroReach account.\n\n"
+        f"An administrator has created your TMS SleepReach account.\n\n"
         f"Role: {role_label}\n"
         f"Email (Username): {email}\n"
         f"Temporary Password: {temp_password}\n\n"
@@ -121,13 +121,13 @@ def send_invitation_email(email, first_name, last_name, temp_password, role):
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.08);">
 <tr><td style="background:linear-gradient(135deg, #3D6B6B 0%, #2d5252 100%); padding:32px 40px; text-align:center;">
-    <h1 style="color:#ffffff; margin:0; font-size:24px; font-weight:bold;">TMS NeuroReach</h1>
+    <h1 style="color:#ffffff; margin:0; font-size:24px; font-weight:bold;">TMS SleepReach</h1>
     <p style="color:rgba(255,255,255,0.8); margin:8px 0 0; font-size:14px;">AI Platform</p>
 </td></tr>
 <tr><td style="padding:40px;">
-    <h2 style="color:#1e3a5f; margin:0 0 16px; font-size:20px;">Welcome to TMS NeuroReach!</h2>
+    <h2 style="color:#1e3a5f; margin:0 0 16px; font-size:20px;">Welcome to TMS SleepReach!</h2>
     <p style="color:#555; line-height:1.6;">Hi <strong>{first_name} {last_name}</strong>,</p>
-    <p style="color:#555; line-height:1.6;">An administrator has created your TMS NeuroReach account. Use the credentials below to log in for the first time.</p>
+    <p style="color:#555; line-height:1.6;">An administrator has created your TMS SleepReach account. Use the credentials below to log in for the first time.</p>
     <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0f7f7; border-radius:8px; border:1px solid #d0e0e0; margin:24px 0;">
     <tr><td style="padding:24px;">
         <p style="color:#3D6B6B; font-weight:bold; margin:0 0 12px; font-size:14px; text-transform:uppercase; letter-spacing:0.5px;">Your Login Credentials</p>
@@ -172,7 +172,7 @@ def send_invitation_email(email, first_name, last_name, temp_password, role):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Create a fresh admin account for NeuroReach AI."
+        description="Create a fresh admin account for SleepReach AI."
     )
     parser.add_argument(
         "--email",

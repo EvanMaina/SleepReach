@@ -147,7 +147,7 @@ function UserModal({
                     <div>
                         <h2 className="text-xl font-bold text-gray-900">{title}</h2>
                         <p className="text-sm text-gray-500">
-                            Manage team access with NeuroReach-style controls.
+                            Manage team access with SleepReach-style controls.
                         </p>
                     </div>
                     <button
@@ -624,7 +624,7 @@ function RolesTab() {
             <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
                 <div className="border-b border-gray-100 px-6 py-4">
                     <h2 className="text-lg font-semibold text-gray-900">Roles & Permissions</h2>
-                    <p className="text-sm text-gray-500">Role definitions aligned with NeuroReach&apos;s RBAC model.</p>
+                    <p className="text-sm text-gray-500">Role definitions aligned with SleepReach&apos;s RBAC model.</p>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full">

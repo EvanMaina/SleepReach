@@ -1,5 +1,5 @@
 # =============================================================================
-# NeuroReach AI — Git Ignore
+# SleepReach AI — Git Ignore
 # =============================================================================
 
 # --- Dependencies ---
@@ -150,4 +150,4 @@ scripts/fix_task_definitions.py
 .claude/
 
 # --- Nested repo clones (accidental) ---
-NeuroReachAI/
+SleepReachAI/

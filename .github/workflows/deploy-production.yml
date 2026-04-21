@@ -2,10 +2,12 @@
 # SleepReach — Deploy to Production
 #
 # Triggers:
-#   1. workflow_call — Called from Promote workflow (primary mechanism)
-#      Accepts skip_ci input since CI already passed in the promote pipeline.
-#   2. push to main — Direct push fallback (runs CI first)
-#   3. workflow_dispatch — Manual trigger from Actions tab (runs CI first)
+#   1. push to main — Primary mechanism (merge stg → main)
+#   2. workflow_dispatch — Manual trigger from Actions tab
+#   3. workflow_call — Reusable (legacy, kept for compatibility)
+#
+# Pipeline: stg verified → merge to main → THIS WORKFLOW → production ECS
+# Note: CI runs as a prerequisite job before build-and-deploy.
 # =============================================================================
 name: Deploy to Production
 

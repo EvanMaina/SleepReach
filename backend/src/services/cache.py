@@ -389,7 +389,7 @@ class CacheService:
         Delete all keys matching pattern.
         
         Args:
-            pattern: Key pattern with wildcards (e.g., "neuroreach:leads:*")
+            pattern: Key pattern with wildcards (e.g., "sleepreach:leads:*")
             
         Returns:
             Number of keys deleted

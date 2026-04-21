@@ -669,7 +669,7 @@ async def jotform_webhook(
         if validation_errors:
             # Log but DO NOT reject — accept the lead anyway so we can
             # diagnose the actual payload and fix field mapping.
-            # NeuroReach never rejects Jotform submissions with 422.
+            # SleepReach never rejects Jotform submissions with 422.
             print(f"[JOTFORM WARN] Validation issues for {submission_id}: {validation_errors}", flush=True)
             print(f"[JOTFORM WARN] Proceeding anyway — lead will be created with available data", flush=True)
 

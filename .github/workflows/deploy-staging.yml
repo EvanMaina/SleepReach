@@ -2,17 +2,19 @@
 # SleepReach — Deploy to Staging
 #
 # Triggers:
-#   1. workflow_call — Called from Promote workflow (primary mechanism)
-#   2. push to stg — Direct push fallback (e.g., hotfix)
-#   3. workflow_dispatch — Manual trigger from Actions tab
+#   1. push to stg — Primary mechanism (merge dev → stg)
+#   2. workflow_dispatch — Manual trigger from Actions tab
+#   3. workflow_call — Reusable (legacy, kept for compatibility)
+#
+# Pipeline: dev → CI → merge to stg → THIS WORKFLOW → staging ECS
 # =============================================================================
 name: Deploy to Staging
 
 on:
   push:
-    branches: [stg]
-  workflow_dispatch:
-  # Called as a reusable workflow from promote.yml
+    branches: [ stg ]
+  workflow_dispatch: # Called as a reusable workflow from promote.yml
+
   workflow_call:
 
 concurrency:
@@ -380,7 +382,7 @@ jobs:
   notify:
     name: "📧 Notify"
     runs-on: ubuntu-latest
-    needs: [build-and-deploy]
+    needs: [ build-and-deploy ]
     if: always()
     steps:
       - name: Notify on success

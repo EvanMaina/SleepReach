@@ -1,8 +1,8 @@
-# Final QA Report — Deep Verification of SleepReach AI & NeuroReachAI Production
+# Final QA Report — Deep Verification of SleepReach AI & SleepReachAI Production
 
 **Report Date:** 2026-04-20 11:10 UTC (14:10 EAT)
 **Author:** Senior Principal Fullstack QA (automated, verified against live infrastructure)
-**Scope:** Both SleepReach AI (SR) and NeuroReachAI (NR) production tools
+**Scope:** Both SleepReach AI (SR) and SleepReachAI (NR) production tools
 **AWS Account:** `131880217305` (`us-east-2`)
 **Safety Policy:** Every test used Twilio-reserved fake numbers `+1 (555) 555-01XX`. Twilio's gateway rejects those with error **21211 "Invalid 'To' Phone Number"** — no real SMS ever left the platform. No live user was contacted during QA.
 **Impact Policy:** Both tools remained **live and fully operational** throughout QA. Zero downtime.
@@ -45,7 +45,7 @@ All eight verification tables below are ✅.
 | SR   | `3e3e607` (main)    | `sleepreach/backend:prod-3e3e607` | `src.tasks.lead_tasks.send_lead_receipt_notifications` | `notifications` | `notifications` (worker `ForkPoolWorker-5`, task id `ca936caf…`) | ✅ |
 | SR   | `3e3e607`           | same                        | `src.tasks.lead_tasks.send_coordinator_email`            | `notifications` | same module → same binding (see §6) | ✅ |
 | SR   | `3e3e607`           | same                        | `src.tasks.lead_tasks.warm_dashboard_cache` (Beat)       | `default`       | Worker picks it up every 60s (§3) | ✅ |
-| NR   | `d24ce4d` (main)    | `neuroreach-ai/backend:prod-d24ce4d` | `src.tasks.lead_tasks.send_lead_receipt_notifications` | `notifications` | `notifications` (worker `ForkPoolWorker-2`, task id `adb8f554…`) | ✅ |
+| NR   | `d24ce4d` (main)    | `SleepReach-ai/backend:prod-d24ce4d` | `src.tasks.lead_tasks.send_lead_receipt_notifications` | `notifications` | `notifications` (worker `ForkPoolWorker-2`, task id `adb8f554…`) | ✅ |
 | NR   | `d24ce4d`           | same                        | `src.tasks.lead_tasks.send_coordinator_email`            | `notifications` | same module → same binding (§6) | ✅ |
 | NR   | `d24ce4d`           | same                        | `src.tasks.lead_tasks.warm_dashboard_cache` (Beat)       | `default`       | Worker picks it up every 60s (§3) | ✅ |
 
@@ -75,7 +75,7 @@ SR  /ecs/sleepreach-prod-celery 09:56:42.856 – 09:56:44.717 UTC
       'email_message_id': '8ef16561-77cd-43d5-ba07-cf43f90b27ba',
       'sms': {'success': False, 'error_code': 21211, 'to': '+15555550101'}}
 
-NR  /ecs/neuroreach-ai-celery  10:07:16.786 – 10:07:17.812 UTC
+NR  /ecs/SleepReach-ai-celery  10:07:16.786 – 10:07:17.812 UTC
     Task src.tasks.lead_tasks.send_lead_receipt_notifications[adb8f554-7481-433a-b687-23e4d2b1582c] received
     succeeded in 1.0253s: {'email': True, 'email_provider': 'paubox',
       'email_message_id': '31f2853f-827d-4916-9999-6bf9ed4fdefa',
@@ -99,7 +99,7 @@ Executed `beat_proof.ps1` (CloudWatch Insights, `filter @message like /Scheduler
 | `refresh-platform-analytics`                    | every 5m       | **2**                   | 2        | ✅ |
 | `elasticsearch-sync-check`                      | every 5m       | **1**                   | 1–2      | ✅ |
 
-### 3.2 NeuroReachAI — `/ecs/neuroreach-ai-celery`
+### 3.2 SleepReachAI — `/ecs/SleepReach-ai-celery`
 
 | Periodic task                                   | Schedule       | Firings observed in 10m | Expected | Status |
 |-------------------------------------------------|----------------|-------------------------|----------|--------|
@@ -130,9 +130,9 @@ ECS service state (all COMPLETED, desired == running):
 | `sleepreach-cluster` / `…-prod-backend`  | `sleepreach-prod-backend:23`          | 1       | 1       | COMPLETED |
 | `sleepreach-cluster` / `…-prod-celery`   | `sleepreach-prod-celery:24`           | **1**   | **1**   | COMPLETED |
 | `sleepreach-cluster` / `…-prod-frontend` | `sleepreach-prod-frontend:18`         | 1       | 1       | COMPLETED |
-| `neuroreach-ai-cluster` / `…-backend-service`  | `neuroreach-ai-backend:39`      | 2       | 2       | COMPLETED |
-| `neuroreach-ai-cluster` / `…-celery-service`   | `neuroreach-ai-celery:39`       | **1**   | **1**   | COMPLETED |
-| `neuroreach-ai-cluster` / `…-frontend-service` | `neuroreach-ai-frontend:24`     | 1       | 1       | COMPLETED |
+| `SleepReach-ai-cluster` / `…-backend-service`  | `SleepReach-ai-backend:39`      | 2       | 2       | COMPLETED |
+| `SleepReach-ai-cluster` / `…-celery-service`   | `SleepReach-ai-celery:39`       | **1**   | **1**   | COMPLETED |
+| `SleepReach-ai-cluster` / `…-frontend-service` | `SleepReach-ai-frontend:24`     | 1       | 1       | COMPLETED |
 
 Celery is pinned to `desired=1` on both clusters (see §8 for why this matters).
 
@@ -167,14 +167,14 @@ Lead scoring (HOT for SR INSOMNIA+insured+30-day-urgency, MEDIUM for NR DEPRESSI
 | Repo        | dev head    | stg head    | main head   | Image tag on prod ECS     | In sync? |
 |-------------|-------------|-------------|-------------|---------------------------|----------|
 | SleepReach  | `da7ac61`*  | `da7ac61`   | `da7ac61`   | `prod-3e3e607`** (= tree parent of da7ac61) | ✅ |
-| NeuroReach  | `d24ce4d`   | `d24ce4d`   | `d24ce4d`   | `prod-d24ce4d`             | ✅ |
+| SleepReach  | `d24ce4d`   | `d24ce4d`   | `d24ce4d`   | `prod-d24ce4d`             | ✅ |
 
 \* SR `da7ac61` is a **docs-only** commit on top of the deploy commit `3e3e607` — no code/workflow difference vs. the running image.
 \** SR image tag `prod-3e3e607` = the last code-bearing commit (all subsequent commits were docs).
 
 ### Workflow runs (last 5, both repos)
 
-| Workflow                            | SR (EvanMaina/SleepReach)                                                    | NR (EvanMaina/NeuroReachAI)                                                  |
+| Workflow                            | SR (EvanMaina/SleepReach)                                                    | NR (EvanMaina/SleepReachAI)                                                  |
 |-------------------------------------|------------------------------------------------------------------------------|------------------------------------------------------------------------------|
 | `promote.yml` (latest 5)            | 5/5 `success`                                                                | 5/5 `success`                                                                |
 | `deploy-production.yml` (latest 5)  | 4 `success`, 1 `failure`+1 `cancelled` (pre-fix iterations from 2026-04-19)  | All green since the Celery fix series                                        |
@@ -186,9 +186,9 @@ Every commit in the `dev → stg → main → deploy-production` chain that was 
 
 ## 8. Hidden issue discovered & permanently fixed
 
-During §3 Beat verification, CloudWatch Insights showed that **before** remediation the NR log `/ecs/neuroreach-ai-celery` was firing *every* periodic task **exactly 2×** the expected rate in a 30-minute window (`cache-warm-dashboard` = 59 events vs. expected 30, `refresh-platform-analytics` = 12 vs. 6, `cleanup-dead-letter-queue` = 12 vs. 6).
+During §3 Beat verification, CloudWatch Insights showed that **before** remediation the NR log `/ecs/SleepReach-ai-celery` was firing *every* periodic task **exactly 2×** the expected rate in a 30-minute window (`cache-warm-dashboard` = 59 events vs. expected 30, `refresh-platform-analytics` = 12 vs. 6, `cleanup-dead-letter-queue` = 12 vs. 6).
 
-**Root cause.** The ECS service `neuroreach-ai-celery-service` had `desiredCount=2`, while the worker container command uses:
+**Root cause.** The ECS service `SleepReach-ai-celery-service` had `desiredCount=2`, while the worker container command uses:
 
 ```
 celery -A src.tasks.celery_app worker -B --loglevel=info --concurrency=4
@@ -199,8 +199,8 @@ The `-B` flag embeds Celery **Beat** in the worker process. Running *N* replicas
 **Immediate remediation.**
 
 ```
-aws ecs update-service --cluster neuroreach-ai-cluster \
-  --service neuroreach-ai-celery-service --desired-count 1
+aws ecs update-service --cluster SleepReach-ai-cluster \
+  --service SleepReach-ai-celery-service --desired-count 1
 ```
 
 Service reached `running=1, rollout=COMPLETED` at 10:23 UTC 2026-04-20. Post-fix Insights query (10-minute window) shows **exactly 1× firing rate on every periodic task** — verified in §3 table.
@@ -224,7 +224,7 @@ This step runs on **every** production deploy. If someone scales celery up throu
 
 | Repo       | Branch | Commit         | Workflow file                                |
 |------------|--------|----------------|-----------------------------------------------|
-| NeuroReach | `dev`  | `9cd3373`      | `.github/workflows/deploy-production.yml`     |
+| SleepReach | `dev`  | `9cd3373`      | `.github/workflows/deploy-production.yml`     |
 | SleepReach | `dev`  | *(this change)* | `.github/workflows/deploy-production.yml`     |
 
 If horizontal worker scaling is ever required in future, the clean split is: a dedicated `beat` service (`desired=1`, cmd `celery beat …`) plus N worker replicas (cmd `celery worker …` with no `-B`). The enforcement step above is compatible with that split — it only constrains the Beat-bearing service.
@@ -252,13 +252,13 @@ aws --profile 131880217305_AdministratorAccess --region us-east-2 ecs describe-s
   --query 'services[].{n:serviceName,td:taskDefinition,desired:desiredCount,running:runningCount,rollout:deployments[0].rolloutState}'
 
 aws --profile 131880217305_AdministratorAccess --region us-east-2 ecs describe-services `
-  --cluster neuroreach-ai-cluster `
-  --services neuroreach-ai-backend-service neuroreach-ai-celery-service neuroreach-ai-frontend-service `
+  --cluster SleepReach-ai-cluster `
+  --services SleepReach-ai-backend-service SleepReach-ai-celery-service SleepReach-ai-frontend-service `
   --query 'services[].{n:serviceName,td:taskDefinition,desired:desiredCount,running:runningCount,rollout:deployments[0].rolloutState}'
 
 # Beat firing frequency
 powershell -ExecutionPolicy Bypass -File C:\Users\hp\AppData\Local\Temp\sr-qa\beat_proof.ps1 -LogGroup /ecs/sleepreach-prod-celery -Minutes 10
-powershell -ExecutionPolicy Bypass -File C:\Users\hp\AppData\Local\Temp\sr-qa\beat_proof.ps1 -LogGroup /ecs/neuroreach-ai-celery  -Minutes 10
+powershell -ExecutionPolicy Bypass -File C:\Users\hp\AppData\Local\Temp\sr-qa\beat_proof.ps1 -LogGroup /ecs/SleepReach-ai-celery  -Minutes 10
 ```
 
 No guessing. No real phone numbers. No placeholders.

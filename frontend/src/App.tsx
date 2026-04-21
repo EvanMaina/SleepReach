@@ -27,7 +27,7 @@ function getPublicHashRoute(hash: string) {
 
 /**
  * AuthGate — renders LoginPage when unauthenticated.
- * Replicates NeuroReach's auth gate pattern: the entire app
+ * Replicates SleepReach's auth gate pattern: the entire app
  * is gated behind authentication BEFORE any routing happens.
  * This prevents any flash of dashboard content for unauthenticated users.
  */
