@@ -385,6 +385,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.warning("Could not import all models: %s", e)
 
+    # Ensure required PostgreSQL extensions exist before creating tables.
+    # Several models use uuid_generate_v4() as a server_default, which
+    # requires the uuid-ossp extension.  The init SQL scripts create these
+    # extensions for docker-compose, but RDS instances may not have them yet.
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"'))
+            conn.execute(text('CREATE EXTENSION IF NOT EXISTS "pgcrypto"'))
+            conn.commit()
+            logger.info("PostgreSQL extensions verified (uuid-ossp, pgcrypto)")
+    except Exception as e:
+        logger.warning("Could not create PostgreSQL extensions: %s", e)
+
     # Auto-create tables if they don't exist (uses CREATE TABLE IF NOT EXISTS).
     # Safe for existing databases — SQLAlchemy will not alter or drop existing tables.
     try:
