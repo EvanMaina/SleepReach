@@ -380,25 +380,50 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if settings.is_development:
         logger.info("Development mode - tables managed by init SQL script")
 
-    # Admin seeding is handled by the setup_fresh_admin.py script.
-    # Run it after first deployment:
-    #   docker exec -it sleepreach-backend python /app/scripts/setup_fresh_admin.py --email you@clinic.com
+    # =========================================================================
+    # AUTO-CREATE INITIAL ADMINISTRATOR
+    # On first deployment (no users in DB), automatically create an admin
+    # account so the system is immediately usable. This is safe for existing
+    # deployments — it only runs when user_count == 0.
+    # =========================================================================
     try:
         from .core.database import SessionLocal
-        from .models.user import User
+        from .models.user import User, UserRole, UserStatus
+        import bcrypt
 
         db = SessionLocal()
         try:
             user_count = db.query(User).count()
             if user_count == 0:
-                logger.warning(
-                    "NO USERS FOUND. Run the setup script to create the first admin: "
-                    "docker exec -it sleepreach-backend python /app/scripts/setup_fresh_admin.py --email admin@clinic.com"
+                logger.warning("NO USERS FOUND — auto-creating initial Administrator account...")
+                _admin_email = "admin@sleeplessinarizona.com"
+                _admin_password = "SleepReach@2026!"
+                _password_hash = bcrypt.hashpw(
+                    _admin_password.encode("utf-8"),
+                    bcrypt.gensalt()
+                ).decode("utf-8")
+                _admin = User(
+                    email=_admin_email,
+                    password_hash=_password_hash,
+                    first_name="Clinic",
+                    last_name="Administrator",
+                    role=UserRole.ADMINISTRATOR,
+                    status=UserStatus.ACTIVE,
+                    must_change_password=True,
                 )
+                db.add(_admin)
+                db.commit()
+                logger.info(
+                    "✅ Initial Administrator created: email=%s role=administrator "
+                    "(must_change_password=True)",
+                    _admin_email,
+                )
+            else:
+                logger.info("Found %d existing user(s) — skipping admin seed.", user_count)
         finally:
             db.close()
     except Exception as e:
-        logger.warning("Could not check user table: %s", e)
+        logger.warning("Could not check/seed user table: %s", e)
 
     yield
 

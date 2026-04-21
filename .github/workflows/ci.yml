@@ -5,13 +5,11 @@
 name: CI
 
 on:
-    push:
-        branches: [dev]
     pull_request:
-        branches: [main, stg, dev]
-    # Allow reusable workflow calls from deploy workflows
-    workflow_call:
-    # Allow manual trigger
+        branches: [ main, stg, dev ]
+    # Allow reusable workflow calls (promote.yml calls this)
+    workflow_call: # Allow manual trigger
+
     workflow_dispatch:
 
 concurrency:
@@ -253,7 +251,7 @@ jobs:
     docker-build:
         name: "🐳 Docker Build (verify)"
         runs-on: ubuntu-latest
-        needs: [frontend-build]
+        needs: [ frontend-build ]
         steps:
             - uses: actions/checkout@v4
 

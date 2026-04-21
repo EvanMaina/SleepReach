@@ -1,53 +1,147 @@
 # =============================================================================
-# SleepReach — Auto-Promote & Deploy (DISABLED)
+# SleepReach — Auto-Promote & Deploy (Full Pipeline)
 #
-# THIS WORKFLOW IS DISABLED as of 2026-04-21.
+# ONE PUSH TO DEV triggers the ENTIRE pipeline:
+#   1. CI runs (lint, type-check, test, build, security scan)
+#   2. Auto-merge dev → stg
+#   3. Deploy to Staging (ECS)
+#   4. Auto-merge stg → main
+#   5. Deploy to Production (ECS)
 #
-# REASON: Replaced by controlled branch-triggered deploys:
-#   - Push/merge to `stg` → deploy-staging.yml runs automatically
-#   - Push/merge to `main` → deploy-production.yml runs automatically
-#
-# OLD BEHAVIOR (removed):
-#   Push to dev → CI → auto-merge dev→stg → deploy staging →
-#   auto-merge stg→main → deploy production (all automatic, no gate)
-#
-# NEW WORKFLOW:
-#   1. Developer pushes to dev → CI runs (lint + test)
-#   2. Developer merges dev → stg (PR or direct) → staging deploys
-#   3. Developer verifies staging
-#   4. Developer merges stg → main (PR) → production deploys
-#
-# See deploy-staging.yml and deploy-production.yml for active workflows.
+# Each stage waits for the previous one to succeed before proceeding.
+# Existing database data is NEVER touched — only Docker images are updated.
 # =============================================================================
-name: "[DISABLED] Promote & Deploy All"
+name: "Promote & Deploy All"
 
 on:
+  push:
+    branches: [ dev ]
   workflow_dispatch:
-    inputs:
-      note:
-        description: "This workflow is disabled. Use branch merges instead. Merge dev→stg for staging, stg→main for production."
-        required: false
-        type: string
+
+concurrency:
+  group: promote-deploy
+  cancel-in-progress: false # Never cancel a running full deploy
+
+permissions:
+  id-token: write
+  contents: write # Needed for git merge/push and tagging
+
+env:
+  AWS_REGION: us-east-2
 
 jobs:
-  disabled-notice:
-    name: "⛔ Workflow Disabled"
+  # ===========================================================================
+  # Stage 1: CI — Lint, Test, Build verification
+  # ===========================================================================
+  ci:
+    name: "🔍 CI Checks"
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  # ===========================================================================
+  # Stage 2: Merge dev → stg
+  # ===========================================================================
+  merge-to-stg:
+    name: "🔀 Merge dev → stg"
     runs-on: ubuntu-latest
+    needs: [ ci ]
     steps:
-      - name: Show disabled notice
+      - uses: actions/checkout@v4
+        with:
+          ref: stg
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
         run: |
-          echo "## ⛔ This Workflow is Disabled" >> $GITHUB_STEP_SUMMARY
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge dev into stg
+        run: |
+          git fetch origin dev
+          echo "📦 Merging dev (${{ github.sha }}) into stg..."
+          git merge origin/dev --no-edit -m "auto-promote: merge dev → stg [skip ci]"
+          git push origin stg
+          echo "✅ dev merged into stg"
+
+  # ===========================================================================
+  # Stage 3: Deploy to Staging
+  # ===========================================================================
+  deploy-staging:
+    name: "🚀 Deploy Staging"
+    needs: [ merge-to-stg ]
+    uses: ./.github/workflows/deploy-staging.yml
+    secrets: inherit
+
+  # ===========================================================================
+  # Stage 4: Merge stg → main
+  # ===========================================================================
+  merge-to-main:
+    name: "🔀 Merge stg → main"
+    runs-on: ubuntu-latest
+    needs: [ deploy-staging ]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge stg into main
+        run: |
+          git fetch origin stg
+          echo "📦 Merging stg into main..."
+          git merge origin/stg --no-edit -m "auto-promote: merge stg → main [skip ci]"
+          git push origin main
+          echo "✅ stg merged into main"
+
+  # ===========================================================================
+  # Stage 5: Deploy to Production
+  # ===========================================================================
+  deploy-production:
+    name: "🚀 Deploy Production"
+    needs: [ merge-to-main ]
+    uses: ./.github/workflows/deploy-production.yml
+    secrets: inherit
+    with:
+      skip_ci: true # CI already passed in stage 1
+
+  # ===========================================================================
+  # Pipeline Summary
+  # ===========================================================================
+  pipeline-summary:
+    name: "📋 Pipeline Summary"
+    runs-on: ubuntu-latest
+    needs: [ ci, merge-to-stg, deploy-staging, merge-to-main, deploy-production ]
+    if: always()
+    steps:
+      - name: Pipeline result
+        run: |
+          echo "## 🚀 Full Pipeline Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "The auto-promote pipeline has been replaced by controlled branch-triggered deploys:" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| CI Checks | ${{ needs.ci.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Merge dev → stg | ${{ needs.merge-to-stg.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy Staging | ${{ needs.deploy-staging.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Merge stg → main | ${{ needs.merge-to-main.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy Production | ${{ needs.deploy-production.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Action | How |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|-----|" >> $GITHUB_STEP_SUMMARY
-          echo "| Deploy to **Staging** | Merge \`dev → stg\` branch |" >> $GITHUB_STEP_SUMMARY
-          echo "| Deploy to **Production** | Merge \`stg → main\` branch |" >> $GITHUB_STEP_SUMMARY
-          echo "| Rollback | Use the 🔄 Rollback Production workflow |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "See \`deploy-staging.yml\` and \`deploy-production.yml\` for the active workflows." >> $GITHUB_STEP_SUMMARY
-          echo ""
-          echo "❌ This workflow is disabled. Use branch merges instead."
-          echo "   - Merge dev → stg for staging deployment"
-          echo "   - Merge stg → main for production deployment"
+          echo "**Trigger:** \`${{ github.event_name }}\` on \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Actor:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.deploy-production.result }}" == "success" ]]; then
+            echo ""
+            echo "✅ FULL PIPELINE COMPLETE — Staging and Production deployed!"
+          else
+            echo ""
+            echo "❌ Pipeline did not fully complete. Check failed stages above."
+            exit 1
+          fi
