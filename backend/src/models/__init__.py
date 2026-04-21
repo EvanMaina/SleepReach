@@ -9,6 +9,8 @@ from .lead import Lead, ConditionType, DurationType, TreatmentType, UrgencyType,
 from .audit_log import AuditLog, AuditAction
 from .provider import ReferringProvider, ProviderSpecialty, ProviderStatus, ProviderContactMethod
 from .attachment import LeadAttachment
+from .user import User, UserRole, UserStatus
+from .lead_note import LeadNote
 
 __all__ = [
     # Lead model and enums
@@ -27,6 +29,12 @@ __all__ = [
     "ProviderSpecialty",
     "ProviderStatus",
     "ProviderContactMethod",
+    # User model and enums
+    "User",
+    "UserRole",
+    "UserStatus",
+    # Note model
+    "LeadNote",
     # Audit model and enums
     "AuditLog",
     "AuditAction",

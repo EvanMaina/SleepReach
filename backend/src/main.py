@@ -376,6 +376,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     else:
         logger.warning("Redis cache not available - operating without cache")
 
+    # Import ALL models so Base.metadata knows about every table.
+    # Without this, create_all() silently creates nothing because the model
+    # classes haven't been imported (their metaclass registers them with Base).
+    try:
+        from .models import Lead, AuditLog, ReferringProvider, LeadAttachment, User, LeadNote  # noqa: F401
+        logger.info("All %d model tables registered with Base.metadata", len(Base.metadata.tables))
+    except Exception as e:
+        logger.warning("Could not import all models: %s", e)
+
     # Auto-create tables if they don't exist (uses CREATE TABLE IF NOT EXISTS).
     # Safe for existing databases — SQLAlchemy will not alter or drop existing tables.
     try:
