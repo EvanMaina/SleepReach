@@ -376,9 +376,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     else:
         logger.warning("Redis cache not available - operating without cache")
 
-    # In development, we can create tables (production should use Alembic)
-    if settings.is_development:
-        logger.info("Development mode - tables managed by init SQL script")
+    # Auto-create tables if they don't exist (uses CREATE TABLE IF NOT EXISTS).
+    # Safe for existing databases — SQLAlchemy will not alter or drop existing tables.
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables verified/created (CREATE TABLE IF NOT EXISTS)")
+    except Exception as e:
+        logger.error("Failed to create database tables: %s", e)
 
     # =========================================================================
     # AUTO-CREATE INITIAL ADMINISTRATOR
