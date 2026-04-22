@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Eye, EyeOff, Lock, Shield, Server, ChevronRight, ArrowRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { authAPI } from '../lib/api'
+import { parseApiError, isValidEmail } from '../lib/errors'
 import toast from 'react-hot-toast'
 
 export default function LoginPage() {
@@ -10,6 +11,7 @@ export default function LoginPage() {
     const [password, setPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
+    const [emailError, setEmailError] = useState<string | null>(null)
     // Show password change form if: user already authenticated with must_change flag, OR login just returned must_change
     const [mustChangePassword, setMustChangePassword] = useState(false)
     const showPasswordChange = mustChangePassword || user?.must_change_password
@@ -18,8 +20,15 @@ export default function LoginPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!email.trim()) {
-            toast.error('Please enter your email address')
+        setEmailError(null)
+
+        const trimmedEmail = email.trim()
+        if (!trimmedEmail) {
+            setEmailError('Please enter your email address')
+            return
+        }
+        if (!isValidEmail(trimmedEmail)) {
+            setEmailError('Please enter a valid email address (e.g. you@clinic.com)')
             return
         }
         if (!password) {
@@ -29,15 +38,14 @@ export default function LoginPage() {
 
         setIsLoading(true)
         try {
-            const result = await login(email, password)
+            const result = await login(trimmedEmail, password)
             if (result?.must_change_password) {
                 setMustChangePassword(true)
             } else {
                 toast.success('Welcome back!')
             }
-        } catch (err: any) {
-            const msg = err.response?.data?.detail || 'Invalid credentials'
-            toast.error(msg)
+        } catch (err: unknown) {
+            toast.error(parseApiError(err, 'Invalid email or password'))
         } finally {
             setIsLoading(false)
         }
@@ -58,8 +66,8 @@ export default function LoginPage() {
             await authAPI.changePassword(null, newPassword)
             toast.success('Password updated — welcome!')
             await refreshUser()
-        } catch (err: any) {
-            toast.error(err.response?.data?.detail || 'Failed to change password')
+        } catch (err: unknown) {
+            toast.error(parseApiError(err, 'Failed to change password'))
         } finally {
             setIsLoading(false)
         }
@@ -233,12 +241,17 @@ export default function LoginPage() {
                                     <input
                                         type="email"
                                         value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
+                                        onChange={(e) => { setEmail(e.target.value); if (emailError) setEmailError(null) }}
                                         className="input-premium"
                                         placeholder="you@clinic.com"
                                         autoComplete="email"
+                                        aria-invalid={Boolean(emailError)}
+                                        aria-describedby={emailError ? 'login-email-error' : undefined}
                                         required
                                     />
+                                    {emailError ? (
+                                        <p id="login-email-error" className="mt-1.5 text-xs font-medium text-red-600">{emailError}</p>
+                                    ) : null}
                                 </div>
 
                                 <div>

@@ -706,13 +706,14 @@ export default function CoordinatorPage({
   );
 
   // After any outcome recording, remove the lead from the current queue
-  // view (it moved to a different queue) and refetch to get accurate data.
+  // view — the outcome always transitions the lead to a different queue,
+  // so optimistic removal is authoritative. No refetch needed; the 10s
+  // polling loop + mergeLeadIntoState keep other rows accurate.
   const handleOutcomeRecorded = useCallback(
     (leadId: string) => {
       setLeads((prev) => prev.filter((lead) => lead.id !== leadId));
-      fetchLeads();
     },
-    [fetchLeads],
+    [],
   );
 
   useEffect(() => {

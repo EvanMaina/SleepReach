@@ -16,6 +16,7 @@ import ProvidersPage from './pages/ProvidersPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import AIInsightsPage from './pages/AIInsightsPage'
 import SettingsPage from './pages/SettingsPage'
+import { RequireRole } from './components/auth/RequireRole'
 import { Moon } from 'lucide-react'
 
 function getPublicHashRoute(hash: string) {
@@ -93,7 +94,14 @@ function AuthGate() {
                     <Route path="providers" element={<ProvidersPage />} />
                     <Route path="analytics" element={<AnalyticsPage />} />
                     <Route path="ai-insights" element={<AIInsightsPage />} />
-                    <Route path="settings" element={<SettingsPage />} />
+                    <Route
+                        path="settings"
+                        element={
+                            <RequireRole roles={['primary_admin', 'administrator']}>
+                                <SettingsPage />
+                            </RequireRole>
+                        }
+                    />
                 </Route>
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

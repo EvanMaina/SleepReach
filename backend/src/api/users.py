@@ -313,19 +313,27 @@ async def update_user(
     Update user details (name, role, status).
 
     Role hierarchy enforcement:
-    - primary_admin cannot be demoted or deactivated by anyone.
-    - Only primary_admin can change an administrator's role or status.
-    - Administrators can change coordinators and specialists.
-    - No one can promote a user above their own rank.
+    - primary_admin account can only be modified by the primary_admin themselves.
+    - primary_admin role and status are immutable (cannot be demoted or deactivated).
+    - Administrators can modify any non-primary_admin user (including other administrators).
+    - No one can promote a user above their own rank (blocks creating another primary_admin).
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     caller_rank = _rank(caller.role.value)
-    target_rank = _rank(user.role.value)
 
-    # primary_admin is protected: cannot be demoted or deactivated
+    # Only the primary_admin account itself can modify the primary_admin record.
+    # Administrators have full rights over every other user.
+    if user.role == UserRole.PRIMARY_ADMIN and str(caller.id) != str(user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the primary admin can modify the primary admin account",
+        )
+
+    # primary_admin role/status is immutable — prevents accidental loss of root access
+    # even when the primary_admin is editing themselves.
     if user.role == UserRole.PRIMARY_ADMIN:
         if body.role is not None and body.role != "primary_admin":
             raise HTTPException(
@@ -338,14 +346,7 @@ async def update_user(
                 detail="The primary admin cannot be deactivated",
             )
 
-    # Cannot modify a user of equal or higher rank (unless modifying yourself)
-    if str(caller.id) != str(user.id) and target_rank >= caller_rank:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You cannot modify a user with equal or higher authority",
-        )
-
-    # Cannot promote a user above your own rank
+    # Cannot promote a user above your own rank (blocks admins from creating another primary_admin)
     if body.role is not None and _rank(body.role) > caller_rank:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -382,8 +383,8 @@ async def deactivate_user(
 
     Role hierarchy enforcement:
     - primary_admin cannot be deactivated by anyone.
-    - Only primary_admin can deactivate an administrator.
     - A user cannot deactivate themselves.
+    - Administrators can deactivate any non-primary_admin user (including other administrators).
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -396,20 +397,11 @@ async def deactivate_user(
             detail="You cannot deactivate your own account",
         )
 
-    # primary_admin is protected
+    # primary_admin cannot be deactivated by anyone
     if user.role == UserRole.PRIMARY_ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="The primary admin cannot be deactivated",
-        )
-
-    # Only primary_admin can deactivate administrators
-    caller_rank = _rank(caller.role.value)
-    target_rank = _rank(user.role.value)
-    if target_rank >= caller_rank:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You cannot deactivate a user with equal or higher authority",
         )
 
     user.status = UserStatus.INACTIVE
@@ -420,13 +412,13 @@ async def deactivate_user(
 @router.delete("/{user_id}/permanent")
 async def permanently_delete_user(
     user_id: str,
-    caller: User = Depends(require_role("primary_admin")),
+    caller: User = Depends(require_role("administrator")),
     db: Session = Depends(get_db),
 ):
     """
     Permanently delete a user from the database.
-    Only primary_admin can perform this action.
-    Cannot delete yourself or another primary_admin.
+    Administrators and primary_admin can perform this action.
+    Cannot delete yourself or the primary_admin account.
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:

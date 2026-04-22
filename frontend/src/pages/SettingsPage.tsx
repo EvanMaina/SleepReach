@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { usersAPI } from '../lib/api'
+import { parseApiError } from '../lib/errors'
 
 interface TeamUser {
     id: string
@@ -87,14 +88,6 @@ const ALL_PERMISSIONS = [
     'Manage Admins',
     'View Settings',
 ]
-
-function parseApiError(err: unknown, fallback: string) {
-    const detail = (err as any)?.response?.data?.detail
-    if (typeof detail === 'string' && detail.trim()) return detail.trim()
-    if (Array.isArray(detail) && detail[0]?.msg) return detail[0].msg
-    if (err instanceof Error && err.message) return err.message
-    return fallback
-}
 
 function roleBadge(role: string) {
     const map: Record<string, string> = {
@@ -305,14 +298,15 @@ function UsersTab() {
         setIsSaving(true)
         setModalError(null)
         try {
-            await usersAPI.create({
+            const response = await usersAPI.create({
                 first_name: String(form.get('first_name') || '').trim(),
                 last_name: String(form.get('last_name') || '').trim(),
                 email: String(form.get('email') || '').trim(),
                 role: String(form.get('role') || 'coordinator'),
             })
+            const created = response.data as TeamUser
+            setUsers((prev) => [created, ...prev])
             setAddOpen(false)
-            await fetchUsers()
         } catch (err) {
             setModalError(parseApiError(err, 'Failed to create user'))
         } finally {
@@ -327,14 +321,15 @@ function UsersTab() {
         setIsSaving(true)
         setModalError(null)
         try {
-            await usersAPI.update(editUser.id, {
+            const response = await usersAPI.update(editUser.id, {
                 first_name: String(form.get('first_name') || '').trim(),
                 last_name: String(form.get('last_name') || '').trim(),
                 role: String(form.get('role') || editUser.role),
                 status: String(form.get('status') || editUser.status),
             })
+            const updated = response.data as TeamUser
+            setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
             setEditUser(null)
-            await fetchUsers()
         } catch (err) {
             setModalError(parseApiError(err, 'Failed to update user'))
         } finally {
@@ -351,13 +346,14 @@ function UsersTab() {
 
     const confirmDeactivate = async () => {
         if (!deactivateConfirmUserId) return
+        const targetId = deactivateConfirmUserId
         setDeactivateConfirmUserId(null)
-        setDeactivatingId(deactivateConfirmUserId)
+        setDeactivatingId(targetId)
         setPageError(null)
         try {
-            await usersAPI.delete(deactivateConfirmUserId)
+            await usersAPI.delete(targetId)
+            setUsers((prev) => prev.map((u) => (u.id === targetId ? { ...u, status: 'inactive' } : u)))
             toast.success('User deactivated successfully')
-            await fetchUsers()
         } catch (err) {
             toast.error(parseApiError(err, 'Failed to deactivate user'))
         } finally {
@@ -367,11 +363,12 @@ function UsersTab() {
 
     const confirmPermanentDelete = async () => {
         if (!deleteConfirmUserId) return
+        const targetId = deleteConfirmUserId
         setDeleteConfirmUserId(null)
         try {
-            await usersAPI.deletePermanently(deleteConfirmUserId)
+            await usersAPI.deletePermanently(targetId)
+            setUsers((prev) => prev.filter((u) => u.id !== targetId))
             toast.success('User permanently deleted')
-            await fetchUsers()
         } catch (err) {
             toast.error(parseApiError(err, 'Failed to delete user'))
         }
@@ -476,7 +473,7 @@ function UsersTab() {
                                                 >
                                                     <Edit3 size={15} />
                                                 </button>
-                                                {currentUser?.id !== teamUser.id ? (
+                                                {currentUser?.id !== teamUser.id && teamUser.role !== 'primary_admin' ? (
                                                     <>
                                                         <button
                                                             onClick={() => handleDeactivate(teamUser.id)}
