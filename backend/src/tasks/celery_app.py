@@ -139,25 +139,30 @@ _conf = dict(
             "task": "src.tasks.lead_tasks.refresh_platform_analytics_views",
             "schedule": 300.0,  # Every 5 minutes
         },
-        "daily-lead-digest-7am-mst": {
-            "task": "src.tasks.lead_tasks.send_daily_lead_digest",
-            "schedule": __import__("celery.schedules", fromlist=["crontab"]).crontab(
-                hour=14, minute=0,  # 14:00 UTC = 7:00 AM MST (UTC-7)
-            ),
-        },
-        "automated-follow-ups-every-6h": {
-            "task": "src.tasks.lead_tasks.send_automated_follow_ups",
-            "schedule": __import__("celery.schedules", fromlist=["crontab"]).crontab(
-                hour="1,7,13,19", minute=0,  # Every 6 hours: 1:00, 7:00, 13:00, 19:00 UTC
-            ),
-        },
-        "not-interested-follow-ups-every-21d": {
-            "task": "src.tasks.lead_tasks.send_not_interested_follow_ups",
-            "schedule": __import__("celery.schedules", fromlist=["crontab"]).crontab(
-                hour=15, minute=0,  # 15:00 UTC = 8:00 AM MST
-                day_of_week="monday",  # Run every Monday — ~3 week cadence managed by last_follow_up_sent_at
-            ),
-        },
+        # ─── DISABLED: All automated outbound emails except welcome receipt ───
+        # The following scheduled tasks have been disabled per business request.
+        # Only the welcome/receipt email+SMS (sent on lead submission) remains active.
+        # To re-enable, uncomment the relevant schedule entries below.
+        #
+        # "daily-lead-digest-7am-mst": {
+        #     "task": "src.tasks.lead_tasks.send_daily_lead_digest",
+        #     "schedule": __import__("celery.schedules", fromlist=["crontab"]).crontab(
+        #         hour=14, minute=0,  # 14:00 UTC = 7:00 AM MST (UTC-7)
+        #     ),
+        # },
+        # "automated-follow-ups-every-6h": {
+        #     "task": "src.tasks.lead_tasks.send_automated_follow_ups",
+        #     "schedule": __import__("celery.schedules", fromlist=["crontab"]).crontab(
+        #         hour="1,7,13,19", minute=0,  # Every 6 hours: 1:00, 7:00, 13:00, 19:00 UTC
+        #     ),
+        # },
+        # "not-interested-follow-ups-every-21d": {
+        #     "task": "src.tasks.lead_tasks.send_not_interested_follow_ups",
+        #     "schedule": __import__("celery.schedules", fromlist=["crontab"]).crontab(
+        #         hour=15, minute=0,  # 15:00 UTC = 8:00 AM MST
+        #         day_of_week="monday",  # Run every Monday — ~3 week cadence managed by last_follow_up_sent_at
+        #     ),
+        # },
     },
 )
 

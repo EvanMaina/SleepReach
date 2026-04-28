@@ -781,6 +781,10 @@ def send_automated_follow_ups(self) -> Dict[str, Any]:
     """
     Automated follow-up system: sends SMS + email every 6 hours to eligible leads.
 
+    *** DISABLED: All automated follow-up emails/SMS have been disabled per
+    business request. Only the welcome/receipt email+SMS remains active.
+    This task returns immediately without sending anything. ***
+
     Eligibility rules:
     - Lead is NOT in 'SCHEDULED' status (once scheduled, follow-ups stop)
     - Lead is NOT soft-deleted
@@ -794,6 +798,17 @@ def send_automated_follow_ups(self) -> Dict[str, Any]:
     Returns:
         Dict with follow-up stats
     """
+    # ─── DISABLED: Automated follow-ups disabled per business request ───
+    logger.info("send_automated_follow_ups: DISABLED — skipping execution")
+    return {
+        "status": "disabled",
+        "message": "Automated follow-up emails/SMS have been disabled. "
+                   "Only the welcome/receipt email+SMS on lead submission is active.",
+        "eligible_leads": 0,
+        "emails_sent": 0,
+        "sms_sent": 0,
+    }
+
     from ..services.email_templates import send_follow_up_email
     from ..services.sms_service import sms_service
     from ..services.encryption import EncryptionService
@@ -1035,6 +1050,10 @@ def send_not_interested_follow_ups(self) -> Dict[str, Any]:
     """
     Automated follow-up for leads marked "Not Interested".
 
+    *** DISABLED: All automated follow-up emails/SMS have been disabled per
+    business request. Only the welcome/receipt email+SMS remains active.
+    This task returns immediately without sending anything. ***
+
     Sends a softer SMS + email every 3 weeks (21 days) to re-engage
     leads who initially declined. Uses separate, warmer messaging
     templates distinct from the standard 6-hour follow-up cadence.
@@ -1053,6 +1072,17 @@ def send_not_interested_follow_ups(self) -> Dict[str, Any]:
     Returns:
         Dict with follow-up stats
     """
+    # ─── DISABLED: Not-interested follow-ups disabled per business request ───
+    logger.info("send_not_interested_follow_ups: DISABLED — skipping execution")
+    return {
+        "status": "disabled",
+        "message": "Not-interested follow-up emails/SMS have been disabled. "
+                   "Only the welcome/receipt email+SMS on lead submission is active.",
+        "eligible_leads": 0,
+        "emails_sent": 0,
+        "sms_sent": 0,
+    }
+
     from ..services.email_templates import send_not_interested_follow_up_email
     from ..services.sms_service import sms_service
     from ..services.encryption import EncryptionService
@@ -1366,6 +1396,10 @@ def send_daily_lead_digest(self) -> Dict[str, Any]:
     """
     Send daily lead digest email at 7:00 AM MST to ask@insomniaandsleep.com.
 
+    *** DISABLED: Daily digest email has been disabled per business request.
+    Only the welcome/receipt email+SMS remains active.
+    This task returns immediately without sending anything. ***
+
     Queries leads created in the prior 24 hours and sends a summary email
     with total count and breakdown by condition. Contains NO PII.
 
@@ -1377,6 +1411,15 @@ def send_daily_lead_digest(self) -> Dict[str, Any]:
     Returns:
         Dict with send status and lead count
     """
+    # ─── DISABLED: Daily lead digest disabled per business request ───
+    logger.info("send_daily_lead_digest: DISABLED — skipping execution")
+    return {
+        "status": "disabled",
+        "message": "Daily lead digest email has been disabled. "
+                   "Only the welcome/receipt email+SMS on lead submission is active.",
+        "total_leads": 0,
+    }
+
     from ..services.email_base import wrap_in_email_layout, HEADER_BG_COLOR
     from ..services.paubox_email_service import send_email_via_paubox
 
