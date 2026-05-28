@@ -367,15 +367,24 @@ def apply_queue_filter(query, queue_type: Optional[str]):
         CONTACTED_OUTCOMES = [
             ContactOutcome.ANSWERED,
             ContactOutcome.NO_ANSWER,
-            ContactOutcome.UNREACHABLE,
             ContactOutcome.CALLBACK_REQUESTED,
-            ContactOutcome.NOT_INTERESTED,
             ContactOutcome.SCHEDULED,
             ContactOutcome.COMPLETED,
         ]
+        # Hard-exclude leads marked not-interested or unreachable — they
+        # have their own queues and must never bleed into contacted.
+        # The or_ handles NULL contact_outcome rows (notin_ alone skips NULLs in SQL).
+        not_excluded = or_(
+            Lead.contact_outcome.is_(None),
+            Lead.contact_outcome.notin_([
+                ContactOutcome.UNREACHABLE,
+                ContactOutcome.NOT_INTERESTED,
+            ]),
+        )
         return query.filter(
             Lead.status != LeadStatus.SCHEDULED,
             Lead.status.notin_(TERMINAL),
+            not_excluded,
             or_(
                 Lead.contact_outcome.in_(CONTACTED_OUTCOMES),
                 Lead.status == LeadStatus.CONTACTED,

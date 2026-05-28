@@ -484,6 +484,13 @@ export const AssessmentPage: React.FC<AssessmentPageProps> = ({ apiUrl }) => {
                             <p>Before we begin, please review our privacy practices and confirm that we may contact you about your sleep consultation.</p>
                         </div>
 
+                        <div className="assess-privacy-card" style={{ background: '#fef9c3', borderColor: '#fde047' }}>
+                            <h4 style={{ color: '#854d0e' }}>&#9888; Location Requirement</h4>
+                            <p style={{ color: '#713f12' }}>
+                                <strong>Note:</strong> The patient must be located in <strong>Arizona</strong> to be eligible for a consultation with our clinic.
+                            </p>
+                        </div>
+
                         <div className="assess-privacy-card">
                             <h4>Privacy and HIPAA Notice</h4>
                             <p>
