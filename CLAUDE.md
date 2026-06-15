@@ -13,7 +13,7 @@ React 18 + FastAPI + PostgreSQL + Redis + Celery. Docker Compose for local dev.
 | Cache / Queue | Redis 7 + Celery 5 |
 | Auth | JWT (FastAPI) |
 | Comms | Twilio (SMS), Paubox (HIPAA email) |
-| AI | Anthropic Claude Sonnet |
+| AI | OpenAI (gpt-4o) |
 
 ## Local dev (Docker Compose)
 
@@ -102,7 +102,7 @@ Never log PHI fields. Do not print decrypted PHI to stdout.
 
 Secrets live in `backend/.env` (not committed). Key vars:
 `DATABASE_URL`, `REDIS_URL`, `SECRET_KEY`, `ENCRYPTION_KEY`,
-`TWILIO_*`, `PAUBOX_*`, `ANTHROPIC_API_KEY`.
+`TWILIO_*`, `PAUBOX_*`, `OPENAI_API_KEY`.
 
 ## Do not
 

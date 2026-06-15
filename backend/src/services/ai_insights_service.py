@@ -157,7 +157,7 @@ class AIInsightsService:
         if narrative.get("coordinator_commentary"):
             snapshot["operational"]["commentary"] = narrative["coordinator_commentary"]
 
-        snapshot["llm_enabled"] = bool(settings.anthropic_api_key)
+        snapshot["llm_enabled"] = bool(settings.openai_api_key)
         snapshot["cached"] = False
 
         # Cache the result
@@ -393,16 +393,16 @@ class AIInsightsService:
         return f"Pipeline health is {health_score}/100. Focus on same-day first contact to improve scheduling velocity."
 
     async def _build_narrative(self, snapshot: dict[str, Any]) -> dict[str, Any]:
-        if not settings.anthropic_api_key:
+        if not settings.openai_api_key:
             return self._fallback_narrative(snapshot)
 
         try:
-            return await self._generate_claude_narrative(snapshot)
+            return await self._generate_llm_narrative(snapshot)
         except Exception as exc:  # pragma: no cover - network fallback
-            logger.warning("Anthropic insight generation failed: %s", exc, exc_info=True)
+            logger.warning("OpenAI insight generation failed: %s", exc, exc_info=True)
             return self._fallback_narrative(snapshot)
 
-    async def _generate_claude_narrative(self, snapshot: dict[str, Any]) -> dict[str, Any]:
+    async def _generate_llm_narrative(self, snapshot: dict[str, Any]) -> dict[str, Any]:
         sanitized = {
             "summary": snapshot["summary"],
             "pipeline": {
@@ -487,28 +487,28 @@ class AIInsightsService:
 
         async with httpx.AsyncClient(timeout=90.0) as client:
             response = await client.post(
-                "https://api.anthropic.com/v1/messages",
+                "https://api.openai.com/v1/chat/completions",
                 headers={
-                    "x-api-key": settings.anthropic_api_key,
-                    "anthropic-version": "2023-06-01",
+                    "Authorization": f"Bearer {settings.openai_api_key}",
                     "content-type": "application/json",
                 },
                 json={
-                    "model": settings.anthropic_model,
+                    "model": settings.openai_model,
                     "max_tokens": 2500,
                     "temperature": 0.2,
-                    "system": system_prompt,
-                    "messages": [{"role": "user", "content": user_prompt}],
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
                 },
             )
             response.raise_for_status()
             payload = response.json()
 
-        text_parts = []
-        for block in payload.get("content", []):
-            if block.get("type") == "text" and block.get("text"):
-                text_parts.append(block["text"])
-        return self._parse_llm_json("\n".join(text_parts))
+        choices = payload.get("choices") or []
+        text = choices[0].get("message", {}).get("content", "") if choices else ""
+        return self._parse_llm_json(text)
 
     def _fallback_narrative(self, snapshot: dict[str, Any]) -> dict[str, Any]:
         top_source = snapshot["pipeline"]["conversion_drivers"]["source"][0]["label"] if snapshot["pipeline"]["conversion_drivers"]["source"] else "Widget"

@@ -355,15 +355,15 @@ class Settings(BaseSettings):
     )
 
     # ==========================================================================
-    # AI Insights / Anthropic
+    # AI Insights / OpenAI
     # ==========================================================================
-    anthropic_api_key: str = Field(
+    openai_api_key: str = Field(
         default="",
-        description="Anthropic API key used for AI Insights generation"
+        description="OpenAI API key used for AI Insights generation"
     )
-    anthropic_model: str = Field(
-        default="claude-sonnet-4-20250514",
-        description="Anthropic model name used for AI Insights generation"
+    openai_model: str = Field(
+        default="gpt-4o",
+        description="OpenAI model name used for AI Insights generation"
     )
     ai_insights_cache_ttl: int = Field(
         default=3600,

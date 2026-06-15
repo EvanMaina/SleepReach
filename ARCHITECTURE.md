@@ -8,7 +8,7 @@
 - **Captures leads** from website widget, Jotform webhooks, referrals, and manual entry
 - **Scores and prioritizes** leads based on 8 clinical/insurance/urgency factors
 - **Automates follow-up** via HIPAA-compliant email (Paubox) and SMS (Twilio)
-- **Provides AI insights** using Anthropic Claude for lead analysis and coordinator recommendations
+- **Provides AI insights** using OpenAI (gpt-4o) for lead analysis and coordinator recommendations
 - **Manages the full patient pipeline** from initial inquiry through treatment start
 - **Tracks referring providers** with conversion analytics
 - **Ensures HIPAA compliance** with encrypted PHI, audit logging, and role-based access
@@ -124,7 +124,7 @@ Internet
 - `131880217305.dkr.ecr.us-east-2.amazonaws.com/sleepreach/frontend`
 
 ### Secrets Manager
-- `sleepreach/production` — Production credentials (DB, Paubox, Twilio, Anthropic, encryption keys)
+- `sleepreach/production` — Production credentials (DB, Paubox, Twilio, OpenAI, encryption keys)
 - `sleepreach/staging` — Staging credentials
 
 ### Monitoring — CloudWatch
@@ -219,13 +219,13 @@ Performance indexes on: lead_number, priority, status, created_at, zip_code, in_
 
 ## 10. AI Integration
 
-- **Provider:** Anthropic (Claude claude-sonnet-4-20250514)
+- **Provider:** OpenAI (gpt-4o)
 - **Features:**
   - AI Insights dashboard — trend analysis, recommendations
   - AI-recommended emails — context-aware draft emails for coordinators
   - Coordinator performance insights — efficiency metrics and suggestions
 - **Caching:** 1-hour TTL in Redis to minimize API costs
-- **Config:** `ANTHROPIC_API_KEY` in Secrets Manager, model configurable via `ANTHROPIC_MODEL`
+- **Config:** `OPENAI_API_KEY` in Secrets Manager, model configurable via `OPENAI_MODEL`
 
 ---
 

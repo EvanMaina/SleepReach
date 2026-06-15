@@ -196,7 +196,7 @@ git push origin main
 | `AWS_ACCESS_KEY_ID` | IAM access key for ECR/ECS/CloudWatch |
 | `AWS_SECRET_ACCESS_KEY` | IAM secret key |
 
-All application secrets (DB password, Paubox key, Twilio tokens, Anthropic key, encryption keys) are in **AWS Secrets Manager**, injected into ECS task definitions at runtime.
+All application secrets (DB password, Paubox key, Twilio tokens, OpenAI key, encryption keys) are in **AWS Secrets Manager**, injected into ECS task definitions at runtime.
 
 ---
 
