@@ -143,7 +143,7 @@ function safeText(val: any): string {
     if (typeof val === 'string') return val
     if (typeof val === 'number') return String(val)
     if (typeof val === 'object') {
-        // Claude sometimes returns objects instead of strings
+        // The LLM sometimes returns objects instead of strings
         return Object.values(val).filter(v => typeof v === 'string').join(' ') || JSON.stringify(val)
     }
     return String(val)
@@ -737,10 +737,10 @@ function AIInsightsPage() {
                 )}
             </Section>
 
-            {/* Powered by Claude badge */}
+            {/* Powered by AI badge */}
             <div className="flex items-center justify-center gap-2 text-xs text-gray-400 pt-2">
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>Powered by Claude AI · Real-time analysis refreshes on demand</span>
+                <span>Powered by OpenAI · Real-time analysis refreshes on demand</span>
             </div>
         </div>
     )

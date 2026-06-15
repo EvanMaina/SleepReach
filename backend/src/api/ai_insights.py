@@ -50,7 +50,7 @@ async def generate_ai_email(
     has_insurance = "insured" if lead.has_insurance else "uninsured"
     treatment = lead.sleep_treatment_interest or "not specified"
 
-    if not settings.anthropic_api_key:
+    if not settings.openai_api_key:
         return {"subject": "Following up on your sleep consultation inquiry", "body": f"Hi {first_name},\n\nFollowing up on your inquiry with The Insomnia and Sleep Institute of Arizona.\n\nCall us at (480) 745-3547.\n\nWarmly,\nThe Insomnia and Sleep Institute of Arizona", "ai_generated": False}
 
     prompt = (
@@ -79,23 +79,24 @@ async def generate_ai_email(
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                "https://api.anthropic.com/v1/messages",
+                "https://api.openai.com/v1/chat/completions",
                 headers={
-                    "x-api-key": settings.anthropic_api_key,
-                    "anthropic-version": "2023-06-01",
+                    "Authorization": f"Bearer {settings.openai_api_key}",
                     "content-type": "application/json",
                 },
                 json={
-                    "model": settings.anthropic_model,
+                    "model": settings.openai_model,
                     "max_tokens": 500,
                     "temperature": 0.3,
+                    "response_format": {"type": "json_object"},
                     "messages": [{"role": "user", "content": prompt}],
                 },
             )
             response.raise_for_status()
             payload = response.json()
-            text = payload.get("content", [{}])[0].get("text", "{}")
-            # Parse JSON from Claude
+            choices = payload.get("choices") or []
+            text = choices[0].get("message", {}).get("content", "{}") if choices else "{}"
+            # Parse JSON from the model response
             import json as _json
             # Handle markdown code blocks
             clean = text.strip()
